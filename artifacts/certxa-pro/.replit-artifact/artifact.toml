@@ -1,0 +1,24 @@
+kind = "mobile"
+previewPath = "/"
+title = "Certxa Pro"
+description = "A mobile booking and point-of-sale experience for independent health and beauty professionals working from home, renting a booth, or traveling to clients. Includes calendar, availability, and payment UI ready for later Certxa and Stripe integration."
+version = "1.0.0"
+id = "artifacts/certxa-pro"
+router = "expo-domain"
+
+[[services]]
+name = "expo"
+ensurePreviewReachable = "/status"
+paths = [ "/" ]
+localPort = 25053
+
+[services.development]
+run = "pnpm --filter @workspace/certxa-pro run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/certxa-pro", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/certxa-pro", "run", "serve" ]
+
+[services.env]
+PORT = "25053"
+BASE_PATH = "/"

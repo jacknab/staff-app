@@ -1,0 +1,58 @@
+{
+  "expo": {
+    "name": "Certxa Pro",
+    "slug": "certxa-pro",
+    "version": "1.0.6",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "certxa-pro",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.fastcheckinllc.certxapro",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.fastcheckinllc.certxapro"
+    },
+    "web": {
+      "favicon": "./assets/images/icon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#F6F6F1",
+          "image": "./assets/images/icon.png",
+          "resizeMode": "contain"
+        }
+      ],
+      [
+        "@stripe/stripe-terminal-react-native",
+        {
+          "bluetoothBackgroundMode": true,
+          "locationWhenInUsePermission": "Location access is required to accept payments.",
+          "bluetoothPeripheralPermission": "Bluetooth access is required to connect to supported card readers.",
+          "bluetoothAlwaysUsagePermission": "This app uses Bluetooth to connect to supported card readers.",
+          "localNetworkUsagePermission": "This app uses the local WiFi network to connect to supported card readers.",
+          "appDelegate": true,
+          "tapToPayCheck": true
+        }
+      ],
+      "expo-secure-store"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "7dfdabdc-943a-437b-84d8-e1984923594c"
+      }
+    },
+    "owner": "tobyben"
+  }
+}
