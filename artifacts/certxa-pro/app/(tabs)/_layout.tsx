@@ -92,5 +92,5 @@ function ClassicTabLayout() {
 }
 
 export default function TabLayout() {
-  return isLiquidGlassAvailable() ? <NativeTabLayout /> : <ClassicTabLayout />;
+  return Platform.OS !== 'web' && isLiquidGlassAvailable() ? <NativeTabLayout /> : <ClassicTabLayout />;
 }

@@ -247,12 +247,12 @@ export default function CalendarScreen() {
               {isPreviewData && <View style={[styles.previewPill, { backgroundColor: colors.accent }]}><Text style={[styles.previewPillText, { color: colors.accentForeground }]}>Preview schedule</Text></View>}
             </View>
             {error && <View style={[styles.syncNotice, { backgroundColor: colors.secondary }]}><Feather name="info" size={14} color={colors.primary} /><Text style={[styles.syncText, { color: colors.secondaryForeground }]}>Showing preview appointments while Certxa is offline.</Text></View>}
-            <View style={[styles.timeline, { backgroundColor: '#25292B', borderColor: '#373D3E' }]}>
-              <View style={styles.timelineLabels}>
+            <View style={[styles.timeline, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={[styles.timelineLabels, { backgroundColor: colors.muted }]}>
                 {TIMELINE_HOURS.map((time) => <Text key={time} style={styles.timelineLabel}>{formatClock(time)}</Text>)}
               </View>
-              <View style={styles.timelineTrack}>
-                {TIMELINE_HOURS.map((time, index) => <View key={time} style={[styles.timelineLine, { top: index * HOUR_HEIGHT }]} />)}
+              <View style={[styles.timelineTrack, { backgroundColor: colors.card }]}>
+                {TIMELINE_HOURS.map((time, index) => <View key={time} style={[styles.timelineLine, { top: index * HOUR_HEIGHT, backgroundColor: colors.border }]} />)}
                 {appointments.map((item, index) => {
                   const top = Math.max(4, ((clockMinutes(item.time) - TIMELINE_START) / 60) * HOUR_HEIGHT);
                   const height = Math.max(54, (durationMinutes(item.duration) / 60) * HOUR_HEIGHT - 7);
@@ -318,10 +318,10 @@ const styles = StyleSheet.create({
   syncNotice: { flexDirection: 'row', alignItems: 'center', gap: 7, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 10 },
   syncText: { fontSize: 10, fontFamily: 'Inter_500Medium', flex: 1 },
   timeline: { minHeight: HOUR_HEIGHT * 10, borderRadius: 14, borderWidth: 1, overflow: 'hidden', flexDirection: 'row' },
-  timelineLabels: { width: 68, paddingTop: 7, backgroundColor: '#F0F1EE' },
+  timelineLabels: { width: 68, paddingTop: 7 },
   timelineLabel: { height: HOUR_HEIGHT, paddingTop: 1, paddingRight: 9, textAlign: 'right', color: '#7E8782', fontSize: 10, fontFamily: 'Inter_500Medium' },
-  timelineTrack: { flex: 1, minHeight: HOUR_HEIGHT * 10, position: 'relative', backgroundColor: '#25292B' },
-  timelineLine: { height: 1, backgroundColor: '#3C4242', left: 0, right: 0, position: 'absolute' },
+  timelineTrack: { flex: 1, minHeight: HOUR_HEIGHT * 10, position: 'relative' },
+  timelineLine: { height: 1, left: 0, right: 0, position: 'absolute' },
   timelineAppointment: { position: 'absolute', left: 7, right: 8, borderRadius: 8, paddingHorizontal: 11, paddingVertical: 8, overflow: 'hidden' },
   timelineClient: { color: '#FFFFFF', fontSize: 12, fontFamily: 'Inter_700Bold' },
   timelineService: { color: '#F8FAF7', fontSize: 11, fontFamily: 'Inter_500Medium', marginTop: 3 },
