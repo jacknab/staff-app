@@ -1,22 +1,101 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Feather } from '@expo/vector-icons';
-import { ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View, Platform } from 'react-native';
+import { Platform, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
-import { useBookingData } from '@/contexts/BookingContext';
+import { AppointmentRecord, useBookingData } from '@/contexts/BookingContext';
 import { useAuth } from '@/contexts/AuthContext';
+
+type ViewMode = 'Month' | 'Week' | 'Day';
+
+const PREVIEW_COLORS = ['#526A62', '#D58B35', '#C56E86', '#6C7894'];
+const TIMELINE_START = 8 * 60;
+const HOUR_HEIGHT = 64;
+const TIMELINE_HOURS = Array.from({ length: 11 }, (_, index) => TIMELINE_START + index * 60);
 
 function dateKey(date: Date) {
   return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
 }
 
-function timeValue(time: string) {
-  const [hourText, minuteText = '0'] = time.split(':');
-  const hour = Number(hourText);
-  const normalizedHour = hour % 12 + (time.toUpperCase().includes('PM') ? 12 : 0);
-  return normalizedHour * 60 + Number(minuteText.slice(0, 2));
+function clockMinutes(value: string) {
+  const [clock, period = ''] = value.toUpperCase().split(' ');
+  const [hoursText, minutesText = '0'] = clock.split(':');
+  const hours = Number(hoursText);
+  const minutes = Number(minutesText);
+  return (hours % 12 + (period === 'PM' ? 12 : 0)) * 60 + minutes;
+}
+
+function formatClock(minutes: number) {
+  const hours = Math.floor(minutes / 60);
+  const hour = hours % 12 || 12;
+  return `${hour}:${String(minutes % 60).padStart(2, '0')} ${hours >= 12 ? 'PM' : 'AM'}`;
+}
+
+function durationMinutes(duration: string) {
+  const minutes = Number.parseInt(duration, 10);
+  return Number.isFinite(minutes) && minutes > 0 ? minutes : 60;
+}
+
+function weekStarting(date: Date) {
+  const monday = new Date(date);
+  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+  monday.setHours(0, 0, 0, 0);
+  return monday;
+}
+
+function previewAppointments(date: Date): AppointmentRecord[] {
+  const create = (id: number, hour: number, minute: number, name: string, service: string, duration: number, price: number): AppointmentRecord => {
+    const appointmentDate = new Date(date);
+    appointmentDate.setHours(hour, minute, 0, 0);
+    return {
+      id: `preview-${id}`,
+      appointmentId: id,
+      dateKey: dateKey(date),
+      dateIso: appointmentDate.toISOString(),
+      time: appointmentDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+      name,
+      service,
+      duration: `${duration} min`,
+      price: `$${price}`,
+      amountCents: price * 100,
+      status: 'confirmed',
+    };
+  };
+
+  return [
+    create(901, 9, 30, 'Maya Thompson', 'Lash lift + tint', 75, 95),
+    create(902, 11, 0, 'Jordan Lee', 'Signature facial', 60, 85),
+    create(903, 13, 30, 'Sofia Martinez', 'Gel manicure', 90, 68),
+    create(904, 15, 45, 'Avery Wilson', 'Brow shaping', 45, 42),
+  ];
+}
+
+function monthCells(date: Date) {
+  const first = new Date(date.getFullYear(), date.getMonth(), 1);
+  const offset = (first.getDay() + 6) % 7;
+  return Array.from({ length: 42 }, (_, index) => {
+    const cell = new Date(first);
+    cell.setDate(1 - offset + index);
+    return cell;
+  });
+}
+
+function appointmentParams(item: AppointmentRecord) {
+  return {
+    pathname: '/appointment/[id]' as const,
+    params: {
+      id: String(item.appointmentId),
+      clientName: item.name,
+      serviceName: item.service,
+      serviceId: String(item.serviceId ?? ''),
+      amountCents: String(item.amountCents),
+      dateIso: item.dateIso,
+      duration: item.duration,
+      status: item.status,
+      note: item.note ?? '',
+    },
+  };
 }
 
 export default function CalendarScreen() {
@@ -25,126 +104,254 @@ export default function CalendarScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { bookings, loading, error, refresh, calendarDate: selectedDate, setCalendarDate } = useBookingData();
+  const [viewMode, setViewMode] = useState<ViewMode>('Day');
   useFocusEffect(useCallback(() => { void refresh(); }, [refresh]));
+
   const days = useMemo(() => {
-    const monday = new Date(selectedDate);
-    monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+    const monday = weekStarting(selectedDate);
     return Array.from({ length: 7 }, (_, index) => {
       const day = new Date(monday);
       day.setDate(monday.getDate() + index);
       return day;
     });
   }, [selectedDate]);
-  const todayIsSelected = dateKey(selectedDate) === dateKey(new Date());
-  const appointments = bookings.filter((booking) => booking.dateKey === dateKey(selectedDate)).sort((a, b) => timeValue(a.time) - timeValue(b.time));
-  const serviceTotal = appointments.reduce((sum, appointment) => sum + appointment.amountCents, 0);
+  const cells = useMemo(() => monthCells(selectedDate), [selectedDate]);
+  const preview = useMemo(() => previewAppointments(selectedDate), [selectedDate]);
+  const appointments = useMemo(() => (bookings.length > 0 ? bookings : preview).sort((a, b) => clockMinutes(a.time) - clockMinutes(b.time)), [bookings, preview]);
+  const isPreviewData = bookings.length === 0 && !loading;
   const displayName = String(user?.name ?? user?.email ?? 'Certxa Pro');
   const profileInitials = displayName.split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase() ?? '').join('') || 'CP';
   const topInset = Platform.OS === 'web' ? 67 : insets.top;
+  const todayIsSelected = dateKey(selectedDate) === dateKey(new Date());
 
-  const shiftWeek = (amount: number) => {
+  const shiftDate = (amount: number) => {
     const next = new Date(selectedDate);
-    next.setDate(next.getDate() + amount * 7);
+    if (viewMode === 'Month') next.setMonth(next.getMonth() + amount);
+    else if (viewMode === 'Week') next.setDate(next.getDate() + amount * 7);
+    else next.setDate(next.getDate() + amount);
     setCalendarDate(next);
+  };
+
+  const selectDate = (date: Date, openDay = false) => {
+    setCalendarDate(date);
+    if (openDay) setViewMode('Day');
+  };
+
+  const monthTitle = viewMode === 'Month'
+    ? selectedDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    : viewMode === 'Week'
+      ? `${days[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${days[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+      : selectedDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+  const openAppointment = (item: AppointmentRecord) => {
+    if (item.appointmentId > 0) router.push(appointmentParams(item));
   };
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background, paddingTop: topInset }]}>
       <StatusBar barStyle="dark-content" />
-          <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-            <View style={styles.topBar}>
-              <View>
-                <Text style={[styles.eyebrow, { color: colors.primary }]}>CERTXA PRO</Text>
-                <Text style={[styles.brandTitle, { color: colors.foreground }]}>{displayName}</Text>
-              </View>
-              <View testID="calendar-profile" style={[styles.profileButton, { backgroundColor: colors.secondary }]}><Text style={[styles.profileInitials, { color: colors.primary }]}>{profileInitials}</Text></View>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.header}>
+          <View style={styles.headerIdentity}>
+            <View style={[styles.staffAvatar, { backgroundColor: colors.secondary }]}>
+              <Text style={[styles.staffInitials, { color: colors.primary }]}>{profileInitials}</Text>
             </View>
-            <View style={styles.monthRow}>
-              <View><Text style={[styles.monthTitle, { color: colors.foreground }]}>{selectedDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</Text><Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Your schedule at a glance</Text></View>
-              <View style={styles.monthActions}>
-                <TouchableOpacity testID="previous-week" onPress={() => shiftWeek(-1)} style={styles.arrowButton}><Feather name="chevron-left" size={20} color={colors.foreground} /></TouchableOpacity>
-                <TouchableOpacity testID="next-week" onPress={() => shiftWeek(1)} style={styles.arrowButton}><Feather name="chevron-right" size={20} color={colors.foreground} /></TouchableOpacity>
-              </View>
+            <View>
+              <Text style={[styles.staffLabel, { color: colors.mutedForeground }]}>SCHEDULE FOR</Text>
+              <Text style={[styles.staffName, { color: colors.foreground }]}>{displayName}</Text>
             </View>
-            <View style={[styles.weekCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              {days.map((day) => {
+          </View>
+          <View style={styles.headerActions}>
+            <TouchableOpacity testID="calendar-refresh" accessibilityLabel="Refresh calendar" onPress={() => void refresh()} style={styles.iconButton}>
+              <Feather name="refresh-cw" size={19} color={colors.primary} />
+            </TouchableOpacity>
+            <TouchableOpacity testID="add-appointment" accessibilityLabel="Add appointment" onPress={() => router.push({ pathname: '/booking', params: { day: dateKey(selectedDate) } })} style={[styles.addButton, { backgroundColor: colors.primary }]}>
+              <Feather name="plus" size={24} color={colors.primaryForeground} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.viewRow}>
+          <View style={[styles.segmentedControl, { borderColor: colors.border, backgroundColor: colors.card }]}>
+            {(['Month', 'Week', 'Day'] as ViewMode[]).map((mode) => (
+              <TouchableOpacity
+                key={mode}
+                testID={`calendar-view-${mode.toLowerCase()}`}
+                accessibilityRole="button"
+                accessibilityState={{ selected: viewMode === mode }}
+                onPress={() => setViewMode(mode)}
+                style={[styles.segment, viewMode === mode && { backgroundColor: colors.primary }]}
+              >
+                <Text style={[styles.segmentText, { color: viewMode === mode ? colors.primaryForeground : colors.mutedForeground }]}>{mode}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <Text style={[styles.todayHint, { color: colors.mutedForeground }]}>{todayIsSelected ? 'Today' : selectedDate.toLocaleDateString('en-US', { weekday: 'short' })}</Text>
+        </View>
+
+        <View style={styles.dateHeader}>
+          <TouchableOpacity testID="previous-calendar-period" accessibilityLabel="Previous period" onPress={() => shiftDate(-1)} style={styles.chevronButton}>
+            <Feather name="chevron-left" size={21} color={colors.foreground} />
+          </TouchableOpacity>
+          <Text style={[styles.monthTitle, { color: colors.foreground }]}>{monthTitle}</Text>
+          <TouchableOpacity testID="next-calendar-period" accessibilityLabel="Next period" onPress={() => shiftDate(1)} style={styles.chevronButton}>
+            <Feather name="chevron-right" size={21} color={colors.foreground} />
+          </TouchableOpacity>
+        </View>
+
+        {viewMode !== 'Month' && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.weekStrip}>
+            {days.map((day) => {
+              const active = dateKey(day) === dateKey(selectedDate);
+              const today = dateKey(day) === dateKey(new Date());
+              return (
+                <TouchableOpacity key={dateKey(day)} testID={`calendar-day-${day.getDate()}`} onPress={() => selectDate(day)} style={[styles.dayCell, active && { backgroundColor: colors.primary }]}>
+                  <Text style={[styles.dayName, { color: active ? colors.primaryForeground : colors.mutedForeground }]}>{day.toLocaleDateString('en-US', { weekday: 'short' }).slice(0, 1)}</Text>
+                  <Text style={[styles.dayNumber, { color: active ? colors.primaryForeground : colors.foreground }]}>{day.getDate()}</Text>
+                  <View style={[styles.dayDot, { backgroundColor: active ? colors.primaryForeground : today ? colors.primary : colors.border }]} />
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        )}
+
+        {viewMode === 'Month' ? (
+          <View style={[styles.monthGrid, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.weekdayRow}>
+              {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((weekday, index) => <Text key={`${weekday}-${index}`} style={[styles.weekdayLabel, { color: colors.mutedForeground }]}>{weekday}</Text>)}
+            </View>
+            <View style={styles.monthCells}>
+              {cells.map((day) => {
+                const inMonth = day.getMonth() === selectedDate.getMonth();
                 const active = dateKey(day) === dateKey(selectedDate);
-                const today = dateKey(day) === dateKey(new Date());
-                return <TouchableOpacity key={dateKey(day)} testID={`calendar-day-${day.getDate()}`} onPress={() => setCalendarDate(day)} style={[styles.dayCell, active && { backgroundColor: colors.primary }]}><Text style={[styles.dayName, { color: active ? colors.primaryForeground : colors.mutedForeground }]}>{day.toLocaleDateString('en-US', { weekday: 'short' })}</Text><Text style={[styles.dayNumber, { color: active ? colors.primaryForeground : colors.foreground }]}>{day.getDate()}</Text><View style={[styles.dayDot, { backgroundColor: active ? colors.primaryForeground : today ? colors.primary : colors.border }]} /></TouchableOpacity>;
+                const isToday = dateKey(day) === dateKey(new Date());
+                return (
+                  <TouchableOpacity key={dateKey(day)} onPress={() => selectDate(day, true)} style={styles.monthCell}>
+                    <View style={[styles.monthNumber, active && { backgroundColor: colors.primary }]}>
+                      <Text style={[styles.monthNumberText, { color: active ? colors.primaryForeground : inMonth ? colors.foreground : colors.mutedForeground }]}>{day.getDate()}</Text>
+                    </View>
+                    <View style={[styles.monthDot, { backgroundColor: active ? colors.primaryForeground : isToday ? colors.primary : inMonth ? colors.accentForeground : colors.border }]} />
+                  </TouchableOpacity>
+                );
               })}
             </View>
-            <View style={styles.agendaHeading}>
-              <View><Text style={[styles.agendaTitle, { color: colors.foreground }]}>{todayIsSelected ? 'Today' : selectedDate.toLocaleDateString('en-US', { weekday: 'long' })}</Text><Text style={[styles.subtitle, { color: colors.mutedForeground }]}>{selectedDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })} · {todayIsSelected ? `${appointments.length} appointments` : 'Your day'}</Text></View>
-              <View testID="availability-shortcut" style={styles.availabilityButton}><Feather name="clock" size={15} color={colors.mutedForeground} /><Text style={[styles.availabilityLabel, { color: colors.mutedForeground }]}>Hours in web</Text></View>
-            </View>
-            {error ? (
-              <View style={[styles.emptyCard, { backgroundColor: colors.accent, borderColor: colors.border }]}><Feather name="alert-circle" size={19} color={colors.accentForeground} /><Text style={[styles.emptyTitle, { color: colors.accentForeground }]}>{error}</Text></View>
-            ) : appointments.length > 0 ? (
-              <View style={styles.agendaList}>
-                {appointments.map((item, index) => (
-                  <TouchableOpacity key={`${item.time}-${index}`} onPress={() => router.push({ pathname: '/appointment/[id]', params: { id: String(item.appointmentId), clientName: item.name, serviceName: item.service, serviceId: String(item.serviceId ?? ''), amountCents: String(item.amountCents), dateIso: item.dateIso, duration: item.duration, status: item.status, note: item.note ?? '' } })} style={styles.appointmentRow}>
-                    <View style={styles.timeColumn}><Text style={[styles.appointmentTime, { color: colors.foreground }]}>{item.time}</Text><Text style={[styles.duration, { color: colors.mutedForeground }]}>{item.duration}</Text></View>
-                    <View style={[styles.appointmentCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                      <View style={[styles.appointmentAccent, { backgroundColor: index === 1 ? colors.accentForeground : colors.primary }]} />
-                      <View style={styles.appointmentDetails}><Text style={[styles.rowTitle, { color: colors.foreground }]}>{item.service}</Text><Text style={[styles.rowSub, { color: colors.mutedForeground }]}>{item.name}{item.note ? ` · ${item.note}` : ''}</Text></View>
-                      <Text style={[styles.priceText, { color: colors.foreground }]}>{item.price}</Text>
-                    </View>
-                  </TouchableOpacity>
-                ))}
+          </View>
+        ) : viewMode === 'Week' ? (
+          <View style={styles.weekAgenda}>
+            {days.map((day) => {
+              const dayAppointments = dateKey(day) === dateKey(selectedDate) ? appointments : [];
+              const active = dateKey(day) === dateKey(selectedDate);
+              return (
+                <TouchableOpacity key={dateKey(day)} onPress={() => selectDate(day, true)} style={[styles.weekDayRow, { borderColor: colors.border, backgroundColor: colors.card }, active && { borderColor: colors.primary }]}>
+                  <View style={styles.weekDayLabel}>
+                    <Text style={[styles.weekDayName, { color: colors.mutedForeground }]}>{day.toLocaleDateString('en-US', { weekday: 'short' })}</Text>
+                    <Text style={[styles.weekDayNumber, { color: active ? colors.primary : colors.foreground }]}>{day.getDate()}</Text>
+                  </View>
+                  <View style={styles.weekDayEvents}>
+                    {dayAppointments.length > 0 ? dayAppointments.slice(0, 2).map((item, index) => <View key={item.id} style={[styles.miniEvent, { backgroundColor: PREVIEW_COLORS[index % PREVIEW_COLORS.length] }]}><Text numberOfLines={1} style={styles.miniEventText}>{item.time} · {item.name}</Text></View>) : <Text style={[styles.noEvents, { color: colors.mutedForeground }]}>Open schedule</Text>}
+                  </View>
+                  <Feather name="chevron-right" size={17} color={colors.mutedForeground} />
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        ) : (
+          <View>
+            <View style={styles.dayHeading}>
+              <View>
+                <Text style={[styles.dayHeadingTitle, { color: colors.foreground }]}>{todayIsSelected ? 'Today' : selectedDate.toLocaleDateString('en-US', { weekday: 'long' })}</Text>
+                <Text style={[styles.dayHeadingSubtitle, { color: colors.mutedForeground }]}>{selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · {appointments.length} appointments</Text>
               </View>
-            ) : (
-              <View style={[styles.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.emptyIcon, { backgroundColor: colors.secondary }]}><Feather name="sun" size={19} color={colors.primary} /></View><Text style={[styles.emptyTitle, { color: colors.foreground }]}>A little breathing room</Text><Text style={[styles.rowSub, { color: colors.mutedForeground }]}>No appointments on this day yet.</Text></View>
-            )}
-            <View style={[styles.summaryCard, { backgroundColor: colors.secondary }]}>
-              <View style={[styles.summaryIcon, { backgroundColor: colors.card }]}><Feather name="trending-up" size={16} color={colors.primary} /></View>
-              <View style={{ flex: 1 }}><Text style={[styles.summaryTitle, { color: colors.foreground }]}>Today's service total</Text><Text style={[styles.rowSub, { color: colors.mutedForeground }]}>Before tips and add-ons</Text></View>
-              <Text style={[styles.summaryAmount, { color: colors.primary }]}>{loading ? '…' : `$${(serviceTotal / 100).toFixed(2)}`}</Text>
+              {isPreviewData && <View style={[styles.previewPill, { backgroundColor: colors.accent }]}><Text style={[styles.previewPillText, { color: colors.accentForeground }]}>Preview schedule</Text></View>}
             </View>
-          </ScrollView>
-          <TouchableOpacity testID="add-appointment" onPress={() => router.push({ pathname: '/booking', params: { day: dateKey(selectedDate) } })} style={[styles.fab, { backgroundColor: colors.primary }]}><Feather name="plus" size={25} color={colors.primaryForeground} /></TouchableOpacity>
+            {error && <View style={[styles.syncNotice, { backgroundColor: colors.secondary }]}><Feather name="info" size={14} color={colors.primary} /><Text style={[styles.syncText, { color: colors.secondaryForeground }]}>Showing preview appointments while Certxa is offline.</Text></View>}
+            <View style={[styles.timeline, { backgroundColor: '#25292B', borderColor: '#373D3E' }]}>
+              <View style={styles.timelineLabels}>
+                {TIMELINE_HOURS.map((time) => <Text key={time} style={styles.timelineLabel}>{formatClock(time)}</Text>)}
+              </View>
+              <View style={styles.timelineTrack}>
+                {TIMELINE_HOURS.map((time, index) => <View key={time} style={[styles.timelineLine, { top: index * HOUR_HEIGHT }]} />)}
+                {appointments.map((item, index) => {
+                  const top = Math.max(4, ((clockMinutes(item.time) - TIMELINE_START) / 60) * HOUR_HEIGHT);
+                  const height = Math.max(54, (durationMinutes(item.duration) / 60) * HOUR_HEIGHT - 7);
+                  return (
+                    <TouchableOpacity key={item.id} onPress={() => openAppointment(item)} style={[styles.timelineAppointment, { top, height, backgroundColor: PREVIEW_COLORS[index % PREVIEW_COLORS.length] }]}>
+                      <Text numberOfLines={1} style={styles.timelineClient}>{item.name}</Text>
+                      <Text numberOfLines={1} style={styles.timelineService}>{item.service}</Text>
+                      <Text numberOfLines={1} style={styles.timelineDuration}>{item.duration}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+                {appointments.length === 0 && !loading && <View style={styles.timelineEmpty}><Feather name="sun" size={18} color="#A8B2AD" /><Text style={styles.timelineEmptyText}>Your schedule is open</Text></View>}
+                <View style={[styles.currentTime, { top: ((new Date().getHours() * 60 + new Date().getMinutes() - TIMELINE_START) / 60) * HOUR_HEIGHT }]} />
+              </View>
+            </View>
+          </View>
+        )}
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  scrollContent: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 112 },
-  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 },
-  eyebrow: { fontSize: 10, letterSpacing: 1.45, fontFamily: 'Inter_700Bold' },
-  brandTitle: { fontSize: 26, letterSpacing: -0.6, fontFamily: 'Inter_600SemiBold', marginTop: 3 },
-  profileButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  profileInitials: { fontSize: 14, fontFamily: 'Inter_700Bold' },
-  monthRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 },
-  monthTitle: { fontSize: 22, letterSpacing: -0.4, fontFamily: 'Inter_600SemiBold' },
-  subtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 4 },
-  monthActions: { flexDirection: 'row', gap: 8 },
-  arrowButton: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  weekCard: { borderWidth: 1, borderRadius: 19, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 8, paddingVertical: 12, marginBottom: 26 },
-  dayCell: { width: 39, alignItems: 'center', paddingVertical: 7, borderRadius: 14, gap: 7 },
-  dayName: { fontSize: 10, fontFamily: 'Inter_500Medium' },
-  dayNumber: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
+  scrollContent: { paddingHorizontal: 18, paddingTop: 12, paddingBottom: 112 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 21 },
+  headerIdentity: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  staffAvatar: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
+  staffInitials: { fontSize: 13, fontFamily: 'Inter_700Bold' },
+  staffLabel: { fontSize: 9, letterSpacing: 1.1, fontFamily: 'Inter_700Bold' },
+  staffName: { fontSize: 16, fontFamily: 'Inter_600SemiBold', marginTop: 2 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  iconButton: { width: 39, height: 39, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  addButton: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  viewRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 },
+  segmentedControl: { flexDirection: 'row', borderWidth: 1, borderRadius: 9, padding: 2 },
+  segment: { minWidth: 61, paddingVertical: 8, paddingHorizontal: 9, borderRadius: 7, alignItems: 'center' },
+  segmentText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
+  todayHint: { fontSize: 12, fontFamily: 'Inter_500Medium', marginRight: 2 },
+  dateHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
+  chevronButton: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  monthTitle: { fontSize: 20, fontFamily: 'Inter_600SemiBold', letterSpacing: -0.35 },
+  weekStrip: { gap: 8, paddingBottom: 19, paddingTop: 2 },
+  dayCell: { width: 43, alignItems: 'center', paddingVertical: 7, borderRadius: 14, gap: 6 },
+  dayName: { fontSize: 10, fontFamily: 'Inter_600SemiBold' },
+  dayNumber: { fontSize: 15, fontFamily: 'Inter_700Bold' },
   dayDot: { width: 4, height: 4, borderRadius: 2 },
-  agendaHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 15 },
-  agendaTitle: { fontSize: 20, fontFamily: 'Inter_600SemiBold' },
-  availabilityButton: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 12 },
-  availabilityLabel: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
-  agendaList: { gap: 12 },
-  appointmentRow: { flexDirection: 'row', alignItems: 'stretch', gap: 12, minHeight: 76 },
-  timeColumn: { width: 60, paddingTop: 15 },
-  appointmentTime: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  duration: { fontSize: 10, fontFamily: 'Inter_400Regular', marginTop: 4 },
-  appointmentCard: { flex: 1, borderWidth: 1, borderRadius: 15, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  appointmentAccent: { width: 3, height: 35, borderRadius: 3 },
-  appointmentDetails: { flex: 1 },
-  rowTitle: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  rowSub: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 4, lineHeight: 16 },
-  priceText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
-  emptyCard: { minHeight: 155, borderWidth: 1, borderRadius: 19, justifyContent: 'center', alignItems: 'center', marginBottom: 18 },
-  emptyIcon: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
-  emptyTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold', marginBottom: 2 },
-  summaryCard: { marginTop: 21, padding: 15, borderRadius: 17, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  summaryIcon: { width: 33, height: 33, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  summaryTitle: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
-  summaryAmount: { fontSize: 17, fontFamily: 'Inter_700Bold' },
-  fab: { position: 'absolute', right: 22, bottom: Platform.OS === 'web' ? 104 : 28, width: 55, height: 55, borderRadius: 28, alignItems: 'center', justifyContent: 'center', elevation: 4 },
+  monthGrid: { borderWidth: 1, borderRadius: 18, padding: 11, overflow: 'hidden' },
+  weekdayRow: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 5 },
+  weekdayLabel: { width: '14.28%', textAlign: 'center', fontSize: 10, fontFamily: 'Inter_700Bold' },
+  monthCells: { flexDirection: 'row', flexWrap: 'wrap' },
+  monthCell: { width: '14.28%', height: 58, alignItems: 'center', paddingTop: 7 },
+  monthNumber: { width: 29, height: 29, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  monthNumberText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  monthDot: { width: 4, height: 4, borderRadius: 2, marginTop: 5 },
+  weekAgenda: { gap: 9 },
+  weekDayRow: { minHeight: 69, borderWidth: 1, borderRadius: 16, padding: 11, flexDirection: 'row', alignItems: 'center', gap: 11 },
+  weekDayLabel: { width: 44, alignItems: 'center' },
+  weekDayName: { fontSize: 10, fontFamily: 'Inter_600SemiBold' },
+  weekDayNumber: { fontSize: 19, fontFamily: 'Inter_700Bold', marginTop: 2 },
+  weekDayEvents: { flex: 1, gap: 4 },
+  miniEvent: { borderRadius: 6, paddingVertical: 4, paddingHorizontal: 7 },
+  miniEventText: { color: '#FFFFFF', fontSize: 10, fontFamily: 'Inter_600SemiBold' },
+  noEvents: { fontSize: 12, fontFamily: 'Inter_400Regular' },
+  dayHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  dayHeadingTitle: { fontSize: 21, fontFamily: 'Inter_600SemiBold' },
+  dayHeadingSubtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 3 },
+  previewPill: { borderRadius: 9, paddingHorizontal: 9, paddingVertical: 6 },
+  previewPillText: { fontSize: 10, fontFamily: 'Inter_600SemiBold' },
+  syncNotice: { flexDirection: 'row', alignItems: 'center', gap: 7, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 10 },
+  syncText: { fontSize: 10, fontFamily: 'Inter_500Medium', flex: 1 },
+  timeline: { minHeight: HOUR_HEIGHT * 10, borderRadius: 14, borderWidth: 1, overflow: 'hidden', flexDirection: 'row' },
+  timelineLabels: { width: 68, paddingTop: 7, backgroundColor: '#F0F1EE' },
+  timelineLabel: { height: HOUR_HEIGHT, paddingTop: 1, paddingRight: 9, textAlign: 'right', color: '#7E8782', fontSize: 10, fontFamily: 'Inter_500Medium' },
+  timelineTrack: { flex: 1, minHeight: HOUR_HEIGHT * 10, position: 'relative', backgroundColor: '#25292B' },
+  timelineLine: { height: 1, backgroundColor: '#3C4242', left: 0, right: 0, position: 'absolute' },
+  timelineAppointment: { position: 'absolute', left: 7, right: 8, borderRadius: 8, paddingHorizontal: 11, paddingVertical: 8, overflow: 'hidden' },
+  timelineClient: { color: '#FFFFFF', fontSize: 12, fontFamily: 'Inter_700Bold' },
+  timelineService: { color: '#F8FAF7', fontSize: 11, fontFamily: 'Inter_500Medium', marginTop: 3 },
+  timelineDuration: { color: 'rgba(255,255,255,0.76)', fontSize: 10, fontFamily: 'Inter_400Regular', marginTop: 4 },
+  timelineEmpty: { position: 'absolute', top: 250, left: 0, right: 0, alignItems: 'center', gap: 8 },
+  timelineEmptyText: { color: '#A8B2AD', fontSize: 12, fontFamily: 'Inter_500Medium' },
+  currentTime: { position: 'absolute', left: 0, right: 0, height: 2, backgroundColor: '#D85E8B' },
 });
