@@ -11,7 +11,12 @@ type TipCheckoutProps = {
   onConfirmTip: (tipCents: number) => void;
 };
 
-const tipOptions = [10, 15, 20, 25];
+const tipOptions = [
+  { label: 'NO TIP', percent: 0 },
+  { label: '15%', percent: 15 },
+  { label: '20%', percent: 20 },
+  { label: '25%', percent: 25 },
+];
 
 function dollars(cents: number) {
   return `$${(Math.max(0, cents) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -95,18 +100,18 @@ export function TipCheckout({ baseCents, serviceName, onConfirmTip }: TipCheckou
             {summary}
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Choose a tip</Text>
             <View style={styles.tipGrid}>
-              {tipOptions.map((percent) => {
+              {tipOptions.map(({ label, percent }) => {
                 const selected = selectedPercent === percent;
                 return (
                   <TouchableOpacity
-                    key={percent}
-                    testID={`tip-${percent}`}
+                    key={label}
+                    testID={percent === 0 ? 'tip-no-tip' : `tip-${percent}`}
                     onPress={() => choosePercent(percent)}
                     style={[styles.tipOption, { backgroundColor: selected ? colors.secondary : colors.card, borderColor: selected ? colors.primary : colors.border }]}
                     accessibilityRole="button"
                     accessibilityState={{ selected }}
                   >
-                    <Text style={[styles.tipPercent, { color: selected ? colors.primary : colors.foreground }]}>{percent}%</Text>
+                    <Text style={[styles.tipPercent, { color: selected ? colors.primary : colors.foreground }]}>{label}</Text>
                     <Text style={[styles.tipAmount, { color: colors.mutedForeground }]}>{dollars(Math.round(safeBaseCents * percent / 100))}</Text>
                   </TouchableOpacity>
                 );
