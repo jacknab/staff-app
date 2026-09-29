@@ -55,6 +55,7 @@ type BookingContextValue = {
   refresh: () => Promise<void>;
   addClient: (client: NewClient) => Promise<ClientProfile>;
   addBooking: (appointment: NewAppointment) => Promise<void>;
+  rescheduleBooking: (appointmentId: number, dateIso: string, durationMinutes: number) => Promise<void>;
 };
 
 type ApiCustomer = { id: number; name?: string | null; fullName?: string | null; firstName?: string | null; lastName?: string | null; phone?: string | null; email?: string | null; notes?: string | null };
@@ -122,6 +123,10 @@ export function BookingProvider({ children }: { children: ReactNode }) {
     },
     addBooking: async (appointment) => {
       await api.post('/api/appointments', { customerId: appointment.customerId, serviceId: appointment.serviceId, duration: Number.parseInt(appointment.duration, 10) || 60, date: appointment.dateIso });
+      await refresh();
+    },
+    rescheduleBooking: async (appointmentId, dateIso, durationMinutes) => {
+      await api.patch(`/api/appointments/${appointmentId}`, { date: dateIso, duration: durationMinutes });
       await refresh();
     },
   }), [bookings, calendarDate, clients, error, loading, refresh, services]);

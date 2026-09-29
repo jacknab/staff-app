@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Feather } from '@expo/vector-icons';
-import { Platform, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Modal, PanResponder, Platform, ScrollView, StatusBar, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
@@ -10,8 +10,10 @@ type ViewMode = 'Month' | 'Week' | 'Day';
 
 const PREVIEW_COLORS = ['#DDEAE2', '#F9E1BC', '#F3D4DE', '#DEE4F4'];
 const TIMELINE_START = 8 * 60;
+const TIMELINE_END = 18 * 60;
 const HOUR_HEIGHT = 64;
 const TIMELINE_HOURS = Array.from({ length: 11 }, (_, index) => TIMELINE_START + index * 60);
+const SNAP_MINUTES = 5;
 
 function dateKey(date: Date) {
   return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
@@ -29,6 +31,22 @@ function formatClock(minutes: number) {
   const hours = Math.floor(minutes / 60);
   const hour = hours % 12 || 12;
   return `${hour}:${String(minutes % 60).padStart(2, '0')} ${hours >= 12 ? 'PM' : 'AM'}`;
+}
+
+function timelineTop(minutes: number) {
+  return ((minutes - TIMELINE_START) / 60) * HOUR_HEIGHT;
+}
+
+function clampDropMinutes(minutes: number, duration: number) {
+  const latestStart = Math.max(TIMELINE_START, TIMELINE_END - duration);
+  const snapped = Math.round(minutes / SNAP_MINUTES) * SNAP_MINUTES;
+  return Math.min(latestStart, Math.max(TIMELINE_START, snapped));
+}
+
+function dateAtMinutes(day: Date, minutes: number) {
+  const result = new Date(day);
+  result.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0);
+  return result;
 }
 
 function durationMinutes(duration: string) {
@@ -98,12 +116,78 @@ function appointmentParams(item: AppointmentRecord) {
   };
 }
 
+function DraggableAppointment({
+  item,
+  top,
+  height,
+  backgroundColor,
+  isDragging,
+  onTap,
+  onDragStart,
+  onDragMove,
+  onDragEnd,
+}: {
+  item: AppointmentRecord;
+  top: number;
+  height: number;
+  backgroundColor: string;
+  isDragging: boolean;
+  onTap: (item: AppointmentRecord) => void;
+  onDragStart: (item: AppointmentRecord) => void;
+  onDragMove: (item: AppointmentRecord, deltaY: number) => void;
+  onDragEnd: (item: AppointmentRecord, deltaY: number) => void;
+}) {
+  const panResponder = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onPanResponderGrant: () => onDragStart(item),
+    onPanResponderMove: (_, gesture) => onDragMove(item, gesture.dy),
+    onPanResponderRelease: (_, gesture) => {
+      const moved = Math.abs(gesture.dy) > 8 || Math.abs(gesture.dx) > 8;
+      if (moved) onDragEnd(item, gesture.dy);
+      else onTap(item);
+    },
+    onPanResponderTerminationRequest: () => false,
+  }), [item, onDragEnd, onDragMove, onDragStart, onTap]);
+
+  return (
+    <View
+      {...panResponder.panHandlers}
+      accessible
+      accessibilityRole="button"
+      accessibilityLabel={`${item.name}, ${item.time}. Press and hold to reschedule.`}
+      style={[
+        styles.timelineAppointment,
+        {
+          top,
+          height,
+          backgroundColor,
+          zIndex: isDragging ? 2 : 1,
+          transform: [{ scale: isDragging ? 1.025 : 1 }],
+          opacity: isDragging ? 0.92 : 1,
+        },
+        isDragging && styles.timelineAppointmentDragging,
+      ]}
+    >
+      <Text numberOfLines={1} style={styles.timelineClient}>{item.name}</Text>
+      <Text numberOfLines={1} style={styles.timelineService}>{item.service}</Text>
+      <Text numberOfLines={1} style={styles.timelineDuration}>{item.duration}</Text>
+    </View>
+  );
+}
+
 export default function CalendarScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { bookings, loading, error, refresh, calendarDate: selectedDate, setCalendarDate } = useBookingData();
+  const { bookings, loading, error, refresh, rescheduleBooking, calendarDate: selectedDate, setCalendarDate } = useBookingData();
   const [viewMode, setViewMode] = useState<ViewMode>('Day');
+  const [previewOverrides, setPreviewOverrides] = useState<Record<string, string>>({});
+  const [activeDrag, setActiveDrag] = useState<{ id: string; top: number } | null>(null);
+  const [pendingDrop, setPendingDrop] = useState<{ item: AppointmentRecord; minutes: number } | null>(null);
+  const [notifyClient, setNotifyClient] = useState(true);
+  const [savingDrop, setSavingDrop] = useState(false);
+  const [dropError, setDropError] = useState('');
   useFocusEffect(useCallback(() => { void refresh(); }, [refresh]));
 
   const days = useMemo(() => {
@@ -115,8 +199,13 @@ export default function CalendarScreen() {
     });
   }, [selectedDate]);
   const cells = useMemo(() => monthCells(selectedDate), [selectedDate]);
-  const preview = useMemo(() => previewAppointments(selectedDate), [selectedDate]);
-  const appointments = useMemo(() => (bookings.length > 0 ? bookings : preview).sort((a, b) => clockMinutes(a.time) - clockMinutes(b.time)), [bookings, preview]);
+  const preview = useMemo(() => previewAppointments(selectedDate).map((item) => {
+    const override = previewOverrides[item.id];
+    if (!override) return item;
+    const date = new Date(override);
+    return { ...item, dateKey: dateKey(date), dateIso: date.toISOString(), time: date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) };
+  }), [previewOverrides, selectedDate]);
+  const appointments = useMemo(() => [...(bookings.length > 0 ? bookings : preview)].sort((a, b) => clockMinutes(a.time) - clockMinutes(b.time)), [bookings, preview]);
   const isPreviewData = bookings.length === 0 && !loading;
   const topInset = Platform.OS === 'web' ? 67 : insets.top;
   const todayIsSelected = dateKey(selectedDate) === dateKey(new Date());
@@ -141,7 +230,52 @@ export default function CalendarScreen() {
       : selectedDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
   const openAppointment = (item: AppointmentRecord) => {
+    setActiveDrag(null);
     if (item.appointmentId > 0) router.push(appointmentParams(item));
+  };
+
+  const startDrag = useCallback((item: AppointmentRecord) => {
+    const top = Math.max(4, timelineTop(clockMinutes(item.time)));
+    setActiveDrag({ id: item.id, top });
+    setDropError('');
+  }, []);
+
+  const moveDrag = useCallback((item: AppointmentRecord, deltaY: number) => {
+    const startTop = Math.max(4, timelineTop(clockMinutes(item.time)));
+    const duration = durationMinutes(item.duration);
+    const minutes = clampDropMinutes(TIMELINE_START + ((startTop + deltaY) / HOUR_HEIGHT) * 60, duration);
+    setActiveDrag({ id: item.id, top: Math.max(4, timelineTop(minutes)) });
+  }, []);
+
+  const endDrag = useCallback((item: AppointmentRecord, deltaY: number) => {
+    const startTop = Math.max(4, timelineTop(clockMinutes(item.time)));
+    const duration = durationMinutes(item.duration);
+    const minutes = clampDropMinutes(TIMELINE_START + ((startTop + deltaY) / HOUR_HEIGHT) * 60, duration);
+    setActiveDrag(null);
+    if (minutes !== clampDropMinutes(clockMinutes(item.time), duration)) {
+      setPendingDrop({ item, minutes });
+      setNotifyClient(true);
+      setDropError('');
+    }
+  }, []);
+
+  const confirmDrop = async () => {
+    if (!pendingDrop) return;
+    setSavingDrop(true);
+    setDropError('');
+    const nextDate = dateAtMinutes(selectedDate, pendingDrop.minutes);
+    try {
+      if (pendingDrop.item.id.startsWith('preview')) {
+        setPreviewOverrides((current) => ({ ...current, [pendingDrop.item.id]: nextDate.toISOString() }));
+      } else {
+        await rescheduleBooking(pendingDrop.item.appointmentId, nextDate.toISOString(), durationMinutes(pendingDrop.item.duration));
+      }
+      setPendingDrop(null);
+    } catch (cause) {
+      setDropError(cause instanceof Error ? cause.message : 'Could not reschedule appointment.');
+    } finally {
+      setSavingDrop(false);
+    }
   };
 
   return (
@@ -246,6 +380,10 @@ export default function CalendarScreen() {
               <Text style={[styles.scheduleCount, { color: colors.mutedForeground }]}>{selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · {appointments.length} appointments</Text>
               {isPreviewData && <View style={[styles.previewPill, { backgroundColor: colors.accent }]}><Text style={[styles.previewPillText, { color: colors.accentForeground }]}>Preview schedule</Text></View>}
             </View>
+            <View style={[styles.dragHint, { backgroundColor: colors.secondary }]}>
+              <Feather name="move" size={14} color={colors.primary} />
+              <Text style={[styles.dragHintText, { color: colors.secondaryForeground }]}>Press and hold an appointment to move it in 5-minute increments.</Text>
+            </View>
             {error && <View style={[styles.syncNotice, { backgroundColor: colors.secondary }]}><Feather name="info" size={14} color={colors.primary} /><Text style={[styles.syncText, { color: colors.secondaryForeground }]}>Showing preview appointments while Certxa is offline.</Text></View>}
             <View style={[styles.timeline, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={[styles.timelineLabels, { backgroundColor: colors.muted }]}>
@@ -257,11 +395,18 @@ export default function CalendarScreen() {
                   const top = Math.max(4, ((clockMinutes(item.time) - TIMELINE_START) / 60) * HOUR_HEIGHT);
                   const height = Math.max(54, (durationMinutes(item.duration) / 60) * HOUR_HEIGHT - 7);
                   return (
-                    <TouchableOpacity key={item.id} onPress={() => openAppointment(item)} style={[styles.timelineAppointment, { top, height, backgroundColor: PREVIEW_COLORS[index % PREVIEW_COLORS.length] }]}>
-                      <Text numberOfLines={1} style={styles.timelineClient}>{item.name}</Text>
-                      <Text numberOfLines={1} style={styles.timelineService}>{item.service}</Text>
-                      <Text numberOfLines={1} style={styles.timelineDuration}>{item.duration}</Text>
-                    </TouchableOpacity>
+                    <DraggableAppointment
+                      key={item.id}
+                      item={item}
+                      top={activeDrag?.id === item.id ? activeDrag.top : top}
+                      height={height}
+                      backgroundColor={PREVIEW_COLORS[index % PREVIEW_COLORS.length]}
+                      isDragging={activeDrag?.id === item.id}
+                      onTap={openAppointment}
+                      onDragStart={startDrag}
+                      onDragMove={moveDrag}
+                      onDragEnd={endDrag}
+                    />
                   );
                 })}
                 {appointments.length === 0 && !loading && <View style={styles.timelineEmpty}><Feather name="sun" size={18} color="#A8B2AD" /><Text style={styles.timelineEmptyText}>Your schedule is open</Text></View>}
@@ -271,6 +416,36 @@ export default function CalendarScreen() {
           </View>
         )}
       </ScrollView>
+      <Modal transparent animationType="fade" visible={Boolean(pendingDrop)} onRequestClose={() => !savingDrop && setPendingDrop(null)}>
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.rescheduleModal, { backgroundColor: colors.card }]}>
+            <View style={styles.modalIcon}><Feather name="calendar" size={20} color={colors.primary} /></View>
+            <Text style={[styles.modalTitle, { color: colors.foreground }]}>Reschedule appointment?</Text>
+            <Text style={[styles.modalSubtitle, { color: colors.mutedForeground }]}>
+              {pendingDrop?.item.name} · {pendingDrop ? formatClock(pendingDrop.minutes) : ''}
+            </Text>
+            <View style={[styles.newTimeCard, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+              <Text style={[styles.newTimeLabel, { color: colors.mutedForeground }]}>NEW TIME</Text>
+              <Text style={[styles.newTimeValue, { color: colors.foreground }]}>{pendingDrop ? formatClock(pendingDrop.minutes) : ''}</Text>
+            </View>
+            <View style={styles.notifyRow}>
+              <View style={styles.notifyCopy}>
+                <Text style={[styles.notifyTitle, { color: colors.foreground }]}>Notify client</Text>
+                <Text style={[styles.notifySubtitle, { color: colors.mutedForeground }]}>Choose whether to send an update.</Text>
+              </View>
+              <Switch value={notifyClient} onValueChange={setNotifyClient} trackColor={{ false: colors.border, true: colors.primary }} thumbColor="#FFFFFF" />
+            </View>
+            {dropError ? <Text style={[styles.dropError, { color: colors.destructive }]}>{dropError}</Text> : null}
+            <TouchableOpacity disabled={savingDrop} onPress={() => void confirmDrop()} style={[styles.confirmDropButton, { backgroundColor: colors.primary, opacity: savingDrop ? 0.65 : 1 }]}>
+              <Text style={[styles.confirmDropText, { color: colors.primaryForeground }]}>{savingDrop ? 'Saving…' : 'Reschedule appointment'}</Text>
+              <Feather name="arrow-right" size={17} color={colors.primaryForeground} />
+            </TouchableOpacity>
+            <TouchableOpacity disabled={savingDrop} onPress={() => setPendingDrop(null)} style={styles.cancelDropButton}>
+              <Text style={[styles.cancelDropText, { color: colors.mutedForeground }]}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -315,6 +490,8 @@ const styles = StyleSheet.create({
   scheduleCount: { fontSize: 12, fontFamily: 'Inter_500Medium' },
   previewPill: { borderRadius: 9, paddingHorizontal: 9, paddingVertical: 6 },
   previewPillText: { fontSize: 10, fontFamily: 'Inter_600SemiBold' },
+  dragHint: { flexDirection: 'row', alignItems: 'center', gap: 7, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 10 },
+  dragHintText: { fontSize: 10, fontFamily: 'Inter_500Medium', flex: 1 },
   syncNotice: { flexDirection: 'row', alignItems: 'center', gap: 7, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 10 },
   syncText: { fontSize: 10, fontFamily: 'Inter_500Medium', flex: 1 },
   timeline: { minHeight: HOUR_HEIGHT * 10, borderRadius: 14, borderWidth: 1, overflow: 'hidden', flexDirection: 'row' },
@@ -323,10 +500,28 @@ const styles = StyleSheet.create({
   timelineTrack: { flex: 1, minHeight: HOUR_HEIGHT * 10, position: 'relative' },
   timelineLine: { height: 1, left: 0, right: 0, position: 'absolute' },
   timelineAppointment: { position: 'absolute', left: 7, right: 8, borderRadius: 8, paddingHorizontal: 11, paddingVertical: 6, justifyContent: 'center', overflow: 'hidden' },
+  timelineAppointmentDragging: { shadowColor: '#173B2E', shadowOpacity: 0.2, shadowRadius: 10, shadowOffset: { width: 0, height: 6 }, elevation: 6 },
   timelineClient: { color: '#26302B', fontSize: 12, lineHeight: 15, fontFamily: 'Inter_700Bold' },
   timelineService: { color: '#26302B', fontSize: 11, lineHeight: 14, fontFamily: 'Inter_600SemiBold', marginTop: 2 },
   timelineDuration: { color: '#5B665F', fontSize: 10, lineHeight: 13, fontFamily: 'Inter_500Medium', marginTop: 2 },
   timelineEmpty: { position: 'absolute', top: 250, left: 0, right: 0, alignItems: 'center', gap: 8 },
   timelineEmptyText: { color: '#A8B2AD', fontSize: 12, fontFamily: 'Inter_500Medium' },
   currentTime: { position: 'absolute', left: 0, right: 0, height: 2, backgroundColor: '#D85E8B' },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(21, 31, 26, 0.42)', justifyContent: 'center', padding: 20 },
+  rescheduleModal: { borderRadius: 22, padding: 20, shadowColor: '#173B2E', shadowOpacity: 0.18, shadowRadius: 20, shadowOffset: { width: 0, height: 8 }, elevation: 8 },
+  modalIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: '#DDEAE2', alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
+  modalTitle: { fontSize: 21, fontFamily: 'Inter_600SemiBold', letterSpacing: -0.3 },
+  modalSubtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 5 },
+  newTimeCard: { borderWidth: 1, borderRadius: 14, padding: 13, marginTop: 18, marginBottom: 16 },
+  newTimeLabel: { fontSize: 9, letterSpacing: 1, fontFamily: 'Inter_700Bold' },
+  newTimeValue: { fontSize: 20, fontFamily: 'Inter_600SemiBold', marginTop: 3 },
+  notifyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingVertical: 5 },
+  notifyCopy: { flex: 1 },
+  notifyTitle: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  notifySubtitle: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 3 },
+  dropError: { fontSize: 11, fontFamily: 'Inter_500Medium', marginTop: 10 },
+  confirmDropButton: { minHeight: 48, borderRadius: 13, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 19 },
+  confirmDropText: { fontSize: 13, fontFamily: 'Inter_700Bold' },
+  cancelDropButton: { minHeight: 40, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
+  cancelDropText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
 });
