@@ -80,7 +80,7 @@ export default function CheckoutScreen() {
             <View style={[styles.successBadge, { backgroundColor: colors.secondary }]}><Feather name="check" size={32} color={colors.primary} /></View>
             <Text style={[styles.successTitle, { color: colors.foreground }]}>Payment complete</Text>
             <Text style={[styles.successAmount, { color: colors.foreground }]}>{amount}</Text>
-            <Text style={[styles.successNote, { color: colors.mutedForeground }]}>.</Text>
+            <Text style={[styles.successNote, { color: colors.mutedForeground }]}>Preview payment recorded on this device.</Text>
             <TouchableOpacity testID="new-checkout" onPress={() => { setDigits('0'); setPaid(false); setTapping(false); }} style={[styles.primaryButton, { backgroundColor: colors.primary }]}><Text style={[styles.primaryButtonText, { color: colors.primaryForeground }]}>New checkout</Text></TouchableOpacity>
           </View>
         ) : (

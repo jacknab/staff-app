@@ -5,7 +5,6 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { AppointmentRecord, useBookingData } from '@/contexts/BookingContext';
-import { useAuth } from '@/contexts/AuthContext';
 
 type ViewMode = 'Month' | 'Week' | 'Day';
 
@@ -103,7 +102,6 @@ export default function CalendarScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user } = useAuth();
   const { bookings, loading, error, refresh, calendarDate: selectedDate, setCalendarDate } = useBookingData();
   const [viewMode, setViewMode] = useState<ViewMode>('Day');
   useFocusEffect(useCallback(() => { void refresh(); }, [refresh]));
@@ -120,8 +118,6 @@ export default function CalendarScreen() {
   const preview = useMemo(() => previewAppointments(selectedDate), [selectedDate]);
   const appointments = useMemo(() => (bookings.length > 0 ? bookings : preview).sort((a, b) => clockMinutes(a.time) - clockMinutes(b.time)), [bookings, preview]);
   const isPreviewData = bookings.length === 0 && !loading;
-  const displayName = String(user?.name ?? user?.email ?? 'Certxa Pro');
-  const profileInitials = displayName.split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase() ?? '').join('') || 'CP';
   const topInset = Platform.OS === 'web' ? 67 : insets.top;
   const todayIsSelected = dateKey(selectedDate) === dateKey(new Date());
 
@@ -153,26 +149,6 @@ export default function CalendarScreen() {
       <StatusBar barStyle="dark-content" />
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <View style={styles.headerIdentity}>
-            <View style={[styles.staffAvatar, { backgroundColor: colors.secondary }]}>
-              <Text style={[styles.staffInitials, { color: colors.primary }]}>{profileInitials}</Text>
-            </View>
-            <View>
-              <Text style={[styles.staffLabel, { color: colors.mutedForeground }]}>SCHEDULE FOR</Text>
-              <Text style={[styles.staffName, { color: colors.foreground }]}>{displayName}</Text>
-            </View>
-          </View>
-          <View style={styles.headerActions}>
-            <TouchableOpacity testID="calendar-refresh" accessibilityLabel="Refresh calendar" onPress={() => void refresh()} style={styles.iconButton}>
-              <Feather name="refresh-cw" size={19} color={colors.primary} />
-            </TouchableOpacity>
-            <TouchableOpacity testID="add-appointment" accessibilityLabel="Add appointment" onPress={() => router.push({ pathname: '/booking', params: { day: dateKey(selectedDate) } })} style={[styles.addButton, { backgroundColor: colors.primary }]}>
-              <Feather name="plus" size={24} color={colors.primaryForeground} />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={styles.viewRow}>
           <View style={[styles.segmentedControl, { borderColor: colors.border, backgroundColor: colors.card }]}>
             {(['Month', 'Week', 'Day'] as ViewMode[]).map((mode) => (
               <TouchableOpacity
@@ -188,6 +164,14 @@ export default function CalendarScreen() {
             ))}
           </View>
           <Text style={[styles.todayHint, { color: colors.mutedForeground }]}>{todayIsSelected ? 'Today' : selectedDate.toLocaleDateString('en-US', { weekday: 'short' })}</Text>
+          <View style={styles.headerActions}>
+            <TouchableOpacity testID="calendar-refresh" accessibilityLabel="Refresh calendar" onPress={() => void refresh()} style={styles.iconButton}>
+              <Feather name="refresh-cw" size={19} color={colors.primary} />
+            </TouchableOpacity>
+            <TouchableOpacity testID="add-appointment" accessibilityLabel="Add appointment" onPress={() => router.push({ pathname: '/booking', params: { day: dateKey(selectedDate) } })} style={[styles.addButton, { backgroundColor: colors.primary }]}>
+              <Feather name="plus" size={24} color={colors.primaryForeground} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.dateHeader}>
@@ -258,11 +242,8 @@ export default function CalendarScreen() {
           </View>
         ) : (
           <View>
-            <View style={styles.dayHeading}>
-              <View>
-                <Text style={[styles.dayHeadingTitle, { color: colors.foreground }]}>{todayIsSelected ? 'Today' : selectedDate.toLocaleDateString('en-US', { weekday: 'long' })}</Text>
-                <Text style={[styles.dayHeadingSubtitle, { color: colors.mutedForeground }]}>{selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · {appointments.length} appointments</Text>
-              </View>
+            <View style={styles.scheduleMeta}>
+              <Text style={[styles.scheduleCount, { color: colors.mutedForeground }]}>{selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · {appointments.length} appointments</Text>
               {isPreviewData && <View style={[styles.previewPill, { backgroundColor: colors.accent }]}><Text style={[styles.previewPillText, { color: colors.accentForeground }]}>Preview schedule</Text></View>}
             </View>
             {error && <View style={[styles.syncNotice, { backgroundColor: colors.secondary }]}><Feather name="info" size={14} color={colors.primary} /><Text style={[styles.syncText, { color: colors.secondaryForeground }]}>Showing preview appointments while Certxa is offline.</Text></View>}
@@ -297,18 +278,12 @@ export default function CalendarScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   scrollContent: { paddingHorizontal: 18, paddingTop: 12, paddingBottom: 112 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 21 },
-  headerIdentity: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  staffAvatar: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
-  staffInitials: { fontSize: 13, fontFamily: 'Inter_700Bold' },
-  staffLabel: { fontSize: 9, letterSpacing: 1.1, fontFamily: 'Inter_700Bold' },
-  staffName: { fontSize: 16, fontFamily: 'Inter_600SemiBold', marginTop: 2 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 19 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   iconButton: { width: 39, height: 39, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   addButton: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  viewRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 },
-  segmentedControl: { flexDirection: 'row', borderWidth: 1, borderRadius: 9, padding: 2 },
-  segment: { minWidth: 61, paddingVertical: 8, paddingHorizontal: 9, borderRadius: 7, alignItems: 'center' },
+  segmentedControl: { flexDirection: 'row', borderWidth: 1, borderRadius: 9, padding: 2, flexShrink: 1 },
+  segment: { minWidth: 48, paddingVertical: 8, paddingHorizontal: 7, borderRadius: 7, alignItems: 'center' },
   segmentText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
   todayHint: { fontSize: 12, fontFamily: 'Inter_500Medium', marginRight: 2 },
   dateHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
@@ -336,9 +311,8 @@ const styles = StyleSheet.create({
   miniEvent: { borderRadius: 6, paddingVertical: 4, paddingHorizontal: 7 },
   miniEventText: { color: '#FFFFFF', fontSize: 10, fontFamily: 'Inter_600SemiBold' },
   noEvents: { fontSize: 12, fontFamily: 'Inter_400Regular' },
-  dayHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  dayHeadingTitle: { fontSize: 21, fontFamily: 'Inter_600SemiBold' },
-  dayHeadingSubtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 3 },
+  scheduleMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
+  scheduleCount: { fontSize: 12, fontFamily: 'Inter_500Medium' },
   previewPill: { borderRadius: 9, paddingHorizontal: 9, paddingVertical: 6 },
   previewPillText: { fontSize: 10, fontFamily: 'Inter_600SemiBold' },
   syncNotice: { flexDirection: 'row', alignItems: 'center', gap: 7, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 10 },
