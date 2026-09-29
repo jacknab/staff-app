@@ -8,7 +8,7 @@ import { AppointmentRecord, useBookingData } from '@/contexts/BookingContext';
 
 type ViewMode = 'Month' | 'Week' | 'Day';
 
-const PREVIEW_COLORS = ['#526A62', '#D58B35', '#C56E86', '#6C7894'];
+const PREVIEW_COLORS = ['#DDEAE2', '#F9E1BC', '#F3D4DE', '#DEE4F4'];
 const TIMELINE_START = 8 * 60;
 const HOUR_HEIGHT = 64;
 const TIMELINE_HOURS = Array.from({ length: 11 }, (_, index) => TIMELINE_START + index * 60);
@@ -309,7 +309,7 @@ const styles = StyleSheet.create({
   weekDayNumber: { fontSize: 19, fontFamily: 'Inter_700Bold', marginTop: 2 },
   weekDayEvents: { flex: 1, gap: 4 },
   miniEvent: { borderRadius: 6, paddingVertical: 4, paddingHorizontal: 7 },
-  miniEventText: { color: '#FFFFFF', fontSize: 10, fontFamily: 'Inter_600SemiBold' },
+  miniEventText: { color: '#26302B', fontSize: 10, fontFamily: 'Inter_600SemiBold' },
   noEvents: { fontSize: 12, fontFamily: 'Inter_400Regular' },
   scheduleMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
   scheduleCount: { fontSize: 12, fontFamily: 'Inter_500Medium' },
@@ -322,10 +322,10 @@ const styles = StyleSheet.create({
   timelineLabel: { height: HOUR_HEIGHT, paddingTop: 1, paddingRight: 9, textAlign: 'right', color: '#7E8782', fontSize: 10, fontFamily: 'Inter_500Medium' },
   timelineTrack: { flex: 1, minHeight: HOUR_HEIGHT * 10, position: 'relative' },
   timelineLine: { height: 1, left: 0, right: 0, position: 'absolute' },
-  timelineAppointment: { position: 'absolute', left: 7, right: 8, borderRadius: 8, paddingHorizontal: 11, paddingVertical: 8, overflow: 'hidden' },
-  timelineClient: { color: '#FFFFFF', fontSize: 12, fontFamily: 'Inter_700Bold' },
-  timelineService: { color: '#F8FAF7', fontSize: 11, fontFamily: 'Inter_500Medium', marginTop: 3 },
-  timelineDuration: { color: 'rgba(255,255,255,0.76)', fontSize: 10, fontFamily: 'Inter_400Regular', marginTop: 4 },
+  timelineAppointment: { position: 'absolute', left: 7, right: 8, borderRadius: 8, paddingHorizontal: 11, paddingVertical: 6, justifyContent: 'center', overflow: 'hidden' },
+  timelineClient: { color: '#26302B', fontSize: 12, lineHeight: 15, fontFamily: 'Inter_700Bold' },
+  timelineService: { color: '#26302B', fontSize: 11, lineHeight: 14, fontFamily: 'Inter_600SemiBold', marginTop: 2 },
+  timelineDuration: { color: '#5B665F', fontSize: 10, lineHeight: 13, fontFamily: 'Inter_500Medium', marginTop: 2 },
   timelineEmpty: { position: 'absolute', top: 250, left: 0, right: 0, alignItems: 'center', gap: 8 },
   timelineEmptyText: { color: '#A8B2AD', fontSize: 12, fontFamily: 'Inter_500Medium' },
   currentTime: { position: 'absolute', left: 0, right: 0, height: 2, backgroundColor: '#D85E8B' },
