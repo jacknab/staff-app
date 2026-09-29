@@ -38,6 +38,7 @@ const keypadRows = [
 // Re-enable after Apple embeds the Tap to Pay managed entitlement in the
 // provisioning profile. Stripe M2 does not require that Apple entitlement.
 const TAP_TO_PAY_ENABLED = false;
+const EXPO_GO_PREVIEW = process.env.EXPO_PUBLIC_EXPO_GO_PREVIEW === '1';
 
 type PaymentStep = 'idle' | 'initializing' | 'discovering' | 'connecting' | 'ready' | 'processing' | 'capture_pending' | 'success' | 'error';
 type ReaderMode = 'tap_to_pay' | 'm2';
@@ -222,6 +223,12 @@ export default function CheckoutScreen() {
     setStep('initializing');
     setStatusText(mode === 'm2' ? 'Preparing Stripe M2…' : 'Preparing Tap to Pay…');
 
+    if (EXPO_GO_PREVIEW) {
+      setStep('ready');
+      setStatusText(`${mode === 'm2' ? 'Stripe M2' : 'Tap to Pay'} preview is ready in Expo Go.`);
+      return;
+    }
+
     try {
       const initialized = await initialize();
       if (initialized.error) throw new Error(initialized.error.message);
@@ -245,6 +252,22 @@ export default function CheckoutScreen() {
 
   const processPayment = async () => {
     const amountCents = Number(digits);
+    if (EXPO_GO_PREVIEW) {
+      if (amountCents < 50) {
+        setError('Enter an amount of at least $0.50.');
+        return;
+      }
+
+      setError('');
+      setSales((current) => [
+        { amount: dollars(digits), label: 'Card payment', time: 'Just now · Expo Go preview' },
+        ...current,
+      ]);
+      setStatusText('Expo Go preview payment complete.');
+      setStep('success');
+      return;
+    }
+
     const numericAppointmentId = Number(appointmentId);
     if (!Number.isInteger(numericAppointmentId) || numericAppointmentId < 1) {
       setError('Enter the numeric Certxa appointment ID for this checkout.');

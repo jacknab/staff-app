@@ -5,12 +5,14 @@ Native booking and point-of-sale UX for independent health and beauty profession
 ## Run & Operate
 
 - `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
+- `pnpm --filter @workspace/certxa-pro run dev` — run the Expo Go development preview (Stripe Terminal is mocked; no real charges)
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/certxa-pro run eas:login` — authenticate the Replit workspace with EAS
 - `pnpm --filter @workspace/certxa-pro run eas:init` — link this app to an EAS project once
 - `pnpm --filter @workspace/certxa-pro run eas:ios:preview` — create an internal iOS device build
 - `pnpm --filter @workspace/certxa-pro run eas:ios:production` — create an iOS store build
+- EAS preview and production builds keep the native Stripe Terminal integration; use an EAS device build for real reader payments
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
 - Required env: `DATABASE_URL` — Postgres connection string
