@@ -1,6 +1,7 @@
 import { useState } from 'react';
+import type { ComponentProps } from 'react';
 import { Feather } from '@expo/vector-icons';
-import { Platform, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Platform, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 
@@ -12,6 +13,13 @@ const keypadRows = [
 ] as const;
 
 type Sale = { amount: string; label: string; time: string };
+type PaymentMethod = 'card' | 'cash' | 'gift_card';
+
+const paymentMethods: Array<{ key: PaymentMethod; label: string; description: string; icon: ComponentProps<typeof Feather>['name'] }> = [
+  { key: 'card', label: 'Card', description: 'Tap to Pay', icon: 'credit-card' },
+  { key: 'cash', label: 'Cash', description: 'Record manually', icon: 'dollar-sign' },
+  { key: 'gift_card', label: 'Gift card', description: 'Record manually', icon: 'gift' },
+];
 
 function dollars(digits: string) {
   const value = (Number(digits || '0') || 0) / 100;
@@ -24,6 +32,8 @@ export default function CheckoutScreen() {
   const [digits, setDigits] = useState('0');
   const [tapping, setTapping] = useState(false);
   const [paid, setPaid] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('card');
+  const [giftCardCode, setGiftCardCode] = useState('');
   const [sales, setSales] = useState<Sale[]>([
   ]);
   const topInset = Platform.OS === 'web' ? 67 : insets.top;
@@ -45,8 +55,14 @@ export default function CheckoutScreen() {
     if (digits.length < 8) setDigits((current) => current === '0' ? value : `${current}${value}`);
   };
 
+  const selectedMethod = paymentMethods.find((method) => method.key === paymentMethod) || paymentMethods[0];
+
   const finishPayment = () => {
-    setSales((current) => [{ amount, label: 'In-person service', time: 'Just now · Demo payment' }, ...current]);
+    setSales((current) => [{
+      amount,
+      label: `${selectedMethod.label} payment${paymentMethod === 'gift_card' && giftCardCode.trim() ? ` · ${giftCardCode.trim()}` : ''}`,
+      time: paymentMethod === 'card' ? 'Just now · Demo payment' : 'Just now · Recorded manually',
+    }, ...current]);
     setPaid(true);
   };
 
@@ -69,12 +85,12 @@ export default function CheckoutScreen() {
           </View>
         ) : (
           <View style={styles.tapContent}>
-            <View style={[styles.nfcCircle, { backgroundColor: colors.secondary }]}><Feather name="radio" size={32} color={colors.primary} /></View>
-            <Text style={[styles.tapTitle, { color: colors.foreground }]}>Hold near phone</Text>
-            <Text style={[styles.tapSub, { color: colors.mutedForeground }]}>Tap to Pay experience preview</Text>
+            <View style={[styles.nfcCircle, { backgroundColor: colors.secondary }]}><Feather name={selectedMethod.icon} size={32} color={colors.primary} /></View>
+            <Text style={[styles.tapTitle, { color: colors.foreground }]}>{paymentMethod === 'card' ? 'Hold near phone' : `${selectedMethod.label} payment`}</Text>
+            <Text style={[styles.tapSub, { color: colors.mutedForeground }]}>{paymentMethod === 'card' ? 'Tap to Pay experience preview' : 'Confirm the payment was received, then record it.'}</Text>
             <View style={[styles.amountCard, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.eyebrow, { color: colors.mutedForeground }]}>AMOUNT DUE</Text><Text style={[styles.tapAmount, { color: colors.foreground }]}>{amount}</Text><Text style={[styles.serviceLabel, { color: colors.mutedForeground }]}>Tom L · Nail services</Text></View>
-            <View style={[styles.previewNotice, { backgroundColor: colors.accent }]}><Feather name="info" size={15} color={colors.accentForeground} /><Text style={[styles.previewText, { color: colors.accentForeground }]}>Tom this app is 100% real native app.</Text></View>
-            <TouchableOpacity testID="simulate-payment" onPress={finishPayment} style={[styles.primaryButton, { backgroundColor: colors.primary }]}><Feather name="check" size={17} color={colors.primaryForeground} /><Text style={[styles.primaryButtonText, { color: colors.primaryForeground }]}>Preview success state</Text></TouchableOpacity>
+            <View style={[styles.previewNotice, { backgroundColor: colors.accent }]}><Feather name="info" size={15} color={colors.accentForeground} /><Text style={[styles.previewText, { color: colors.accentForeground }]}>{paymentMethod === 'card' ? 'Preview only · Payments are not processed.' : 'Manual payment entry · No card charge will be made.'}</Text></View>
+            <TouchableOpacity testID="simulate-payment" onPress={finishPayment} style={[styles.primaryButton, { backgroundColor: colors.primary }]}><Feather name="check" size={17} color={colors.primaryForeground} /><Text style={[styles.primaryButtonText, { color: colors.primaryForeground }]}>{paymentMethod === 'card' ? 'Preview success state' : `Record ${selectedMethod.label.toLowerCase()} payment`}</Text></TouchableOpacity>
           </View>
         )}
       </View>
@@ -104,7 +120,21 @@ export default function CheckoutScreen() {
             </View>
           ))}
         </View>
-        <TouchableOpacity testID="tap-to-pay" onPress={() => { setTapping(true); setPaid(false); }} disabled={Number(digits) === 0} style={[styles.tapButton, { backgroundColor: Number(digits) === 0 ? colors.muted : colors.primary }]}><Feather name="radio" size={18} color={Number(digits) === 0 ? colors.mutedForeground : colors.primaryForeground} /><Text style={[styles.tapButtonText, { color: Number(digits) === 0 ? colors.mutedForeground : colors.primaryForeground }]}>Tap to Pay</Text><Feather name="arrow-up-right" size={16} color={Number(digits) === 0 ? colors.mutedForeground : colors.primaryForeground} /></TouchableOpacity>
+        <Text style={[styles.methodHeading, { color: colors.foreground }]}>Payment method</Text>
+        <View style={styles.methodList}>
+          {paymentMethods.map((method) => {
+            const selected = paymentMethod === method.key;
+            return (
+              <TouchableOpacity key={method.key} testID={`payment-method-${method.key}`} onPress={() => setPaymentMethod(method.key)} accessibilityRole="button" accessibilityState={{ selected }} style={[styles.methodCard, { backgroundColor: selected ? colors.secondary : colors.card, borderColor: selected ? colors.primary : colors.border }]}>
+                <View style={[styles.methodIcon, { backgroundColor: selected ? colors.primary : colors.muted }]}><Feather name={method.icon} size={16} color={selected ? colors.primaryForeground : colors.foreground} /></View>
+                <View style={{ flex: 1 }}><Text style={[styles.methodLabel, { color: colors.foreground }]}>{method.label}</Text><Text style={[styles.methodDescription, { color: colors.mutedForeground }]}>{method.description}</Text></View>
+                <Feather name={selected ? 'check-circle' : 'circle'} size={18} color={selected ? colors.primary : colors.border} />
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        {paymentMethod === 'gift_card' ? <View style={styles.giftCardField}><Text style={[styles.fieldLabel, { color: colors.foreground }]}>Gift card number <Text style={{ color: colors.mutedForeground }}>(optional)</Text></Text><TextInput autoCapitalize="characters" onChangeText={setGiftCardCode} placeholder="Add a reference to the receipt" placeholderTextColor={colors.mutedForeground} style={[styles.fieldInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} testID="gift-card-code" value={giftCardCode} /></View> : null}
+        <TouchableOpacity testID={paymentMethod === 'card' ? 'tap-to-pay' : `record-${paymentMethod}`} onPress={() => { setTapping(true); setPaid(false); }} disabled={Number(digits) === 0} style={[styles.tapButton, { backgroundColor: Number(digits) === 0 ? colors.muted : colors.primary }]}><Feather name={selectedMethod.icon} size={18} color={Number(digits) === 0 ? colors.mutedForeground : colors.primaryForeground} /><Text style={[styles.tapButtonText, { color: Number(digits) === 0 ? colors.mutedForeground : colors.primaryForeground }]}>{paymentMethod === 'card' ? 'Tap to Pay' : `Record ${selectedMethod.label}`}</Text><Feather name="arrow-up-right" size={16} color={Number(digits) === 0 ? colors.mutedForeground : colors.primaryForeground} /></TouchableOpacity>
         <View style={styles.recentHeader}><Text style={[styles.sectionTitle, { color: colors.foreground }]}>Recent payments</Text></View>
         <View style={styles.saleList}>{sales.slice(0, 3).map((sale, index) => <View key={`${sale.time}-${index}`} style={[styles.saleRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.saleIcon, { backgroundColor: colors.secondary }]}><Feather name="check" size={15} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={[styles.quickTitle, { color: colors.foreground }]}>{sale.label}</Text><Text style={[styles.saleTime, { color: colors.mutedForeground }]}>{sale.time}</Text></View><Text style={[styles.saleAmount, { color: colors.foreground }]}>{sale.amount}</Text></View>)}</View>
         <Text style={[styles.disclaimer, { color: colors.mutedForeground }]}>Preview only · Payments are not processed</Text>
@@ -134,6 +164,15 @@ const styles = StyleSheet.create({
   keyButton: { flex: 1, height: 56, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   keyButtonSpacing: { marginRight: 8 },
   keyText: { fontSize: 18, fontFamily: 'Inter_500Medium' },
+  methodHeading: { fontSize: 16, fontFamily: 'Inter_600SemiBold', marginTop: 25, marginBottom: 10 },
+  methodList: { gap: 8 },
+  methodCard: { borderWidth: 1, borderRadius: 15, padding: 11, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  methodIcon: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  methodLabel: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  methodDescription: { fontSize: 10, marginTop: 3 },
+  giftCardField: { gap: 6, marginTop: 12 },
+  fieldLabel: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
+  fieldInput: { borderWidth: 1, borderRadius: 13, minHeight: 45, paddingHorizontal: 12, fontSize: 12, fontFamily: 'Inter_400Regular' },
   tapButton: { height: 54, marginTop: 11, borderRadius: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 11 },
   tapButtonText: { fontSize: 14, fontFamily: 'Inter_600SemiBold', flex: 1, textAlign: 'center' },
   recentHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 26, marginBottom: 11 },

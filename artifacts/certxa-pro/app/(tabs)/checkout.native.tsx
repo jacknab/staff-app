@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import type { ComponentProps } from 'react';
 import { Feather } from '@expo/vector-icons';
 import {
   Keyboard,
@@ -40,6 +41,13 @@ const TAP_TO_PAY_ENABLED = false;
 
 type PaymentStep = 'idle' | 'initializing' | 'discovering' | 'connecting' | 'ready' | 'processing' | 'capture_pending' | 'success' | 'error';
 type ReaderMode = 'tap_to_pay' | 'm2';
+type PaymentMethod = 'card' | 'cash' | 'gift_card';
+
+const paymentMethods: Array<{ key: PaymentMethod; label: string; description: string; icon: ComponentProps<typeof Feather>['name'] }> = [
+  { key: 'card', label: 'Card', description: 'Stripe reader', icon: 'credit-card' },
+  { key: 'cash', label: 'Cash', description: 'Record manually', icon: 'dollar-sign' },
+  { key: 'gift_card', label: 'Gift card', description: 'Record manually', icon: 'gift' },
+];
 
 function dollars(cents: string) {
   const value = (Number(cents || '0') || 0) / 100;
@@ -59,6 +67,8 @@ export default function CheckoutScreen() {
   const [appointmentId, setAppointmentId] = useState('');
   const [clientName, setClientName] = useState('');
   const [step, setStep] = useState<PaymentStep>('idle');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('card');
+  const [giftCardCode, setGiftCardCode] = useState('');
   const [statusText, setStatusText] = useState('');
   const [error, setError] = useState('');
   const [locationId, setLocationId] = useState<string | null>(null);
@@ -70,6 +80,7 @@ export default function CheckoutScreen() {
   const [isRegisteringReader, setIsRegisteringReader] = useState(false);
   const [sales, setSales] = useState<Array<{ amount: string; label: string; time: string }>>([]);
   const topInset = insets.top;
+  const selectedMethod = paymentMethods.find((method) => method.key === paymentMethod) || paymentMethods[0];
 
   useEffect(() => {
     if (params.appointmentId) setAppointmentId(String(params.appointmentId));
@@ -326,6 +337,25 @@ export default function CheckoutScreen() {
     }
   };
 
+  const processManualPayment = () => {
+    if (Number(digits) < 50) {
+      setError('Enter an amount of at least $0.50.');
+      return;
+    }
+
+    setError('');
+    setSales((current) => [
+      {
+        amount: dollars(digits),
+        label: `${selectedMethod.label} payment${paymentMethod === 'gift_card' && giftCardCode.trim() ? ` · ${giftCardCode.trim()}` : ''}`,
+        time: 'Just now · Recorded manually',
+      },
+      ...current,
+    ]);
+    setStatusText(`${selectedMethod.label} payment recorded.`);
+    setStep('success');
+  };
+
   const retryCapture = async () => {
     if (!pendingCaptureId) return;
 
@@ -378,6 +408,8 @@ export default function CheckoutScreen() {
     setStatusText('');
     setPaymentIntentId(null);
     setPendingCaptureId(null);
+    setPaymentMethod('card');
+    setGiftCardCode('');
     void clearPendingTerminalCapture();
   };
 
@@ -400,7 +432,7 @@ export default function CheckoutScreen() {
             <View style={[styles.successBadge, { backgroundColor: colors.secondary }]}><Feather name="check" size={32} color={colors.primary} /></View>
             <Text style={[styles.successTitle, { color: colors.foreground }]}>Payment complete</Text>
             <Text style={[styles.successAmount, { color: colors.foreground }]}>{dollars(digits)}</Text>
-            <Text style={[styles.successNote, { color: colors.mutedForeground }]}>Captured through Certxa · {paymentIntentId}</Text>
+            <Text style={[styles.successNote, { color: colors.mutedForeground }]}>{paymentMethod === 'card' ? `Captured through Certxa · ${paymentIntentId}` : `${selectedMethod.label} payment recorded manually${paymentMethod === 'gift_card' && giftCardCode.trim() ? ` · ${giftCardCode.trim()}` : ''}`}</Text>
             <TouchableOpacity testID="new-checkout" onPress={resetCheckout} style={[styles.primaryButton, { backgroundColor: colors.primary }]}><Text style={[styles.primaryButtonText, { color: colors.primaryForeground }]}>New checkout</Text></TouchableOpacity>
           </View>
         ) : (
@@ -430,14 +462,14 @@ export default function CheckoutScreen() {
         <View style={styles.form}>
           <View style={styles.formField}><Text style={[styles.fieldLabel, { color: colors.foreground }]}>Certxa appointment ID</Text><TextInput keyboardType="number-pad" onChangeText={setAppointmentId} placeholder="Required for live payment" placeholderTextColor={colors.mutedForeground} style={[styles.fieldInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} testID="appointment-id" value={appointmentId} /></View>
           <View style={styles.formField}><Text style={[styles.fieldLabel, { color: colors.foreground }]}>Client name <Text style={{ color: colors.mutedForeground }}>(optional)</Text></Text><TextInput autoCapitalize="words" onChangeText={setClientName} placeholder="Shown on the receipt" placeholderTextColor={colors.mutedForeground} style={[styles.fieldInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} testID="client-name" value={clientName} /></View>
-          <View style={styles.formField}>
+           {paymentMethod === 'card' ? <View style={styles.formField}>
             <Text style={[styles.fieldLabel, { color: colors.foreground }]}>New Stripe M2 setup <Text style={{ color: colors.mutedForeground }}>(one time)</Text></Text>
             <View style={styles.registrationRow}>
               <TextInput autoCapitalize="none" autoCorrect={false} onChangeText={setRegistrationCode} placeholder="Reader registration code" placeholderTextColor={colors.mutedForeground} style={[styles.fieldInput, styles.registrationInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} testID="m2-registration-code" value={registrationCode} />
               <TouchableOpacity disabled={isRegisteringReader || !registrationCode.trim()} onPress={registerM2Reader} style={[styles.registerButton, { backgroundColor: registrationCode.trim() ? colors.secondary : colors.muted }]} testID="register-m2"><Text style={[styles.registerButtonText, { color: registrationCode.trim() ? colors.primary : colors.mutedForeground }]}>{isRegisteringReader ? 'Registering…' : 'Register'}</Text></TouchableOpacity>
             </View>
             {readerSetupText ? <Text style={[styles.setupText, { color: colors.primary }]}>{readerSetupText}</Text> : null}
-          </View>
+           </View> : null}
         </View>
         <View style={styles.keypad}>
           {keypadRows.map((row, rowIndex) => (
@@ -447,10 +479,24 @@ export default function CheckoutScreen() {
           ))}
         </View>
         {error ? <View style={[styles.errorNotice, { backgroundColor: colors.accent }]}><Feather name="alert-circle" size={15} color={colors.accentForeground} /><Text style={[styles.previewText, { color: colors.accentForeground }]}>{error}</Text></View> : null}
-        <View style={styles.readerButtons}>
+        <Text style={[styles.methodHeading, { color: colors.foreground }]}>Payment method</Text>
+        <View style={styles.methodList}>
+          {paymentMethods.map((method) => {
+            const selected = paymentMethod === method.key;
+            return (
+              <TouchableOpacity key={method.key} testID={`payment-method-${method.key}`} onPress={() => setPaymentMethod(method.key)} accessibilityRole="button" accessibilityState={{ selected }} style={[styles.methodCard, { backgroundColor: selected ? colors.secondary : colors.card, borderColor: selected ? colors.primary : colors.border }]}>
+                <View style={[styles.methodIcon, { backgroundColor: selected ? colors.primary : colors.muted }]}><Feather name={method.icon} size={16} color={selected ? colors.primaryForeground : colors.foreground} /></View>
+                <View style={{ flex: 1 }}><Text style={[styles.methodLabel, { color: colors.foreground }]}>{method.label}</Text><Text style={[styles.methodDescription, { color: colors.mutedForeground }]}>{method.description}</Text></View>
+                <Feather name={selected ? 'check-circle' : 'circle'} size={18} color={selected ? colors.primary : colors.border} />
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        {paymentMethod === 'gift_card' ? <View style={styles.giftCardField}><Text style={[styles.fieldLabel, { color: colors.foreground }]}>Gift card number <Text style={{ color: colors.mutedForeground }}>(optional)</Text></Text><TextInput autoCapitalize="characters" onChangeText={setGiftCardCode} placeholder="Add a reference to the receipt" placeholderTextColor={colors.mutedForeground} style={[styles.fieldInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} testID="gift-card-code" value={giftCardCode} /></View> : null}
+        {paymentMethod === 'card' ? <View style={styles.readerButtons}>
           <TouchableOpacity testID="stripe-m2" onPress={() => startReader('m2')} disabled={Number(digits) < 50} style={[styles.tapButton, styles.readerButton, { backgroundColor: Number(digits) < 50 ? colors.muted : colors.primary }]}><Feather name="credit-card" size={18} color={Number(digits) < 50 ? colors.mutedForeground : colors.primaryForeground} /><Text style={[styles.tapButtonText, { color: Number(digits) < 50 ? colors.mutedForeground : colors.primaryForeground }]}>Stripe M2</Text></TouchableOpacity>
           <TouchableOpacity testID="tap-to-pay" onPress={() => startReader('tap_to_pay')} disabled={!TAP_TO_PAY_ENABLED || Number(digits) < 50} style={[styles.tapButton, styles.readerButton, { backgroundColor: colors.muted }]}><Feather name="radio" size={18} color={colors.mutedForeground} /><Text style={[styles.tapButtonText, { color: colors.mutedForeground }]}>Tap to Pay pending Apple</Text></TouchableOpacity>
-        </View>
+        </View> : <TouchableOpacity testID={`record-${paymentMethod}`} onPress={processManualPayment} disabled={Number(digits) < 50} style={[styles.tapButton, { backgroundColor: Number(digits) < 50 ? colors.muted : colors.primary }]}><Feather name={selectedMethod.icon} size={18} color={Number(digits) < 50 ? colors.mutedForeground : colors.primaryForeground} /><Text style={[styles.tapButtonText, { color: Number(digits) < 50 ? colors.mutedForeground : colors.primaryForeground }]}>Record {selectedMethod.label} payment</Text></TouchableOpacity>}
         <View style={styles.recentHeader}><Text style={[styles.sectionTitle, { color: colors.foreground }]}>Recent payments</Text></View>
         <View style={styles.saleList}>{sales.slice(0, 3).map((sale, index) => <View key={`${sale.time}-${index}`} style={[styles.saleRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.saleIcon, { backgroundColor: colors.secondary }]}><Feather name="check" size={15} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={[styles.quickTitle, { color: colors.foreground }]}>{sale.label}</Text><Text style={[styles.saleTime, { color: colors.mutedForeground }]}>{sale.time}</Text></View><Text style={[styles.saleAmount, { color: colors.foreground }]}>{sale.amount}</Text></View>)}</View>
         <Text style={[styles.disclaimer, { color: colors.mutedForeground }]}>Payments are processed by Certxa Connect in a custom native build.</Text>
@@ -494,6 +540,13 @@ const styles = StyleSheet.create({
   readerButtons: { flexDirection: 'row', gap: 9 },
   readerButton: { flex: 1 },
   tapButtonText: { fontSize: 14, fontFamily: 'Inter_600SemiBold', flex: 1, textAlign: 'center' },
+  methodHeading: { fontSize: 16, fontFamily: 'Inter_600SemiBold', marginTop: 25, marginBottom: 10 },
+  methodList: { gap: 8 },
+  methodCard: { borderWidth: 1, borderRadius: 15, padding: 11, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  methodIcon: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  methodLabel: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  methodDescription: { fontSize: 10, marginTop: 3 },
+  giftCardField: { gap: 6, marginTop: 12 },
   recentHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 26, marginBottom: 11 },
   sectionTitle: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
   saleList: { gap: 8 },

@@ -1,0 +1,1 @@
+- [Expo web and Stripe Terminal](expo-web-stripe-terminal.md) — keep native Stripe Terminal imports isolated from Expo web bundling.
