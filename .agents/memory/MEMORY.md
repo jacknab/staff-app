@@ -1,2 +1,3 @@
 - [Expo web and Stripe Terminal](expo-web-stripe-terminal.md) — keep native Stripe Terminal imports isolated from Expo web bundling.
 - [Expo web tab navigation](expo-web-tab-navigation.md) — use the classic tab bar on web; native tab labels can render as invalid text nodes.
+- [Expo DevTools runtime](expo-devtools-runtime.md) — the optional native debugger may warn about desktop libraries while web preview still works.

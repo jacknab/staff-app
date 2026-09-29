@@ -2,7 +2,7 @@ modules = ["nodejs-20", "web", "bash"]
 
 [nix]
 channel = "stable-25_05"
-packages = ["glib"]
+packages = ["glib", "nspr", "nss", "dbus"]
 
 [agent]
 expertMode = true
@@ -18,3 +18,25 @@ externalPort = 80
 exposeLocalhost = true
 
 [workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "artifacts/certxa-pro: expo"
+
+[[workflows.workflow]]
+name = "artifacts/certxa-pro: expo"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pnpm --filter @workspace/certxa-pro run dev"
+waitForPort = 25053
+
+[workflows.workflow.metadata]
+outputType = "console"
