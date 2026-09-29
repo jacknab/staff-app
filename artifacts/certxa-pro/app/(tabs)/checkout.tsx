@@ -1,23 +1,16 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ComponentProps } from 'react';
 import { Feather } from '@expo/vector-icons';
 import { Platform, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 
-const keypadRows = [
-  ['1', '2', '3'],
-  ['4', '5', '6'],
-  ['7', '8', '9'],
-  ['.', '0', 'delete'],
-] as const;
-
 type Sale = { amount: string; label: string; time: string };
-type PaymentMethod = 'card' | 'cash' | 'gift_card';
+type PaymentMethod = 'card' | 'gift_card';
 
 const paymentMethods: Array<{ key: PaymentMethod; label: string; description: string; icon: ComponentProps<typeof Feather>['name'] }> = [
   { key: 'card', label: 'Card', description: 'Tap to Pay', icon: 'credit-card' },
-  { key: 'cash', label: 'Cash', description: 'Record manually', icon: 'dollar-sign' },
   { key: 'gift_card', label: 'Gift card', description: 'Record manually', icon: 'gift' },
 ];
 
@@ -29,6 +22,7 @@ function dollars(digits: string) {
 export default function CheckoutScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams<{ amountCents?: string; clientName?: string }>();
   const [digits, setDigits] = useState('0');
   const [tapping, setTapping] = useState(false);
   const [paid, setPaid] = useState(false);
@@ -39,21 +33,12 @@ export default function CheckoutScreen() {
   const topInset = Platform.OS === 'web' ? 67 : insets.top;
   const amount = dollars(digits);
 
-  const pressDigit = (value: string) => {
-    if (value === 'delete') {
-      setDigits((current) => current.length > 1 ? current.slice(0, -1) : '0');
-      return;
+  useEffect(() => {
+    const amountCents = Number(params.amountCents);
+    if (params.amountCents && Number.isFinite(amountCents) && amountCents >= 0) {
+      setDigits(String(Math.round(amountCents)));
     }
-    if (value === '.') {
-      if (!digits.includes('.')) setDigits((current) => `${current === '0' ? '0' : current}.`);
-      return;
-    }
-    if (digits.includes('.')) {
-      if (digits.split('.')[1].length < 2) setDigits((current) => `${current}${value}`);
-      return;
-    }
-    if (digits.length < 8) setDigits((current) => current === '0' ? value : `${current}${value}`);
-  };
+  }, [params.amountCents]);
 
   const selectedMethod = paymentMethods.find((method) => method.key === paymentMethod) || paymentMethods[0];
 
@@ -101,24 +86,10 @@ export default function CheckoutScreen() {
     <View style={[styles.root, { backgroundColor: colors.background, paddingTop: topInset }]}>
       <StatusBar barStyle="dark-content" />
       <ScrollView contentContainerStyle={styles.pageContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.topLine}><View><Text style={[styles.eyebrow, { color: colors.primary }]}>TOM L</Text><Text style={[styles.title, { color: colors.foreground }]}>Checkout</Text></View><View style={[styles.secureBadge, { backgroundColor: colors.secondary }]}><Feather name="lock" size={13} color={colors.primary} /><Text style={[styles.secureText, { color: colors.primary }]}>Nails by Tom</Text></View></View>
+        <View style={styles.topLine}><View><Text style={[styles.eyebrow, { color: colors.primary }]}>{params.clientName ? String(params.clientName).toUpperCase() : 'CERTXA PRO'}</Text><Text style={[styles.title, { color: colors.foreground }]}>Checkout</Text></View><View style={[styles.secureBadge, { backgroundColor: colors.secondary }]}><Feather name="lock" size={13} color={colors.primary} /><Text style={[styles.secureText, { color: colors.primary }]}>Certxa secure</Text></View></View>
         <View style={[styles.amountPanel, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[styles.amountCaption, { color: colors.mutedForeground }]}>PAYMENT AMOUNT</Text>
           <Text testID="checkout-amount" style={[styles.amount, { color: colors.foreground }]}>{amount}</Text>
-          <View style={styles.quickServices}>
-            {[{ title: 'Brow shaping', cost: '4800' }, { title: 'Facial', cost: '12500' }].map((service) => <TouchableOpacity key={service.title} testID={`quick-${service.title}`} onPress={() => setDigits(service.cost)} style={[styles.quickChip, { backgroundColor: colors.background, borderColor: colors.border }]}><Text style={[styles.quickTitle, { color: colors.foreground }]}>{service.title}</Text><Text style={[styles.quickPrice, { color: colors.primary }]}>{dollars(service.cost)}</Text></TouchableOpacity>)}
-          </View>
-        </View>
-        <View style={styles.keypad}>
-          {keypadRows.map((row, rowIndex) => (
-            <View key={`key-row-${rowIndex}`} style={[styles.keypadRow, rowIndex < keypadRows.length - 1 && styles.keypadRowSpacing]}>
-              {row.map((key, keyIndex) => (
-                <TouchableOpacity key={key} testID={`key-${key}`} onPress={() => pressDigit(key)} style={[styles.keyButton, keyIndex < row.length - 1 && styles.keyButtonSpacing, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  {key === 'delete' ? <Feather name="delete" size={20} color={colors.foreground} /> : <Text style={[styles.keyText, { color: colors.foreground }]}>{key}</Text>}
-                </TouchableOpacity>
-              ))}
-            </View>
-          ))}
         </View>
         <Text style={[styles.methodHeading, { color: colors.foreground }]}>Payment method</Text>
         <View style={styles.methodList}>
@@ -154,16 +125,7 @@ const styles = StyleSheet.create({
   amountPanel: { borderWidth: 1, borderRadius: 20, alignItems: 'center', paddingHorizontal: 15, paddingTop: 19, paddingBottom: 14 },
   amountCaption: { fontSize: 9, letterSpacing: 1.45, fontFamily: 'Inter_600SemiBold' },
   amount: { fontSize: 40, letterSpacing: -1.3, fontFamily: 'Inter_500Medium', marginTop: 6, marginBottom: 15 },
-  quickServices: { flexDirection: 'row', gap: 8, width: '100%' },
-  quickChip: { flex: 1, borderWidth: 1, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 9, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 4 },
   quickTitle: { fontSize: 11, fontFamily: 'Inter_500Medium' },
-  quickPrice: { fontSize: 10, fontFamily: 'Inter_600SemiBold' },
-  keypad: { marginTop: 11 },
-  keypadRow: { flexDirection: 'row', alignItems: 'center' },
-  keypadRowSpacing: { marginBottom: 8 },
-  keyButton: { flex: 1, height: 56, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  keyButtonSpacing: { marginRight: 8 },
-  keyText: { fontSize: 18, fontFamily: 'Inter_500Medium' },
   methodHeading: { fontSize: 16, fontFamily: 'Inter_600SemiBold', marginTop: 25, marginBottom: 10 },
   methodList: { gap: 8 },
   methodCard: { borderWidth: 1, borderRadius: 15, padding: 11, flexDirection: 'row', alignItems: 'center', gap: 10 },

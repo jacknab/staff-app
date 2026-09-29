@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import type { ComponentProps } from 'react';
 import { Feather } from '@expo/vector-icons';
 import {
-  Keyboard,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -28,13 +27,6 @@ import {
   CertxaApiError,
 } from '@/lib/certxa-api';
 
-const keypadRows = [
-  ['1', '2', '3'],
-  ['4', '5', '6'],
-  ['7', '8', '9'],
-  ['delete', '0', 'clear'],
-] as const;
-
 // Re-enable after Apple embeds the Tap to Pay managed entitlement in the
 // provisioning profile. Stripe M2 does not require that Apple entitlement.
 const TAP_TO_PAY_ENABLED = false;
@@ -42,11 +34,10 @@ const EXPO_GO_PREVIEW = process.env.EXPO_PUBLIC_EXPO_GO_PREVIEW === '1';
 
 type PaymentStep = 'idle' | 'initializing' | 'discovering' | 'connecting' | 'ready' | 'processing' | 'capture_pending' | 'success' | 'error';
 type ReaderMode = 'tap_to_pay' | 'm2';
-type PaymentMethod = 'card' | 'cash' | 'gift_card';
+type PaymentMethod = 'card' | 'gift_card';
 
 const paymentMethods: Array<{ key: PaymentMethod; label: string; description: string; icon: ComponentProps<typeof Feather>['name'] }> = [
   { key: 'card', label: 'Card', description: 'Stripe reader', icon: 'credit-card' },
-  { key: 'cash', label: 'Cash', description: 'Record manually', icon: 'dollar-sign' },
   { key: 'gift_card', label: 'Gift card', description: 'Record manually', icon: 'gift' },
 ];
 
@@ -177,18 +168,6 @@ export default function CheckoutScreen() {
     }, 30_000);
     return () => clearTimeout(timer);
   }, [readerMode, step]);
-
-  const pressDigit = (value: string) => {
-    if (value === 'delete') {
-      setDigits((current) => current.length > 1 ? current.slice(0, -1) : '0');
-      return;
-    }
-    if (value === 'clear') {
-      setDigits('0');
-      return;
-    }
-    setDigits((current) => current === '0' ? value : `${current}${value}`.slice(0, 8));
-  };
 
   const registerM2Reader = async () => {
     const code = registrationCode.trim();
@@ -494,13 +473,6 @@ export default function CheckoutScreen() {
             {readerSetupText ? <Text style={[styles.setupText, { color: colors.primary }]}>{readerSetupText}</Text> : null}
            </View> : null}
         </View>
-        <View style={styles.keypad}>
-          {keypadRows.map((row, rowIndex) => (
-            <View key={`key-row-${rowIndex}`} style={[styles.keypadRow, rowIndex < keypadRows.length - 1 && styles.keypadRowSpacing]}>
-              {row.map((key, keyIndex) => <TouchableOpacity key={key} testID={`key-${key}`} onPress={() => { pressDigit(key); Keyboard.dismiss(); }} style={[styles.keyButton, keyIndex < row.length - 1 && styles.keyButtonSpacing, { backgroundColor: colors.card, borderColor: colors.border }]}>{key === 'delete' ? <Feather name="delete" size={20} color={colors.foreground} /> : key === 'clear' ? <Feather name="x" size={20} color={colors.foreground} /> : <Text style={[styles.keyText, { color: colors.foreground }]}>{key}</Text>}</TouchableOpacity>)}
-            </View>
-          ))}
-        </View>
         {error ? <View style={[styles.errorNotice, { backgroundColor: colors.accent }]}><Feather name="alert-circle" size={15} color={colors.accentForeground} /><Text style={[styles.previewText, { color: colors.accentForeground }]}>{error}</Text></View> : null}
         <Text style={[styles.methodHeading, { color: colors.foreground }]}>Payment method</Text>
         <View style={styles.methodList}>
@@ -540,10 +512,7 @@ const styles = StyleSheet.create({
   amountCaption: { fontSize: 9, letterSpacing: 1.45, fontFamily: 'Inter_600SemiBold' },
   amount: { fontSize: 40, letterSpacing: -1.3, fontFamily: 'Inter_500Medium', marginTop: 6, marginBottom: 15 },
   liveAmountNote: { fontSize: 11, lineHeight: 16, textAlign: 'center' },
-  quickServices: { flexDirection: 'row', gap: 8, width: '100%' },
-  quickChip: { flex: 1, borderWidth: 1, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 9, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 4 },
   quickTitle: { fontSize: 11, fontFamily: 'Inter_500Medium' },
-  quickPrice: { fontSize: 10, fontFamily: 'Inter_600SemiBold' },
   form: { gap: 12, marginTop: 14 },
   formField: { gap: 6 },
   fieldLabel: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
@@ -553,12 +522,6 @@ const styles = StyleSheet.create({
   registerButton: { minWidth: 92, borderRadius: 13, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
   registerButtonText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
   setupText: { fontSize: 10, lineHeight: 15, fontFamily: 'Inter_500Medium' },
-  keypad: { marginTop: 14 },
-  keypadRow: { flexDirection: 'row', alignItems: 'center' },
-  keypadRowSpacing: { marginBottom: 8 },
-  keyButton: { flex: 1, height: 51, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  keyButtonSpacing: { marginRight: 8 },
-  keyText: { fontSize: 18, fontFamily: 'Inter_500Medium' },
   tapButton: { height: 54, marginTop: 11, borderRadius: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 11 },
   readerButtons: { flexDirection: 'row', gap: 9 },
   readerButton: { flex: 1 },
