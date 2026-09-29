@@ -6,6 +6,7 @@ Native booking and point-of-sale UX for independent health and beauty profession
 
 - `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
 - `pnpm --filter @workspace/certxa-pro run dev` — run the Expo Go development preview (Stripe Terminal is mocked; no real charges)
+- Replit Preview runs the `artifacts/certxa-pro: expo` workflow on port 25053.
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/certxa-pro run eas:login` — authenticate the Replit workspace with EAS
