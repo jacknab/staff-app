@@ -94,6 +94,7 @@ function appointmentParams(item: AppointmentRecord) {
       duration: item.duration,
       status: item.status,
       note: item.note ?? '',
+      preview: item.id.startsWith('preview') ? '1' : '0',
     },
   };
 }
