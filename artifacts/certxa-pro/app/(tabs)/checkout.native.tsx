@@ -457,7 +457,6 @@ export default function CheckoutScreen() {
 
   return <TipCheckout
     baseCents={Number(params.amountCents) || 0}
-    clientName={String(params.clientName || '')}
     serviceName={String(params.serviceName || '')}
     onConfirmTip={(nextTipCents) => {
       const baseCents = Number(params.amountCents) || 0;

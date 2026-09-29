@@ -45,7 +45,7 @@ export default function CheckoutScreen() {
   };
 
   if (stage === 'tip') {
-    return <TipCheckout baseCents={baseCents} clientName={String(params.clientName || '')} serviceName={String(params.serviceName || '')} onConfirmTip={(nextTipCents) => { setTipCents(nextTipCents); setStage('tap'); }} />;
+    return <TipCheckout baseCents={baseCents} serviceName={String(params.serviceName || '')} onConfirmTip={(nextTipCents) => { setTipCents(nextTipCents); setStage('tap'); }} />;
   }
 
   if (stage === 'tap' || stage === 'success') {

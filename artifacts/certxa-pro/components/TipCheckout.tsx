@@ -1,12 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Feather } from '@expo/vector-icons';
 import { Platform, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useNavigation } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 
 type TipCheckoutProps = {
   baseCents: number;
-  clientName?: string;
   serviceName?: string;
   onConfirmTip: (tipCents: number) => void;
 };
@@ -17,9 +17,10 @@ function dollars(cents: number) {
   return `$${(Math.max(0, cents) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-export function TipCheckout({ baseCents, clientName, serviceName, onConfirmTip }: TipCheckoutProps) {
+export function TipCheckout({ baseCents, serviceName, onConfirmTip }: TipCheckoutProps) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
   const [screen, setScreen] = useState<'select' | 'custom'>('select');
   const [selectedPercent, setSelectedPercent] = useState<number | null>(null);
   const [customDigits, setCustomDigits] = useState('0');
@@ -28,8 +29,12 @@ export function TipCheckout({ baseCents, clientName, serviceName, onConfirmTip }
   const customTipCents = Number(customDigits) || 0;
   const tipCents = screen === 'custom' ? customTipCents : selectedTipCents ?? 0;
   const topInset = Platform.OS === 'web' ? 67 : insets.top;
-  const displayName = clientName?.trim() || 'Walk-in client';
   const displayService = serviceName?.trim() || 'Appointment';
+
+  useEffect(() => {
+    navigation.setOptions({ tabBarStyle: { display: 'none' } });
+    return () => navigation.setOptions({ tabBarStyle: undefined });
+  }, [navigation]);
 
   const choosePercent = (percent: number) => {
     setSelectedPercent(percent);
@@ -83,9 +88,7 @@ export function TipCheckout({ baseCents, clientName, serviceName, onConfirmTip }
       <View style={styles.content}>
         <Text style={[styles.eyebrow, { color: colors.primary }]}>FINISHING UP</Text>
         <Text style={[styles.title, { color: colors.foreground }]}>{screen === 'custom' ? 'Add a custom tip' : 'Add a tip?'}</Text>
-        <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-          {screen === 'custom' ? 'Enter the tip amount for this appointment.' : `How would you like to thank ${displayName}?`}
-        </Text>
+        {screen === 'custom' ? <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Enter the tip amount for this appointment.</Text> : null}
 
         {screen === 'select' ? (
           <>
