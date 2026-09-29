@@ -57,6 +57,7 @@ export default function CheckoutScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ appointmentId?: string; clientName?: string; serviceName?: string; amountCents?: string }>();
   const [digits, setDigits] = useState('0');
+  const [tipCents, setTipCents] = useState(0);
   const [appointmentId, setAppointmentId] = useState('');
   const [clientName, setClientName] = useState('');
   const [step, setStep] = useState<PaymentStep>('idle');
@@ -274,7 +275,7 @@ export default function CheckoutScreen() {
         appointmentId: numericAppointmentId,
         clientName: clientName.trim() || undefined,
         method: readerMode,
-        tipCents: 0,
+        tipCents,
         discountCents: 0,
         priorTenderedCents: 0,
       });
@@ -404,6 +405,7 @@ export default function CheckoutScreen() {
 
   const resetCheckout = () => {
     setDigits('0');
+    setTipCents(0);
     setAppointmentId('');
     setClientName('');
     setError('');
@@ -459,6 +461,7 @@ export default function CheckoutScreen() {
     serviceName={String(params.serviceName || '')}
     onConfirmTip={(nextTipCents) => {
       const baseCents = Number(params.amountCents) || 0;
+      setTipCents(nextTipCents);
       setDigits(String(Math.max(0, Math.round(baseCents + nextTipCents))));
       setStep('tap_intro');
     }}
