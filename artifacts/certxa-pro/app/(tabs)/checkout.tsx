@@ -1,81 +1,78 @@
 import { useEffect, useState } from 'react';
-import type { ComponentProps } from 'react';
 import { Feather } from '@expo/vector-icons';
 import { Platform, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
+import { TipCheckout } from '@/components/TipCheckout';
 
 type Sale = { amount: string; label: string; time: string };
-type PaymentMethod = 'card' | 'gift_card';
+type CheckoutStage = 'tip' | 'tap' | 'success';
 
-const paymentMethods: Array<{ key: PaymentMethod; label: string; description: string; icon: ComponentProps<typeof Feather>['name'] }> = [
-  { key: 'card', label: 'Card', description: 'Tap to Pay', icon: 'credit-card' },
-  { key: 'gift_card', label: 'Gift card', description: 'Record manually', icon: 'gift' },
-];
-
-function dollars(digits: string) {
-  const value = (Number(digits || '0') || 0) / 100;
+function dollars(cents: number) {
+  const value = (Number(cents || 0) || 0) / 100;
   return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 export default function CheckoutScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ amountCents?: string; clientName?: string }>();
+  const params = useLocalSearchParams<{ amountCents?: string; clientName?: string; serviceName?: string }>();
+  const [stage, setStage] = useState<CheckoutStage>('tip');
+  const [tipCents, setTipCents] = useState(0);
   const [digits, setDigits] = useState('0');
-  const [tapping, setTapping] = useState(false);
-  const [paid, setPaid] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('card');
-  const [giftCardCode, setGiftCardCode] = useState('');
   const [sales, setSales] = useState<Sale[]>([
   ]);
   const topInset = Platform.OS === 'web' ? 67 : insets.top;
-  const amount = dollars(digits);
+  const baseCents = Number(params.amountCents) || 0;
+  const totalCents = baseCents + tipCents;
+  const amount = dollars(totalCents);
 
   useEffect(() => {
     const amountCents = Number(params.amountCents);
     if (params.amountCents && Number.isFinite(amountCents) && amountCents >= 0) {
-      setDigits(String(Math.round(amountCents)));
+       setDigits(String(Math.round(amountCents)));
     }
   }, [params.amountCents]);
-
-  const selectedMethod = paymentMethods.find((method) => method.key === paymentMethod) || paymentMethods[0];
 
   const finishPayment = () => {
     setSales((current) => [{
       amount,
-      label: `${selectedMethod.label} payment${paymentMethod === 'gift_card' && giftCardCode.trim() ? ` · ${giftCardCode.trim()}` : ''}`,
-      time: paymentMethod === 'card' ? 'Just now · Demo payment' : 'Just now · Recorded manually',
+      label: 'Tap to Pay',
+      time: 'Just now · Demo payment',
     }, ...current]);
-    setPaid(true);
+    setStage('success');
   };
 
-  if (tapping) {
+  if (stage === 'tip') {
+    return <TipCheckout baseCents={baseCents} clientName={String(params.clientName || '')} serviceName={String(params.serviceName || '')} onConfirmTip={(nextTipCents) => { setTipCents(nextTipCents); setStage('tap'); }} />;
+  }
+
+  if (stage === 'tap' || stage === 'success') {
     return (
       <View style={[styles.root, { backgroundColor: colors.background, paddingTop: topInset }]}>
         <StatusBar barStyle="dark-content" />
         <View style={styles.tapHeader}>
-          <TouchableOpacity testID="cancel-tap" onPress={() => { setTapping(false); setPaid(false); }} style={styles.iconButton}><Feather name="x" size={23} color={colors.foreground} /></TouchableOpacity>
+          <TouchableOpacity testID="cancel-tap" onPress={() => { setStage('tip'); setTipCents(0); }} style={styles.iconButton}><Feather name="x" size={23} color={colors.foreground} /></TouchableOpacity>
           <Text style={[styles.eyebrow, { color: colors.mutedForeground }]}>IN-PERSON CHECKOUT</Text>
           <View style={{ width: 42 }} />
         </View>
-        {paid ? (
+        {stage === 'success' ? (
           <View style={styles.successContent}>
             <View style={[styles.successBadge, { backgroundColor: colors.secondary }]}><Feather name="check" size={32} color={colors.primary} /></View>
-            <Text style={[styles.successTitle, { color: colors.foreground }]}>Payment complete</Text>
+            <Text style={[styles.successTitle, { color: colors.foreground }]}>Payment successful</Text>
             <Text style={[styles.successAmount, { color: colors.foreground }]}>{amount}</Text>
-            <Text style={[styles.successNote, { color: colors.mutedForeground }]}>Preview payment recorded on this device.</Text>
-            <TouchableOpacity testID="new-checkout" onPress={() => { setDigits('0'); setPaid(false); setTapping(false); }} style={[styles.primaryButton, { backgroundColor: colors.primary }]}><Text style={[styles.primaryButtonText, { color: colors.primaryForeground }]}>New checkout</Text></TouchableOpacity>
+            <Text style={[styles.successNote, { color: colors.mutedForeground }]}>Tip included · Preview payment recorded on this device.</Text>
+            <TouchableOpacity testID="new-checkout" onPress={() => { setDigits('0'); setTipCents(0); setStage('tip'); }} style={[styles.primaryButton, { backgroundColor: colors.primary }]}><Text style={[styles.primaryButtonText, { color: colors.primaryForeground }]}>New checkout</Text></TouchableOpacity>
           </View>
         ) : (
           <View style={styles.tapContent}>
-            <View style={[styles.nfcCircle, { backgroundColor: colors.secondary }]}><Feather name={selectedMethod.icon} size={32} color={colors.primary} /></View>
-            <Text style={[styles.tapTitle, { color: colors.foreground }]}>{paymentMethod === 'card' ? 'Hold near phone' : `${selectedMethod.label} payment`}</Text>
-            <Text style={[styles.tapSub, { color: colors.mutedForeground }]}>{paymentMethod === 'card' ? 'Tap to Pay experience preview' : 'Confirm the payment was received, then record it.'}</Text>
-            <View style={[styles.amountCard, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.eyebrow, { color: colors.mutedForeground }]}>AMOUNT DUE</Text><Text style={[styles.tapAmount, { color: colors.foreground }]}>{amount}</Text><Text style={[styles.serviceLabel, { color: colors.mutedForeground }]}>Tom L · Nail services</Text></View>
-            <View style={[styles.previewNotice, { backgroundColor: colors.accent }]}><Feather name="info" size={15} color={colors.accentForeground} /><Text style={[styles.previewText, { color: colors.accentForeground }]}>{paymentMethod === 'card' ? 'Preview only · Payments are not processed.' : 'Manual payment entry · No card charge will be made.'}</Text></View>
-            <TouchableOpacity testID="simulate-payment" onPress={finishPayment} style={[styles.primaryButton, { backgroundColor: colors.primary }]}><Feather name="check" size={17} color={colors.primaryForeground} /><Text style={[styles.primaryButtonText, { color: colors.primaryForeground }]}>{paymentMethod === 'card' ? 'Preview success state' : `Record ${selectedMethod.label.toLowerCase()} payment`}</Text></TouchableOpacity>
+            <View style={[styles.nfcCircle, { backgroundColor: colors.secondary }]}><Feather name="radio" size={32} color={colors.primary} /></View>
+            <Text style={[styles.tapTitle, { color: colors.foreground }]}>Tap to Pay</Text>
+            <Text style={[styles.tapSub, { color: colors.mutedForeground }]}>Hold the customer’s card near this phone.</Text>
+            <View style={[styles.amountCard, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.eyebrow, { color: colors.mutedForeground }]}>AMOUNT DUE</Text><Text style={[styles.tapAmount, { color: colors.foreground }]}>{amount}</Text><Text style={[styles.serviceLabel, { color: colors.mutedForeground }]}>{String(params.clientName || 'Walk-in client')} · {String(params.serviceName || 'Appointment')}</Text><Text style={[styles.tipIncluded, { color: colors.primary }]}>Includes {dollars(tipCents)} tip</Text></View>
+            <View style={[styles.previewNotice, { backgroundColor: colors.accent }]}><Feather name="info" size={15} color={colors.accentForeground} /><Text style={[styles.previewText, { color: colors.accentForeground }]}>Preview only · Payments are not processed.</Text></View>
+            <TouchableOpacity testID="simulate-payment" onPress={finishPayment} style={[styles.primaryButton, { backgroundColor: colors.primary }]}><Feather name="radio" size={17} color={colors.primaryForeground} /><Text style={[styles.primaryButtonText, { color: colors.primaryForeground }]}>Simulate tap</Text></TouchableOpacity>
           </View>
         )}
       </View>
@@ -91,21 +88,7 @@ export default function CheckoutScreen() {
           <Text style={[styles.amountCaption, { color: colors.mutedForeground }]}>PAYMENT AMOUNT</Text>
           <Text testID="checkout-amount" style={[styles.amount, { color: colors.foreground }]}>{amount}</Text>
         </View>
-        <Text style={[styles.methodHeading, { color: colors.foreground }]}>Payment method</Text>
-        <View style={styles.methodList}>
-          {paymentMethods.map((method) => {
-            const selected = paymentMethod === method.key;
-            return (
-              <TouchableOpacity key={method.key} testID={`payment-method-${method.key}`} onPress={() => setPaymentMethod(method.key)} accessibilityRole="button" accessibilityState={{ selected }} style={[styles.methodCard, { backgroundColor: selected ? colors.secondary : colors.card, borderColor: selected ? colors.primary : colors.border }]}>
-                <View style={[styles.methodIcon, { backgroundColor: selected ? colors.primary : colors.muted }]}><Feather name={method.icon} size={16} color={selected ? colors.primaryForeground : colors.foreground} /></View>
-                <View style={{ flex: 1 }}><Text style={[styles.methodLabel, { color: colors.foreground }]}>{method.label}</Text><Text style={[styles.methodDescription, { color: colors.mutedForeground }]}>{method.description}</Text></View>
-                <Feather name={selected ? 'check-circle' : 'circle'} size={18} color={selected ? colors.primary : colors.border} />
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-        {paymentMethod === 'gift_card' ? <View style={styles.giftCardField}><Text style={[styles.fieldLabel, { color: colors.foreground }]}>Gift card number <Text style={{ color: colors.mutedForeground }}>(optional)</Text></Text><TextInput autoCapitalize="characters" onChangeText={setGiftCardCode} placeholder="Add a reference to the receipt" placeholderTextColor={colors.mutedForeground} style={[styles.fieldInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} testID="gift-card-code" value={giftCardCode} /></View> : null}
-        <TouchableOpacity testID={paymentMethod === 'card' ? 'tap-to-pay' : `record-${paymentMethod}`} onPress={() => { setTapping(true); setPaid(false); }} disabled={Number(digits) === 0} style={[styles.tapButton, { backgroundColor: Number(digits) === 0 ? colors.muted : colors.primary }]}><Feather name={selectedMethod.icon} size={18} color={Number(digits) === 0 ? colors.mutedForeground : colors.primaryForeground} /><Text style={[styles.tapButtonText, { color: Number(digits) === 0 ? colors.mutedForeground : colors.primaryForeground }]}>{paymentMethod === 'card' ? 'Tap to Pay' : `Record ${selectedMethod.label}`}</Text><Feather name="arrow-up-right" size={16} color={Number(digits) === 0 ? colors.mutedForeground : colors.primaryForeground} /></TouchableOpacity>
+        <TouchableOpacity testID="start-tip-checkout" onPress={() => setStage('tip')} disabled={baseCents <= 0} style={[styles.tapButton, { backgroundColor: baseCents <= 0 ? colors.muted : colors.primary }]}><Feather name="percent" size={18} color={baseCents <= 0 ? colors.mutedForeground : colors.primaryForeground} /><Text style={[styles.tapButtonText, { color: baseCents <= 0 ? colors.mutedForeground : colors.primaryForeground }]}>Add tip and checkout</Text><Feather name="arrow-up-right" size={16} color={baseCents <= 0 ? colors.mutedForeground : colors.primaryForeground} /></TouchableOpacity>
         <View style={styles.recentHeader}><Text style={[styles.sectionTitle, { color: colors.foreground }]}>Recent payments</Text></View>
         <View style={styles.saleList}>{sales.slice(0, 3).map((sale, index) => <View key={`${sale.time}-${index}`} style={[styles.saleRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.saleIcon, { backgroundColor: colors.secondary }]}><Feather name="check" size={15} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={[styles.quickTitle, { color: colors.foreground }]}>{sale.label}</Text><Text style={[styles.saleTime, { color: colors.mutedForeground }]}>{sale.time}</Text></View><Text style={[styles.saleAmount, { color: colors.foreground }]}>{sale.amount}</Text></View>)}</View>
         <Text style={[styles.disclaimer, { color: colors.mutedForeground }]}>Preview only · Payments are not processed</Text>
@@ -154,6 +137,7 @@ const styles = StyleSheet.create({
   amountCard: { width: '100%', borderWidth: 1, borderRadius: 21, paddingVertical: 22, paddingHorizontal: 16, alignItems: 'center', marginTop: 31 },
   tapAmount: { fontSize: 38, letterSpacing: -1, fontFamily: 'Inter_500Medium', marginTop: 7 },
   serviceLabel: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 5 },
+  tipIncluded: { fontSize: 10, fontFamily: 'Inter_600SemiBold', marginTop: 9 },
   previewNotice: { flexDirection: 'row', alignItems: 'flex-start', gap: 9, padding: 13, borderRadius: 14, width: '100%', marginTop: 15 },
   previewText: { flex: 1, fontSize: 11, lineHeight: 16, fontFamily: 'Inter_500Medium' },
   primaryButton: { height: 53, width: '100%', borderRadius: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, marginTop: 'auto', marginBottom: 24 },

@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import { useStripeTerminal } from '@stripe/stripe-terminal-react-native';
 import { useColors } from '@/hooks/useColors';
+import { TipCheckout } from '@/components/TipCheckout';
 import {
   cancelTerminalPaymentIntent,
   captureTerminalPaymentIntent,
@@ -32,7 +33,7 @@ import {
 const TAP_TO_PAY_ENABLED = false;
 const EXPO_GO_PREVIEW = process.env.EXPO_PUBLIC_EXPO_GO_PREVIEW === '1';
 
-type PaymentStep = 'idle' | 'initializing' | 'discovering' | 'connecting' | 'ready' | 'processing' | 'capture_pending' | 'success' | 'error';
+type PaymentStep = 'idle' | 'tap_intro' | 'initializing' | 'discovering' | 'connecting' | 'ready' | 'processing' | 'capture_pending' | 'success' | 'error';
 type ReaderMode = 'tap_to_pay' | 'm2';
 type PaymentMethod = 'card' | 'gift_card';
 
@@ -54,7 +55,7 @@ function errorMessage(cause: unknown) {
 export default function CheckoutScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ appointmentId?: string; clientName?: string; amountCents?: string }>();
+  const params = useLocalSearchParams<{ appointmentId?: string; clientName?: string; serviceName?: string; amountCents?: string }>();
   const [digits, setDigits] = useState('0');
   const [appointmentId, setAppointmentId] = useState('');
   const [clientName, setClientName] = useState('');
@@ -416,6 +417,7 @@ export default function CheckoutScreen() {
   };
 
   if (step !== 'idle') {
+    const isTapIntro = step === 'tap_intro';
     const isReady = step === 'ready';
     const isCapturePending = step === 'capture_pending';
     const isSuccess = step === 'success';
@@ -432,7 +434,7 @@ export default function CheckoutScreen() {
         {isSuccess ? (
           <View style={styles.successContent}>
             <View style={[styles.successBadge, { backgroundColor: colors.secondary }]}><Feather name="check" size={32} color={colors.primary} /></View>
-            <Text style={[styles.successTitle, { color: colors.foreground }]}>Payment complete</Text>
+            <Text style={[styles.successTitle, { color: colors.foreground }]}>Payment successful</Text>
             <Text style={[styles.successAmount, { color: colors.foreground }]}>{dollars(digits)}</Text>
             <Text style={[styles.successNote, { color: colors.mutedForeground }]}>{paymentMethod === 'card' ? `Captured through Certxa · ${paymentIntentId}` : `${selectedMethod.label} payment recorded manually${paymentMethod === 'gift_card' && giftCardCode.trim() ? ` · ${giftCardCode.trim()}` : ''}`}</Text>
             <TouchableOpacity testID="new-checkout" onPress={resetCheckout} style={[styles.primaryButton, { backgroundColor: colors.primary }]}><Text style={[styles.primaryButtonText, { color: colors.primaryForeground }]}>New checkout</Text></TouchableOpacity>
@@ -440,16 +442,27 @@ export default function CheckoutScreen() {
         ) : (
           <View style={styles.tapContent}>
              <View style={[styles.nfcCircle, { backgroundColor: isReady || isCapturePending ? colors.secondary : colors.muted }]}><Feather name={isCapturePending ? 'alert-circle' : isReady ? 'radio' : 'loader'} size={32} color={isReady || isCapturePending ? colors.primary : colors.mutedForeground} /></View>
-             <Text style={[styles.tapTitle, { color: colors.foreground }]}>{isCapturePending ? 'Payment needs finalizing' : isReady ? 'Ready for payment' : `Connecting ${readerMode === 'm2' ? 'Stripe M2' : 'Tap to Pay'}`}</Text>
-            <Text style={[styles.tapSub, { color: colors.mutedForeground }]}>{error || statusText}</Text>
+             <Text style={[styles.tapTitle, { color: colors.foreground }]}>{isCapturePending ? 'Payment needs finalizing' : isTapIntro ? 'Tap to Pay' : isReady ? 'Ready for payment' : `Connecting ${readerMode === 'm2' ? 'Stripe M2' : 'Tap to Pay'}`}</Text>
+             <Text style={[styles.tapSub, { color: colors.mutedForeground }]}>{error || (isTapIntro ? 'Hold the customer’s card near this phone.' : statusText)}</Text>
             <View style={[styles.amountCard, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.eyebrow, { color: colors.mutedForeground }]}>AMOUNT DUE</Text><Text style={[styles.tapAmount, { color: colors.foreground }]}>{dollars(digits)}</Text><Text style={[styles.serviceLabel, { color: colors.mutedForeground }]}>{clientName.trim() || 'Certxa appointment'} · Appointment #{appointmentId || '—'}</Text></View>
             {error ? <View style={[styles.errorNotice, { backgroundColor: colors.accent }]}><Feather name="alert-circle" size={15} color={colors.accentForeground} /><Text style={[styles.previewText, { color: colors.accentForeground }]}>{error}</Text></View> : null}
-             <TouchableOpacity disabled={(!isReady && !isCapturePending) || isBusy} testID={isCapturePending ? 'retry-capture' : 'accept-payment'} onPress={isCapturePending ? retryCapture : processPayment} style={[styles.primaryButton, { backgroundColor: (isReady || isCapturePending) && !isBusy ? colors.primary : colors.muted }]}><Feather name={isCapturePending ? 'refresh-cw' : 'radio'} size={17} color={(isReady || isCapturePending) && !isBusy ? colors.primaryForeground : colors.mutedForeground} /><Text style={[styles.primaryButtonText, { color: (isReady || isCapturePending) && !isBusy ? colors.primaryForeground : colors.mutedForeground }]}>{isBusy ? 'Preparing…' : isCapturePending ? 'Retry capture' : 'Accept payment'}</Text></TouchableOpacity>
+             <TouchableOpacity disabled={(!isReady && !isCapturePending && !isTapIntro) || isBusy} testID={isTapIntro ? 'start-tap-to-pay' : isCapturePending ? 'retry-capture' : 'accept-payment'} onPress={isTapIntro ? () => void startReader('tap_to_pay') : isCapturePending ? retryCapture : processPayment} style={[styles.primaryButton, { backgroundColor: (isReady || isCapturePending || isTapIntro) && !isBusy ? colors.primary : colors.muted }]}><Feather name={isTapIntro ? 'radio' : isCapturePending ? 'refresh-cw' : 'radio'} size={17} color={(isReady || isCapturePending || isTapIntro) && !isBusy ? colors.primaryForeground : colors.mutedForeground} /><Text style={[styles.primaryButtonText, { color: (isReady || isCapturePending || isTapIntro) && !isBusy ? colors.primaryForeground : colors.mutedForeground }]}>{isBusy ? 'Preparing…' : isTapIntro ? 'Start Tap to Pay' : isCapturePending ? 'Retry capture' : 'Accept payment'}</Text></TouchableOpacity>
           </View>
         )}
       </View>
     );
   }
+
+  return <TipCheckout
+    baseCents={Number(params.amountCents) || 0}
+    clientName={String(params.clientName || '')}
+    serviceName={String(params.serviceName || '')}
+    onConfirmTip={(nextTipCents) => {
+      const baseCents = Number(params.amountCents) || 0;
+      setDigits(String(Math.max(0, Math.round(baseCents + nextTipCents))));
+      setStep('tap_intro');
+    }}
+  />;
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background, paddingTop: topInset }]}>
