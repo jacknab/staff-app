@@ -170,7 +170,7 @@ function DraggableAppointment({
       ]}
     >
       <Text numberOfLines={1} style={styles.timelineClient}>{item.name}</Text>
-      <Text numberOfLines={1} style={styles.timelineService}>{item.service}</Text>
+      <Text numberOfLines={1} style={styles.timelineService}>{item.status === 'paid' ? `PAID · ${item.service}` : item.service}</Text>
       <Text numberOfLines={1} style={styles.timelineDuration}>{item.duration}</Text>
     </View>
   );
@@ -297,7 +297,6 @@ export default function CalendarScreen() {
               </TouchableOpacity>
             ))}
           </View>
-          <Text style={[styles.todayHint, { color: colors.mutedForeground }]}>{todayIsSelected ? 'Today' : selectedDate.toLocaleDateString('en-US', { weekday: 'short' })}</Text>
           <View style={styles.headerActions}>
             <TouchableOpacity testID="calendar-refresh" accessibilityLabel="Refresh calendar" onPress={() => void refresh()} style={styles.iconButton}>
               <Feather name="refresh-cw" size={19} color={colors.primary} />
@@ -454,7 +453,7 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   scrollContent: { paddingHorizontal: 18, paddingTop: 12, paddingBottom: 112 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 19 },
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8, marginLeft: 'auto' },
   iconButton: { width: 39, height: 39, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   addButton: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   segmentedControl: { flexDirection: 'row', borderWidth: 1, borderRadius: 9, padding: 2, flexShrink: 1 },

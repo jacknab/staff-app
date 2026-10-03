@@ -13,7 +13,8 @@ import {
 } from '@expo-google-fonts/inter';
 import { Redirect, Stack, usePathname, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { BookingProvider } from '@/contexts/BookingContext';
+import { BookingProvider, useBookingData } from '@/contexts/BookingContext';
+import { onBookingPush, registerForBookingPushes } from '@/lib/push';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { CertxaTerminalProvider } from '@/components/CertxaTerminalProvider';
 
@@ -21,6 +22,25 @@ import { CertxaTerminalProvider } from '@/components/CertxaTerminalProvider';
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
+
+/**
+ * Booking push notifications: registers this phone once signed in, reloads the calendar when a
+ * notification arrives, and opens the calendar when one is tapped.
+ */
+function PushBridge() {
+  const { isAuthenticated } = useAuth();
+  const { refresh } = useBookingData();
+  const router = useRouter();
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    void registerForBookingPushes();
+    return onBookingPush((_data, tapped) => {
+      void refresh();
+      if (tapped) router.push('/(tabs)');
+    });
+  }, [isAuthenticated, refresh, router]);
+  return null;
+}
 
 function RootLayoutNav() {
   const { isLoading, isAuthenticated } = useAuth();
@@ -43,6 +63,8 @@ function RootLayoutNav() {
       <Stack.Screen name="booking" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="appointment/[id]" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="ai" options={{ headerShown: false, presentation: 'card' }} />
+      <Stack.Screen name="settings" options={{ headerShown: false, presentation: 'card' }} />
+      <Stack.Screen name="reviews" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="login" options={{ headerShown: false }} />
     </Stack>
   );
@@ -73,6 +95,7 @@ export default function RootLayout() {
               <BookingProvider>
                 <GestureHandlerRootView>
                   <KeyboardProvider>
+                    <PushBridge />
                     <RootLayoutNav />
                   </KeyboardProvider>
                 </GestureHandlerRootView>

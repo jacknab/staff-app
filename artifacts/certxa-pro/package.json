@@ -60,6 +60,7 @@
   },
   "dependencies": {
     "@stripe/stripe-terminal-react-native": "0.0.1-beta.33",
+    "expo-notifications": "~57.0.21",
     "expo-secure-store": "~57.0.4"
   }
 }

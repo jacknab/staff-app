@@ -60,7 +60,7 @@ type BookingContextValue = {
 
 type ApiCustomer = { id: number; name?: string | null; fullName?: string | null; firstName?: string | null; lastName?: string | null; phone?: string | null; email?: string | null; notes?: string | null };
 type ApiService = { id: number; name?: string | null; duration?: number | string | null; price?: number | string | null };
-type ApiAppointment = { id: number; date: string; duration?: number | null; status?: string | null; notes?: string | null; customer?: ApiCustomer | null; service?: ApiService | null };
+type ApiAppointment = { appointmentAddons?: { addon?: { price?: number | string | null } | null }[] | null; customLines?: { label?: string; price?: number | string | null }[] | null; id: number; date: string; duration?: number | null; status?: string | null; notes?: string | null; customer?: ApiCustomer | null; service?: ApiService | null };
 
 const BookingContext = createContext<BookingContextValue | null>(null);
 
@@ -83,9 +83,12 @@ function mapService(service: ApiService, index: number): ServiceProfile {
 
 function mapAppointment(appointment: ApiAppointment): AppointmentRecord {
   const date = new Date(appointment.date);
-  const priceValue = Number(appointment.service?.price ?? 0) || 0;
+  // What the visit comes to: the main service, its add-ons, and any extra services on the ticket.
+  const priceValue = (Number(appointment.service?.price ?? 0) || 0)
+    + (appointment.appointmentAddons ?? []).reduce((sum, row) => sum + (Number(row?.addon?.price ?? 0) || 0), 0)
+    + (Array.isArray(appointment.customLines) ? appointment.customLines : []).reduce((sum, line) => sum + (Number(line?.price ?? 0) || 0), 0);
   const minutes = Number(appointment.duration ?? appointment.service?.duration ?? 60) || 60;
-  return { id: String(appointment.id), appointmentId: appointment.id, dateKey: dateKey(date), dateIso: date.toISOString(), time: date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }), name: nameOf(appointment.customer), service: appointment.service?.name || 'Service', serviceId: appointment.service?.id, duration: `${minutes} min`, price: money(priceValue), amountCents: Math.round(priceValue * 100), status: appointment.status || 'pending', note: appointment.notes ?? undefined };
+  return { id: String(appointment.id), appointmentId: appointment.id, dateKey: dateKey(date), dateIso: date.toISOString(), time: date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }), name: nameOf(appointment.customer), service: appointment.service?.name || 'Service', serviceId: appointment.service?.id, duration: `${minutes} min`, price: money(priceValue), amountCents: Math.round(priceValue * 100), status: appointment.status === 'completed' ? 'paid' : appointment.status || 'pending', note: appointment.notes ?? undefined };
 }
 
 export function BookingProvider({ children }: { children: ReactNode }) {

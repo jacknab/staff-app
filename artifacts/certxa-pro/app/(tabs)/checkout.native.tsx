@@ -15,6 +15,8 @@ import { useLocalSearchParams } from 'expo-router';
 import { useStripeTerminal } from '@stripe/stripe-terminal-react-native';
 import { useColors } from '@/hooks/useColors';
 import { TipCheckout } from '@/components/TipCheckout';
+import { useBookingData } from '@/contexts/BookingContext';
+import { api } from '@/lib/live-api';
 import {
   cancelTerminalPaymentIntent,
   captureTerminalPaymentIntent,
@@ -28,9 +30,13 @@ import {
   CertxaApiError,
 } from '@/lib/certxa-api';
 
-// Re-enable after Apple embeds the Tap to Pay managed entitlement in the
-// provisioning profile. Stripe M2 does not require that Apple entitlement.
-const TAP_TO_PAY_ENABLED = false;
+// Tap to Pay on iPhone needs Apple's managed entitlement in the provisioning
+// profile. Today only the development profile carries it (the "preview-dev"
+// EAS build profile), so ad hoc and App Store builds cannot use it yet.
+// Stripe M2 does not require that Apple entitlement.
+const TAP_TO_PAY_ENABLED = true;
+// Shown on the payment screen so a tester can tell which build is installed.
+const BUILD_LABEL = 'Build Oct 3 · J';
 const EXPO_GO_PREVIEW = process.env.EXPO_PUBLIC_EXPO_GO_PREVIEW === '1';
 
 type PaymentStep = 'idle' | 'tap_intro' | 'initializing' | 'discovering' | 'connecting' | 'ready' | 'processing' | 'capture_pending' | 'success' | 'error';
@@ -55,6 +61,7 @@ function errorMessage(cause: unknown) {
 export default function CheckoutScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { refresh: refreshBookings } = useBookingData();
   const params = useLocalSearchParams<{ appointmentId?: string; clientName?: string; serviceName?: string; amountCents?: string }>();
   const [digits, setDigits] = useState('0');
   const [tipCents, setTipCents] = useState(0);
@@ -89,7 +96,7 @@ export default function CheckoutScreen() {
     disconnectReader,
     retrievePaymentIntent,
     collectPaymentMethod,
-    processPaymentIntent,
+    confirmPaymentIntent,
     connectedReader,
     discoveredReaders,
     loading,
@@ -194,12 +201,44 @@ export default function CheckoutScreen() {
     }
   };
 
+  // Discount, chosen on the payment screen before the reader starts: a preset percentage or a
+  // custom dollar amount off the appointment's price (never more than the price). The tip is
+  // added after the discount. Sent to Certxa with the charge so the ticket records it.
+  const [discountPercent, setDiscountPercent] = useState(0);
+  const [customDiscount, setCustomDiscount] = useState('');
+  const baseCentsParam = Math.max(0, Math.round(Number(params.amountCents) || 0));
+  const customDiscountCents = Math.round((Number(customDiscount.replace(/[^0-9.]/g, '')) || 0) * 100);
+  const discountCents = Math.min(
+    baseCentsParam,
+    customDiscountCents > 0 ? customDiscountCents : Math.round(baseCentsParam * discountPercent / 100),
+  );
+  useEffect(() => {
+    if (step !== 'tap_intro' || baseCentsParam <= 0) return;
+    setDigits(String(baseCentsParam - discountCents + tipCents));
+  }, [baseCentsParam, discountCents, step, tipCents]);
+
   const startReader = async (mode: ReaderMode) => {
     if (Number(digits) < 50) {
       setError('Enter an amount of at least $0.50.');
       return;
     }
     setError('');
+    // Never take a second payment for a booking: ask Certxa for its current status first.
+    const paidCheckId = Number(appointmentId);
+    if (!EXPO_GO_PREVIEW && Number.isInteger(paidCheckId) && paidCheckId > 0) {
+      try {
+        const current = await api.get<{ status?: string | null }>(`/api/appointments/${paidCheckId}`);
+        const alreadyPaid = current?.status === 'completed' || current?.status === 'paid';
+        if (alreadyPaid || current?.status === 'cancelled') {
+          setError(alreadyPaid ? 'This appointment has already been paid.' : 'This appointment was cancelled.');
+          void refreshBookings();
+          return;
+        }
+      } catch {
+        setError('Could not check this appointment with Certxa. Check the connection and try again.');
+        return;
+      }
+    }
     setReaderMode(mode);
     setStep('initializing');
     setStatusText(mode === 'm2' ? 'Preparing Stripe M2…' : 'Preparing Tap to Pay…');
@@ -265,6 +304,8 @@ export default function CheckoutScreen() {
     let createdPaymentIntentId: string | null = null;
     let captured = false;
     let paymentMayBeAuthorized = false;
+    // Which step is running, so an error says where it happened.
+    let phase = 'Create payment';
 
     try {
       const token = await getStoredToken();
@@ -276,21 +317,27 @@ export default function CheckoutScreen() {
         clientName: clientName.trim() || undefined,
         method: readerMode,
         tipCents,
-        discountCents: 0,
+        discountCents,
         priorTenderedCents: 0,
       });
       createdPaymentIntentId = created.paymentIntentId;
       setPaymentIntentId(created.paymentIntentId);
 
+      phase = 'Load payment';
       const retrieved = await retrievePaymentIntent(created.clientSecret);
       if (retrieved.error || !retrieved.paymentIntent) throw new Error(retrieved.error?.message || 'Unable to prepare the payment.');
 
       setStatusText(readerMode === 'm2' ? 'Tap, insert, or swipe the card on the M2 reader…' : 'Hold the customer’s card near this phone…');
+      phase = 'Read card';
       const collected = await collectPaymentMethod({ paymentIntent: retrieved.paymentIntent });
       if (collected.error || !collected.paymentIntent) throw new Error(collected.error?.message || 'Payment collection was not completed.');
 
       setStatusText('Confirming payment…');
-      const processed = await processPaymentIntent({ paymentIntent: collected.paymentIntent });
+      // Confirm the card that was just collected. (In this Stripe Terminal SDK, processPaymentIntent
+      // is collect + confirm in one call - using it after collectPaymentMethod asks the reader to
+      // collect a second time and fails with "The reader is busy".)
+      phase = 'Charge card';
+      const processed = await confirmPaymentIntent({ paymentIntent: collected.paymentIntent });
       if (processed.error || !processed.paymentIntent) throw new Error(processed.error?.message || 'Payment confirmation was not completed.');
 
       paymentMayBeAuthorized = true;
@@ -305,6 +352,7 @@ export default function CheckoutScreen() {
         // Storage recovery is best-effort; it must not block capture.
       }
       setStatusText('Finalizing payment…');
+      phase = 'Finalize';
       const capturedPayment = await captureTerminalPaymentIntent(token, created.paymentIntentId, readerMode);
       captured = true;
       try {
@@ -319,6 +367,7 @@ export default function CheckoutScreen() {
       ]);
       setStep('success');
       setStatusText('Payment complete.');
+      void refreshBookings();
     } catch (cause) {
       if (paymentMayBeAuthorized && createdPaymentIntentId && !captured) {
         setPaymentIntentId(createdPaymentIntentId);
@@ -337,7 +386,7 @@ export default function CheckoutScreen() {
         }
       }
       setStep('error');
-      setError(cause instanceof CertxaApiError && cause.status === 401 ? 'Your Certxa session has expired. Please sign in again.' : errorMessage(cause));
+      setError(cause instanceof CertxaApiError && cause.status === 401 ? 'Your Certxa session has expired. Please sign in again.' : `${phase}: ${errorMessage(cause)}`);
     }
   };
 
@@ -423,7 +472,9 @@ export default function CheckoutScreen() {
     const isReady = step === 'ready';
     const isCapturePending = step === 'capture_pending';
     const isSuccess = step === 'success';
-    const isBusy = loading || ['initializing', 'discovering', 'connecting', 'processing'].includes(step);
+    // Stripe Terminal reports `loading` until initialize() has run, and initialize() only runs when
+    // "Start Tap to Pay" is pressed - so `loading` must not disable that button.
+    const isBusy = (loading && !isTapIntro) || ['initializing', 'discovering', 'connecting', 'processing'].includes(step);
 
     return (
       <View style={[styles.root, { backgroundColor: colors.background, paddingTop: topInset }]}>
@@ -442,13 +493,33 @@ export default function CheckoutScreen() {
             <TouchableOpacity testID="new-checkout" onPress={resetCheckout} style={[styles.primaryButton, { backgroundColor: colors.primary }]}><Text style={[styles.primaryButtonText, { color: colors.primaryForeground }]}>New checkout</Text></TouchableOpacity>
           </View>
         ) : (
-          <View style={styles.tapContent}>
-             <View style={[styles.nfcCircle, { backgroundColor: isReady || isCapturePending ? colors.secondary : colors.muted }]}><Feather name={isCapturePending ? 'alert-circle' : isReady ? 'radio' : 'loader'} size={32} color={isReady || isCapturePending ? colors.primary : colors.mutedForeground} /></View>
+          <View style={[styles.tapContent, { paddingBottom: insets.bottom + 84 }]}>
+             {isTapIntro ? null : <View style={[styles.nfcCircle, { backgroundColor: isReady || isCapturePending ? colors.secondary : colors.muted }]}><Feather name={isCapturePending ? 'alert-circle' : isReady ? 'radio' : 'loader'} size={32} color={isReady || isCapturePending ? colors.primary : colors.mutedForeground} /></View>}
              <Text style={[styles.tapTitle, { color: colors.foreground }]}>{isCapturePending ? 'Payment needs finalizing' : isTapIntro ? 'Tap to Pay' : isReady ? 'Ready for payment' : `Connecting ${readerMode === 'm2' ? 'Stripe M2' : 'Tap to Pay'}`}</Text>
              <Text style={[styles.tapSub, { color: colors.mutedForeground }]}>{error || (isTapIntro ? 'Hold the customer’s card near this phone.' : statusText)}</Text>
             <View style={[styles.amountCard, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.eyebrow, { color: colors.mutedForeground }]}>AMOUNT DUE</Text><Text style={[styles.tapAmount, { color: colors.foreground }]}>{dollars(digits)}</Text><Text style={[styles.serviceLabel, { color: colors.mutedForeground }]}>{clientName.trim() || 'Certxa appointment'} · Appointment #{appointmentId || '—'}</Text></View>
             {error ? <View style={[styles.errorNotice, { backgroundColor: colors.accent }]}><Feather name="alert-circle" size={15} color={colors.accentForeground} /><Text style={[styles.previewText, { color: colors.accentForeground }]}>{error}</Text></View> : null}
-             <TouchableOpacity disabled={(!isReady && !isCapturePending && !isTapIntro) || isBusy} testID={isTapIntro ? 'start-tap-to-pay' : isCapturePending ? 'retry-capture' : 'accept-payment'} onPress={isTapIntro ? () => void startReader('tap_to_pay') : isCapturePending ? retryCapture : processPayment} style={[styles.primaryButton, { backgroundColor: (isReady || isCapturePending || isTapIntro) && !isBusy ? colors.primary : colors.muted }]}><Feather name={isTapIntro ? 'radio' : isCapturePending ? 'refresh-cw' : 'radio'} size={17} color={(isReady || isCapturePending || isTapIntro) && !isBusy ? colors.primaryForeground : colors.mutedForeground} /><Text style={[styles.primaryButtonText, { color: (isReady || isCapturePending || isTapIntro) && !isBusy ? colors.primaryForeground : colors.mutedForeground }]}>{isBusy ? 'Preparing…' : isTapIntro ? 'Start Tap to Pay' : isCapturePending ? 'Retry capture' : 'Accept payment'}</Text></TouchableOpacity>
+             {isTapIntro && baseCentsParam > 0 ? <View testID="discount-block" style={[styles.formField, { width: '100%', marginTop: 16 }]}>
+               <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Discount{discountCents > 0 ? <Text style={{ color: colors.primary }}>{` · −${dollars(String(discountCents))}`}</Text> : null}</Text>
+               <View style={{ flexDirection: 'row', gap: 6 }}>
+                 {[0, 10, 15, 20, 25].map((pct) => {
+                   const selected = customDiscountCents <= 0 && discountPercent === pct;
+                   return <TouchableOpacity key={pct} testID={`discount-${pct}`} onPress={() => { setCustomDiscount(''); setDiscountPercent(pct); }} style={{ flex: 1, height: 38, borderRadius: 11, borderWidth: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: selected ? colors.secondary : colors.card, borderColor: selected ? colors.primary : colors.border }}><Text style={[styles.fieldLabel, { color: colors.foreground }]}>{pct === 0 ? 'None' : `${pct}%`}</Text></TouchableOpacity>;
+                 })}
+               </View>
+               <TextInput keyboardType="numbers-and-punctuation" returnKeyType="done" onChangeText={setCustomDiscount} placeholder="Or a custom amount off, e.g. 39.00" placeholderTextColor={colors.mutedForeground} style={[styles.fieldInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} testID="discount-custom" value={customDiscount} />
+             </View> : null}
+             {isTapIntro ? <View testID="m2-registration-intro" style={[styles.formField, { width: '100%', marginTop: 18 }]}>
+               <Text style={[styles.fieldLabel, { color: colors.foreground }]}>New Stripe M2 setup <Text style={{ color: colors.mutedForeground }}>(one time)</Text></Text>
+               <View style={styles.registrationRow}>
+               <TextInput autoCapitalize="none" autoCorrect={false} onChangeText={setRegistrationCode} placeholder="Reader registration code" placeholderTextColor={colors.mutedForeground} style={[styles.fieldInput, styles.registrationInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} testID="m2-registration-code" value={registrationCode} />
+               <TouchableOpacity disabled={isRegisteringReader || !registrationCode.trim()} onPress={registerM2Reader} style={[styles.registerButton, { backgroundColor: registrationCode.trim() ? colors.secondary : colors.muted }]} testID="register-m2"><Text style={[styles.registerButtonText, { color: registrationCode.trim() ? colors.primary : colors.mutedForeground }]}>{isRegisteringReader ? 'Registering…' : 'Register'}</Text></TouchableOpacity>
+               </View>
+               {readerSetupText ? <Text style={[styles.setupText, { color: colors.primary }]}>{readerSetupText}</Text> : null}
+             </View> : null}
+             <TouchableOpacity disabled={(!isReady && !isCapturePending && !isTapIntro) || isBusy} testID={isTapIntro ? 'start-tap-to-pay' : isCapturePending ? 'retry-capture' : 'accept-payment'} onPress={isTapIntro ? () => void startReader('tap_to_pay') : isCapturePending ? retryCapture : processPayment} style={[styles.primaryButton, { backgroundColor: (isReady || isCapturePending || isTapIntro) && !isBusy ? colors.primary : colors.muted }]}><Feather name={isTapIntro ? 'radio' : isCapturePending ? 'refresh-cw' : 'radio'} size={17} color={(isReady || isCapturePending || isTapIntro) && !isBusy ? colors.primaryForeground : colors.mutedForeground} /><Text style={[styles.primaryButtonText, { color: (isReady || isCapturePending || isTapIntro) && !isBusy ? colors.primaryForeground : colors.mutedForeground }]}>{isBusy ? (step === 'processing' ? 'Payment in progress…' : 'Preparing…') : isTapIntro ? 'Start Tap to Pay' : isCapturePending ? 'Retry capture' : 'Accept payment'}</Text></TouchableOpacity>
+             {isTapIntro ? <TouchableOpacity testID="start-stripe-m2" disabled={isBusy} onPress={() => void startReader('m2')} style={[styles.primaryButton, { marginTop: -12, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}><Feather name="credit-card" size={17} color={colors.foreground} /><Text style={[styles.primaryButtonText, { color: colors.foreground }]}>Use Stripe M2 reader</Text></TouchableOpacity> : null}
+             <Text testID="build-label" style={[styles.tapSub, { fontSize: 10, marginTop: 10, color: colors.mutedForeground }]}>{BUILD_LABEL}</Text>
           </View>
         )}
       </View>

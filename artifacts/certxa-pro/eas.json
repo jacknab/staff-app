@@ -17,6 +17,12 @@
         "EXPO_PUBLIC_API_BASE_URL": "https://certxa.com",
         "PNPM_CONFIG_STRICT_DEP_BUILDS": "false"
       }
+    },
+    "preview-dev": {
+      "extends": "preview",
+      "ios": {
+        "credentialsSource": "local"
+      }
     }
   }
 }

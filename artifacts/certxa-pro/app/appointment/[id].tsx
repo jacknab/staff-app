@@ -55,7 +55,7 @@ export default function AppointmentDetailScreen() {
   const [day, setDay] = useState(originalDate);
   const [time, setTime] = useState(originalDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }));
   const [serviceId, setServiceId] = useState(Number(params.serviceId) || services[0]?.id || 0);
-  const [status, setStatus] = useState(params.status || 'pending');
+  const [status, setStatus] = useState(params.status === 'completed' ? 'paid' : params.status || 'pending');
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');

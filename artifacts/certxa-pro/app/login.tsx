@@ -6,7 +6,7 @@ import { Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'r
 import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollViewCompat';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/contexts/AuthContext';
-import { CertxaApiError } from '@/lib/certxa-api';
+import { CertxaApiError, certxaRequest } from '@/lib/certxa-api';
 
 export default function LoginScreen() {
   const colors = useColors();
@@ -17,6 +17,8 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [notice, setNotice] = useState('');
+  const [isSendingReset, setIsSendingReset] = useState(false);
   const topInset = Platform.OS === 'web' ? 67 : insets.top;
   const bottomInset = Platform.OS === 'web' ? 34 : insets.bottom;
 
@@ -35,6 +37,26 @@ export default function LoginScreen() {
       setError(cause instanceof CertxaApiError ? cause.message : 'Unable to sign in right now.');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  /** Certxa e-mails a link to choose a new password. It answers the same way whether or not the address is registered. */
+  const forgotPassword = async () => {
+    if (isSendingReset) return;
+    setNotice('');
+    if (!email.trim() || !email.includes('@')) {
+      setError('Enter your email above, then tap Forgot password.');
+      return;
+    }
+    setError('');
+    setIsSendingReset(true);
+    try {
+      await certxaRequest('/api/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email: email.trim() }) });
+      setNotice(`If ${email.trim()} has a Certxa account, we just sent it a link to choose a new password.`);
+    } catch (cause) {
+      setError(cause instanceof CertxaApiError ? cause.message : 'Could not send the reset link. Check your connection and try again.');
+    } finally {
+      setIsSendingReset(false);
     }
   };
 
@@ -93,6 +115,10 @@ export default function LoginScreen() {
             {isSubmitting ? 'Signing in…' : 'Sign in'}
           </Text>
           {!isSubmitting && <Feather name="arrow-right" size={17} color={colors.primaryForeground} />}
+        </TouchableOpacity>
+        {notice ? <Text style={[styles.error, { color: colors.primary, marginTop: 0 }]}>{notice}</Text> : null}
+        <TouchableOpacity disabled={isSendingReset} onPress={() => void forgotPassword()} style={{ alignSelf: 'center', minHeight: 40, justifyContent: 'center' }} testID="login-forgot-password">
+          <Text style={[styles.label, { color: colors.primary, marginBottom: 0 }]}>{isSendingReset ? 'Sending…' : 'Forgot password?'}</Text>
         </TouchableOpacity>
       </View>
 

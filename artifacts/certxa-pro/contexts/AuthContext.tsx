@@ -7,6 +7,7 @@ import {
   storeSession,
   type CertxaUser,
 } from '@/lib/certxa-api';
+import { unregisterBookingPushes } from '@/lib/push';
 
 type AuthContextValue = {
   isLoading: boolean;
@@ -53,6 +54,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(session.user);
     },
     logout: async () => {
+      // Stop this phone getting the account's booking notifications before the session goes.
+      await unregisterBookingPushes(token);
       await clearSession();
       setToken(null);
       setUser(null);

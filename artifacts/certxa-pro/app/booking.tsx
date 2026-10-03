@@ -1,15 +1,36 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Feather } from '@expo/vector-icons';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Platform, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
-import { useBookingData, type ClientProfile } from '@/contexts/BookingContext';
+import { useBookingData, type ClientProfile, type ServiceProfile } from '@/contexts/BookingContext';
+import { api } from '@/lib/live-api';
 
-const availableTimes = ['9:00 AM', '10:30 AM', '12:00 PM', '2:00 PM', '3:30 PM', '4:00 PM'];
+type AddonOption = { id: number; name: string; priceValue: number; minutes: number; serviceIds: number[] };
+type Slot = { time: string; staffId: number; staffName: string };
+type Stage = 'client' | 'services' | 'addons' | 'schedule';
+/** Extra time a slot must have free after the services and add-ons, to cover running over. */
+const BUFFER_MINUTES = 15;
 
-function formatPhone(value: string) {
+function money(value: number) { return `$${value.toFixed(2)}`; }
+function minutesLabel(minutes: number) {
+  return minutes >= 60 ? `${Math.floor(minutes / 60)} hr${minutes % 60 ? ` ${minutes % 60} min` : ''}` : `${minutes} min`;
+}
+function isoDay(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+/** The ten digits of a US phone number, however it was typed or stored: "(720) 243-1234", "+1 720…", "7202431234". */
+function phoneDigitsOf(value: string) {
+  const digits = (value ?? '').replace(/\D/g, '');
+  return digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits.slice(0, 10);
+}
+
+function formatPhone(raw: string) {
+  // Certxa stores some numbers already formatted - always start again from the bare digits.
+  const value = phoneDigitsOf(raw);
   const area = value.slice(0, 3);
   const middle = value.slice(3, 6);
   const last = value.slice(6, 10);
@@ -34,15 +55,26 @@ export default function BookingScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams<{ day?: string; phone?: string }>();
-  const { clients, services, addClient, addBooking, calendarDate, setCalendarDate } = useBookingData();
+  const { clients, services, addClient, refresh, calendarDate, setCalendarDate } = useBookingData();
   const initialPhone = (params.phone ?? '').replace(/\D/g, '').slice(0, 10);
   const [phone, setPhone] = useState(initialPhone);
   const [name, setName] = useState('');
-  const [stage, setStage] = useState<'client' | 'details'>('client');
+  const [stage, setStage] = useState<Stage>('client');
+  // Step 1 finds the client either by phone number (and can add a new one) or by name / e-mail.
+  const [lookupTab, setLookupTab] = useState<'phone' | 'name'>('phone');
+  const [query, setQuery] = useState('');
   const [selectedClient, setSelectedClient] = useState<ClientProfile | null>(null);
   const [ticketClient, setTicketClient] = useState<ClientProfile | null>(null);
-  const [serviceIndex, setServiceIndex] = useState(0);
-  const [selectedTime, setSelectedTime] = useState('3:30 PM');
+  // Step 2: one or more services. Step 3: optional add-ons for those services. Step 4: date + time.
+  const [serviceIds, setServiceIds] = useState<number[]>([]);
+  const [serviceQuery, setServiceQuery] = useState('');
+  const [addonOptions, setAddonOptions] = useState<AddonOption[]>([]);
+  const [addonIds, setAddonIds] = useState<number[]>([]);
+  const [addonQuery, setAddonQuery] = useState('');
+  const [storeSlug, setStoreSlug] = useState('');
+  const [slots, setSlots] = useState<Slot[]>([]);
+  const [slotsState, setSlotsState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [slot, setSlot] = useState<Slot | null>(null);
   const [selectedDate, setSelectedDate] = useState(() => params.day ? dateFromKey(params.day) : calendarDate);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
@@ -58,9 +90,93 @@ export default function BookingScreen() {
   const topInset = Platform.OS === 'web' ? 67 : insets.top;
   const phoneDigits = phone.replace(/\D/g, '').slice(0, 10);
   const matches = phoneDigits.length >= 4
-    ? clients.filter((client) => client.phone.replace(/\D/g, '').startsWith(phoneDigits))
+    ? clients.filter((client) => phoneDigitsOf(client.phone).startsWith(phoneDigits))
     : [];
-  const service = services[serviceIndex] ?? services[0];
+  const queryText = query.trim().toLowerCase();
+  const nameMatches = queryText.length >= 2
+    ? clients.filter((client) => client.name.toLowerCase().includes(queryText) || (client.email ?? '').toLowerCase().includes(queryText))
+    : [];
+
+  // Add-ons, which services each one belongs to, and the store's booking address (used to ask
+  // Certxa for open times) are loaded once when the screen opens.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [addonRows, linkRows, storeRows] = await Promise.all([
+          api.get<any[]>('/api/addons'), api.get<any[]>('/api/service-addons'), api.get<any[]>('/api/stores'),
+        ]);
+        if (cancelled) return;
+        const links = Array.isArray(linkRows) ? linkRows : [];
+        setAddonOptions((Array.isArray(addonRows) ? addonRows : []).filter((a) => a && a.isActive !== false).map((a) => ({
+          id: Number(a.id), name: String(a.name ?? 'Add-on'), priceValue: Number(a.price ?? 0) || 0, minutes: Number(a.duration ?? 0) || 0,
+          serviceIds: links.filter((l) => Number(l?.addonId) === Number(a.id)).map((l) => Number(l.serviceId)),
+        })));
+        setStoreSlug(String((Array.isArray(storeRows) ? storeRows[0]?.bookingSlug : '') ?? ''));
+      } catch { /* no add-ons are offered, and the schedule step says times could not be loaded */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const chosenServices = serviceIds.map((id) => services.find((item) => item.id === id)).filter((item): item is ServiceProfile => !!item);
+  const serviceFilter = serviceQuery.trim().toLowerCase();
+  const visibleServices = serviceFilter ? services.filter((item) => item.name.toLowerCase().includes(serviceFilter)) : services;
+  // An add-on linked to no service at all is offered with every service (same rule as the kiosk).
+  const applicableAddons = addonOptions.filter((item) => item.serviceIds.length === 0 || item.serviceIds.some((id) => serviceIds.includes(id)));
+  const addonFilter = addonQuery.trim().toLowerCase();
+  const visibleAddons = addonFilter ? applicableAddons.filter((item) => item.name.toLowerCase().includes(addonFilter)) : applicableAddons;
+  const chosenAddons = applicableAddons.filter((item) => addonIds.includes(item.id));
+  const totalMinutes = chosenServices.reduce((sum, item) => sum + item.durationMinutes, 0) + chosenAddons.reduce((sum, item) => sum + item.minutes, 0);
+  const totalPrice = chosenServices.reduce((sum, item) => sum + item.priceValue, 0) + chosenAddons.reduce((sum, item) => sum + item.priceValue, 0);
+  const primaryServiceId = serviceIds[0];
+  const dayParam = isoDay(selectedDate);
+
+  // Open times for the chosen date: Certxa works them out from business hours, each technician's
+  // bookings and who can do the service. The whole visit plus the buffer has to fit.
+  useEffect(() => {
+    if (stage !== 'schedule' || !primaryServiceId || totalMinutes <= 0) return;
+    setSlot(null);
+    if (!storeSlug) { setSlots([]); setSlotsState('error'); return; }
+    let cancelled = false;
+    setSlotsState('loading');
+    api.get<Slot[]>(`/api/public/store/${encodeURIComponent(storeSlug)}/availability?serviceId=${primaryServiceId}&date=${dayParam}&duration=${totalMinutes + BUFFER_MINUTES}`)
+      .then((rows) => {
+        if (cancelled) return;
+        const seen = new Set<string>();
+        const unique = (Array.isArray(rows) ? rows : []).filter((row) => {
+          if (!row?.time || seen.has(row.time)) return false;
+          seen.add(row.time);
+          return true;
+        });
+        unique.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
+        setSlots(unique);
+        setSlotsState('ready');
+      })
+      .catch(() => { if (!cancelled) { setSlots([]); setSlotsState('error'); } });
+    return () => { cancelled = true; };
+  }, [dayParam, primaryServiceId, stage, storeSlug, totalMinutes]);
+
+  const toggleItem = (id: number) => {
+    const toggle = (current: number[]) => (current.includes(id) ? current.filter((value) => value !== id) : [...current, id]);
+    if (stage === 'services') setServiceIds(toggle); else setAddonIds(toggle);
+  };
+  const goBack = () => {
+    setSaveError('');
+    if (stage === 'schedule') setStage(applicableAddons.length > 0 ? 'addons' : 'services');
+    else if (stage === 'addons') setStage('services');
+    else setStage('client');
+  };
+  const goNext = () => {
+    if (stage === 'services') {
+      if (serviceIds.length === 0) return;
+      // Drop add-ons that no longer belong to any chosen service.
+      setAddonIds((current) => current.filter((id) => applicableAddons.some((item) => item.id === id)));
+      setStage(applicableAddons.length > 0 ? 'addons' : 'schedule');
+    } else if (stage === 'addons') {
+      setStage('schedule');
+    }
+  };
+  const stepNumber = stage === 'client' ? 1 : stage === 'services' ? 2 : stage === 'addons' ? 3 : 4;
   const clientCanContinue = selectedClient !== null || (phoneDigits.length === 10 && name.trim().length > 0);
   const shiftWeek = (amount: number) => {
     const next = new Date(selectedDate);
@@ -112,43 +228,47 @@ export default function BookingScreen() {
     } else {
       return;
     }
-    setStage('details');
+    setStage('services');
   };
 
   const saveBooking = async () => {
-    if (!ticketClient || !service || saving) return;
+    const primary = chosenServices[0];
+    if (!ticketClient || !primary || !slot || saving) return;
     setSaving(true); setSaveError('');
     try {
-    const client = ticketClient.id.startsWith('draft-')
-      ? await addClient({
-          name: ticketClient.name,
-          initials: ticketClient.initials,
-          phone: ticketClient.phone,
-          lastVisit: 'Upcoming · Today',
-          service: service.name,
-          visits: 0,
-          spend: '$0',
-          color: 'green',
-        })
-      : ticketClient;
-    const dateIso = new Date(selectedDate);
-    const match = selectedTime.match(/(\d+):(\d+)\s*(AM|PM)/i);
-    if (match) { let hour = Number(match[1]) % 12; if (match[3].toUpperCase() === 'PM') hour += 12; dateIso.setHours(hour, Number(match[2]), 0, 0); }
-    await addBooking({
-      customerId: client.customerId,
-      dateKey: keyForDate(selectedDate),
-      dateIso: dateIso.toISOString(),
-      time: selectedTime,
-      name: client.name,
-      service: service.name,
-      serviceId: service.id,
-      duration: `${service.durationMinutes} min`,
-      price: service.price,
-      amountCents: Math.round(service.priceValue * 100),
-      status: 'pending',
-    });
-    setCalendarDate(selectedDate);
-    router.replace('/(tabs)');
+      const client = ticketClient.id.startsWith('draft-')
+        ? await addClient({
+            name: ticketClient.name,
+            initials: ticketClient.initials,
+            phone: ticketClient.phone,
+            lastVisit: 'Upcoming · Today',
+            service: primary.name,
+            visits: 0,
+            spend: '$0',
+            color: 'green',
+          })
+        : ticketClient;
+      // Certxa keeps one main service per appointment. The first service chosen is that one; any
+      // others are added as their own priced lines on the same ticket, and the appointment's
+      // length covers everything. The technician is the one Certxa offered for the chosen time.
+      const extras = chosenServices.slice(1);
+      const created = await api.post<{ id?: number }>('/api/appointments', {
+        customerId: client.customerId,
+        serviceId: primary.id,
+        staffId: slot.staffId,
+        duration: totalMinutes,
+        date: slot.time,
+        ...(extras.length > 0 ? { customLines: extras.map((item) => ({ label: item.name, price: item.priceValue })) } : {}),
+      });
+      const newId = Number(created?.id);
+      if (chosenAddons.length > 0 && Number.isInteger(newId) && newId > 0) {
+        await api.post(`/api/appointments/${newId}/addons`, { addonIds: chosenAddons.map((item) => item.id), force: true });
+        // Keep the full length (all services + add-ons) on the calendar.
+        await api.patch(`/api/appointments/${newId}`, { duration: totalMinutes });
+      }
+      setCalendarDate(selectedDate);
+      await refresh();
+      router.replace('/(tabs)');
     } catch (cause) { setSaveError(cause instanceof Error ? cause.message : 'Could not create appointment.'); }
     finally { setSaving(false); }
   };
@@ -166,13 +286,13 @@ export default function BookingScreen() {
           </>
         ) : (
           <>
-            <TouchableOpacity testID="booking-back-to-client" accessibilityLabel="Back to client" onPress={() => setStage('client')} style={styles.backLink}><Feather name="arrow-left" size={19} color={colors.foreground} /><Text style={[styles.backLabel, { color: colors.foreground }]}>Client</Text></TouchableOpacity>
-            <Text style={[styles.navSub, { color: colors.mutedForeground }]}>STEP 2 OF 2</Text>
+            <TouchableOpacity testID="booking-back-to-client" accessibilityLabel="Back to client" onPress={goBack} style={styles.backLink}><Feather name="arrow-left" size={19} color={colors.foreground} /><Text style={[styles.backLabel, { color: colors.foreground }]}>Client</Text></TouchableOpacity>
+            <Text style={[styles.navSub, { color: colors.mutedForeground }]}>{`STEP ${stepNumber} OF 4`}</Text>
           </>
         )}
       </View>
 
-      <View style={[styles.progressTrack, { backgroundColor: colors.border }]}><View style={[styles.progressFill, { backgroundColor: colors.primary, width: stage === 'client' ? '45%' : '100%' }]} /></View>
+      <View style={[styles.progressTrack, { backgroundColor: colors.border }]}><View style={[styles.progressFill, { backgroundColor: colors.primary, width: `${stepNumber * 25}%` }]} /></View>
 
       {stage === 'client' ? (
         <>
@@ -182,6 +302,14 @@ export default function BookingScreen() {
               <Text style={[styles.heading, { color: colors.foreground }]}>Who are we booking?</Text>
               <Text style={[styles.subheading, { color: colors.mutedForeground }]}>Look up a familiar face or add someone new.</Text>
             </View>
+            <View style={{ flexDirection: 'row', borderWidth: 1, borderRadius: 13, padding: 3, marginBottom: 13, backgroundColor: colors.card, borderColor: colors.border }}>
+              {(['phone', 'name'] as const).map((tab) => (
+                <TouchableOpacity key={tab} testID={`booking-tab-${tab}`} accessibilityRole="tab" accessibilityState={{ selected: lookupTab === tab }} onPress={() => setLookupTab(tab)} style={{ flex: 1, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: lookupTab === tab ? colors.primary : 'transparent' }}>
+                  <Text style={[styles.sectionLabel, { letterSpacing: 0.4, color: lookupTab === tab ? colors.primaryForeground : colors.mutedForeground }]}>{tab === 'phone' ? 'PHONE NUMBER' : 'NAME OR E-MAIL'}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {lookupTab === 'phone' ? (<>
             <View style={[styles.phonePanel, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Text style={[styles.phoneLabel, { color: colors.mutedForeground }]}>PHONE NUMBER</Text>
               <Text testID="booking-phone" style={[styles.phoneValue, { color: phoneDigits ? colors.foreground : colors.mutedForeground }]}>{phoneDigits ? formatPhone(phoneDigits) : 'Enter Phone Number'}</Text>
@@ -219,6 +347,24 @@ export default function BookingScreen() {
             ) : (
               <View style={[styles.lookupHint, { backgroundColor: colors.secondary }]}><Feather name="search" size={15} color={colors.primary} /><Text style={[styles.hintText, { color: colors.primary }]}>Enter a phone number to find a client.</Text></View>
             )}
+            </>) : (<>
+              <TextInput testID="booking-name-search" autoCapitalize="none" autoCorrect={false} value={query} onChangeText={(value) => { setQuery(value); setSelectedClient(null); }} placeholder="Client name or e-mail" placeholderTextColor={colors.mutedForeground} style={[styles.nameInput, { height: 50, fontSize: 14, backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
+              {nameMatches.length > 0 ? (
+                <View style={styles.lookupSection}>
+                  <Text style={[styles.sectionLabel, { color: colors.foreground }]}>{nameMatches.length === 1 ? 'CLIENT FOUND' : 'MATCHES'}</Text>
+                  {nameMatches.slice(0, 8).map((client) => {
+                    const isSelected = selectedClient?.id === client.id;
+                    return <TouchableOpacity key={client.id} testID={`booking-name-match-${client.id}`} onPress={() => chooseClient(client)} style={[styles.matchCard, { backgroundColor: colors.card, borderColor: isSelected ? colors.primary : colors.border }]}>
+                      <View style={[styles.avatar, { backgroundColor: client.color === 'sand' ? colors.accent : colors.secondary }]}><Text style={[styles.avatarText, { color: client.color === 'sand' ? colors.accentForeground : colors.primary }]}>{client.initials}</Text></View>
+                      <View style={{ flex: 1 }}><Text style={[styles.matchName, { color: colors.foreground }]}>{client.name}</Text><Text numberOfLines={1} style={[styles.matchPhone, { color: colors.mutedForeground }]}>{[client.phone ? formatPhone(client.phone.replace(/\D/g, '').slice(-10)) : '', client.email ?? ''].filter(Boolean).join(' · ') || 'No phone or e-mail on file'}</Text></View>
+                      <Feather name={isSelected ? 'check-circle' : 'chevron-right'} size={19} color={isSelected ? colors.primary : colors.mutedForeground} />
+                    </TouchableOpacity>;
+                  })}
+                </View>
+              ) : (
+                <View style={[styles.lookupHint, { backgroundColor: colors.secondary }]}><Feather name="search" size={15} color={colors.primary} /><Text style={[styles.hintText, { flex: 1, color: colors.primary }]}>{queryText.length < 2 ? 'Type a name or e-mail to find a client.' : 'No client found. Use the Phone number tab to add someone new.'}</Text></View>
+              )}
+            </>)}
           </ScrollView>
           <View style={[styles.footer, { borderTopColor: colors.border, backgroundColor: colors.background, paddingBottom: Math.max(insets.bottom, Platform.OS === 'web' ? 34 : 16) }]}>
             <TouchableOpacity testID="continue-booking" disabled={!clientCanContinue} onPress={continueToDetails} style={[styles.primaryButton, { backgroundColor: clientCanContinue ? colors.primary : colors.muted }]}><Text style={[styles.primaryButtonText, { color: clientCanContinue ? colors.primaryForeground : colors.mutedForeground }]}>{selectedClient ? `Continue with ${selectedClient.name.split(' ')[0]}` : 'Add client to booking'}</Text><Feather name="arrow-right" size={17} color={clientCanContinue ? colors.primaryForeground : colors.mutedForeground} /></TouchableOpacity>
@@ -228,52 +374,85 @@ export default function BookingScreen() {
       ) : (
         <>
           <ScrollView contentContainerStyle={styles.detailsContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-            <View style={styles.intro}>
-              <Text style={[styles.eyebrow, { color: colors.primary }]}>STEP 2 · APPOINTMENT</Text>
-              <Text style={[styles.heading, { color: colors.foreground }]}>Add to the ticket</Text>
-              <Text style={[styles.subheading, { color: colors.mutedForeground }]}>Choose a service and time for {ticketClient?.name.split(' ')[0]}.</Text>
-            </View>
-            <View style={[styles.ticketClient, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={[styles.avatar, { backgroundColor: colors.secondary }]}><Text style={[styles.avatarText, { color: colors.primary }]}>{ticketClient?.initials}</Text></View>
-              <View style={{ flex: 1 }}><Text style={[styles.matchName, { color: colors.foreground }]}>{ticketClient?.name}</Text><Text style={[styles.matchPhone, { color: colors.mutedForeground }]}>{ticketClient ? formatPhone(ticketClient.phone) : ''}</Text></View>
-              <TouchableOpacity testID="change-booking-client" onPress={() => setStage('client')}><Text style={[styles.changeLabel, { color: colors.primary }]}>Change</Text></TouchableOpacity>
-            </View>
-            <View style={styles.monthRow}>
-              <View>
-                <Text style={[styles.monthTitle, { color: colors.foreground }]}>{selectedDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</Text>
-                <Text style={[styles.monthSubtitle, { color: colors.mutedForeground }]}>Choose an appointment date</Text>
-              </View>
-              <View style={styles.monthActions}>
-                <TouchableOpacity testID="booking-previous-week" accessibilityLabel="Previous week" onPress={() => shiftWeek(-1)} style={styles.arrowButton}><Feather name="chevron-left" size={20} color={colors.foreground} /></TouchableOpacity>
-                <TouchableOpacity testID="booking-next-week" accessibilityLabel="Next week" onPress={() => shiftWeek(1)} style={styles.arrowButton}><Feather name="chevron-right" size={20} color={colors.foreground} /></TouchableOpacity>
-              </View>
-            </View>
-            <View style={[styles.weekCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              {weekDays.map((day) => {
-                const active = keyForDate(day) === keyForDate(selectedDate);
-                const today = keyForDate(day) === keyForDate(new Date());
-                return (
-                  <TouchableOpacity key={keyForDate(day)} testID={`booking-day-${day.getDate()}`} accessibilityRole="button" accessibilityState={{ selected: active }} onPress={() => setSelectedDate(day)} style={[styles.dayCell, active && { backgroundColor: colors.primary }]}>
-                    <Text style={[styles.dayName, { color: active ? colors.primaryForeground : colors.mutedForeground }]}>{day.toLocaleDateString('en-US', { weekday: 'short' })}</Text>
-                    <Text style={[styles.dayNumber, { color: active ? colors.primaryForeground : colors.foreground }]}>{day.getDate()}</Text>
-                    <View style={[styles.dayDot, { backgroundColor: active ? colors.primaryForeground : today ? colors.primary : colors.border }]} />
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-            <View style={styles.sectionHeading}><Text style={[styles.sectionLabel, { color: colors.foreground }]}>SERVICE</Text><Text style={[styles.sectionHint, { color: colors.mutedForeground }]}>Choose one</Text></View>
-            <View style={styles.serviceList}>
-              {services.map((item, index) => <TouchableOpacity key={item.id} testID={`booking-service-${item.name}`} onPress={() => setServiceIndex(index)} style={[styles.serviceRow, { backgroundColor: colors.card, borderColor: serviceIndex === index ? colors.primary : colors.border }]}><View style={[styles.serviceIcon, { backgroundColor: colors.secondary }]}><Feather name={item.icon} size={17} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={[styles.matchName, { color: colors.foreground }]}>{item.name}</Text><Text style={[styles.matchPhone, { color: colors.mutedForeground }]}>{item.duration}</Text></View><Text style={[styles.price, { color: colors.foreground }]}>{item.price}</Text><Feather name={serviceIndex === index ? 'check-circle' : 'circle'} size={18} color={serviceIndex === index ? colors.primary : colors.border} /></TouchableOpacity>)}
-            </View>
-            <View style={styles.sectionHeading}><Text style={[styles.sectionLabel, { color: colors.foreground }]}>AVAILABLE TIMES</Text><Text style={[styles.sectionHint, { color: colors.mutedForeground }]}>{titleDate}</Text></View>
-            <View style={styles.timeGrid}>
-              {availableTimes.map((time) => <TouchableOpacity key={time} testID={`booking-time-${time}`} onPress={() => setSelectedTime(time)} style={[styles.timeChip, { backgroundColor: selectedTime === time ? colors.primary : colors.card, borderColor: selectedTime === time ? colors.primary : colors.border }]}><Text style={[styles.timeText, { color: selectedTime === time ? colors.primaryForeground : colors.foreground }]}>{time}</Text></TouchableOpacity>)}
-            </View>
-            <View style={[styles.summary, { backgroundColor: colors.accent }]}><Text style={[styles.summaryLabel, { color: colors.accentForeground }]}>BOOKING TOTAL</Text><Text style={[styles.summaryValue, { color: colors.accentForeground }]}>{service.price}</Text></View>
+            {stage === 'schedule' ? (
+              <>
+                <View style={styles.intro}>
+                  <Text style={[styles.eyebrow, { color: colors.primary }]}>STEP 4 · DATE AND TIME</Text>
+                  <Text style={[styles.heading, { color: colors.foreground }]}>When are they coming in?</Text>
+                  <Text style={[styles.subheading, { color: colors.mutedForeground }]}>{`Times shown have room for ${minutesLabel(totalMinutes)} plus ${BUFFER_MINUTES} minutes in case it runs over.`}</Text>
+                </View>
+                <View style={styles.monthRow}>
+                  <View>
+                    <Text style={[styles.monthTitle, { color: colors.foreground }]}>{selectedDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</Text>
+                    <Text style={[styles.monthSubtitle, { color: colors.mutedForeground }]}>Choose an appointment date</Text>
+                  </View>
+                  <View style={styles.monthActions}>
+                    <TouchableOpacity testID="booking-previous-week" accessibilityLabel="Previous week" onPress={() => shiftWeek(-1)} style={styles.arrowButton}><Feather name="chevron-left" size={20} color={colors.foreground} /></TouchableOpacity>
+                    <TouchableOpacity testID="booking-next-week" accessibilityLabel="Next week" onPress={() => shiftWeek(1)} style={styles.arrowButton}><Feather name="chevron-right" size={20} color={colors.foreground} /></TouchableOpacity>
+                  </View>
+                </View>
+                <View style={[styles.weekCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  {weekDays.map((day) => {
+                    const active = keyForDate(day) === keyForDate(selectedDate);
+                    const today = keyForDate(day) === keyForDate(new Date());
+                    const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
+                    const past = day.getTime() < startOfToday.getTime();
+                    return (
+                      <TouchableOpacity key={keyForDate(day)} testID={`booking-day-${day.getDate()}`} disabled={past} accessibilityRole="button" accessibilityState={{ selected: active, disabled: past }} onPress={() => setSelectedDate(day)} style={[styles.dayCell, active && { backgroundColor: colors.primary }, past && { opacity: 0.35 }]}>
+                        <Text style={[styles.dayName, { color: active ? colors.primaryForeground : colors.mutedForeground }]}>{day.toLocaleDateString('en-US', { weekday: 'short' })}</Text>
+                        <Text style={[styles.dayNumber, { color: active ? colors.primaryForeground : colors.foreground }]}>{day.getDate()}</Text>
+                        <View style={[styles.dayDot, { backgroundColor: active ? colors.primaryForeground : today ? colors.primary : colors.border }]} />
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                <View style={styles.sectionHeading}><Text style={[styles.sectionLabel, { color: colors.foreground }]}>AVAILABLE TIMES</Text><Text style={[styles.sectionHint, { color: colors.mutedForeground }]}>{titleDate}</Text></View>
+                {slotsState === 'ready' && slots.length > 0 ? (
+                  <View style={styles.timeGrid}>
+                    {slots.map((item) => {
+                      const picked = slot?.time === item.time;
+                      return <TouchableOpacity key={item.time} testID={`booking-time-${item.time}`} onPress={() => setSlot(item)} style={[styles.timeChip, { backgroundColor: picked ? colors.primary : colors.card, borderColor: picked ? colors.primary : colors.border }]}><Text style={[styles.timeText, { color: picked ? colors.primaryForeground : colors.foreground }]}>{new Date(item.time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</Text></TouchableOpacity>;
+                    })}
+                  </View>
+                ) : (
+                  <View style={[styles.lookupHint, { marginTop: 0, backgroundColor: colors.secondary }]}><Feather name={slotsState === 'error' ? 'alert-circle' : 'clock'} size={15} color={colors.primary} /><Text style={[styles.hintText, { flex: 1, color: colors.primary }]}>{slotsState === 'error' ? 'Could not load times from Certxa. Check the connection and pick the date again.' : slotsState === 'ready' ? 'No time on this day has room for the whole visit. Try another date.' : 'Checking available times…'}</Text></View>
+                )}
+                {slot ? <Text style={[styles.footerNote, { color: colors.mutedForeground, marginTop: 12 }]}>{`With ${slot.staffName}`}</Text> : null}
+              </>
+            ) : (
+              <>
+                <View style={styles.intro}>
+                  <Text style={[styles.eyebrow, { color: colors.primary }]}>{stage === 'services' ? 'STEP 2 · SERVICES' : 'STEP 3 · ADD-ONS'}</Text>
+                  <Text style={[styles.heading, { color: colors.foreground }]}>{stage === 'services' ? 'What are we doing?' : 'Any add-ons?'}</Text>
+                  <Text style={[styles.subheading, { color: colors.mutedForeground }]}>{stage === 'services' ? `Choose one or more services for ${ticketClient?.name.split(' ')[0] ?? 'this client'}.` : 'Optional extras for the services you picked.'}</Text>
+                </View>
+                <TextInput testID={stage === 'services' ? 'booking-service-search' : 'booking-addon-search'} autoCapitalize="none" autoCorrect={false} value={stage === 'services' ? serviceQuery : addonQuery} onChangeText={stage === 'services' ? setServiceQuery : setAddonQuery} placeholder={stage === 'services' ? 'Search services' : 'Search add-ons'} placeholderTextColor={colors.mutedForeground} style={[styles.nameInput, { height: 48, fontSize: 14, marginBottom: 12, backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
+                <View style={styles.serviceList}>
+                  {(stage === 'services' ? visibleServices.map((item) => ({ id: item.id, name: item.name, minutes: item.durationMinutes, priceValue: item.priceValue })) : visibleAddons).map((item) => {
+                    const picked = (stage === 'services' ? serviceIds : addonIds).includes(item.id);
+                    return (
+                      <TouchableOpacity key={item.id} testID={`booking-${stage === 'services' ? 'service' : 'addon'}-${item.id}`} accessibilityRole="checkbox" accessibilityState={{ checked: picked }} onPress={() => toggleItem(item.id)} style={[styles.serviceRow, { backgroundColor: colors.card, borderColor: picked ? colors.primary : colors.border }]}>
+                        <View style={[styles.serviceIcon, { backgroundColor: picked ? colors.primary : colors.secondary }]}><Feather name={picked ? 'check' : 'plus'} size={16} color={picked ? colors.primaryForeground : colors.primary} /></View>
+                        <View style={{ flex: 1 }}><Text numberOfLines={1} style={[styles.matchName, { color: colors.foreground }]}>{item.name}</Text><Text style={[styles.matchPhone, { color: colors.mutedForeground }]}>{minutesLabel(item.minutes)}</Text></View>
+                        <Text style={[styles.price, { color: colors.foreground }]}>{money(item.priceValue)}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                {(stage === 'services' ? visibleServices : visibleAddons).length === 0 ? (
+                  <View style={[styles.lookupHint, { marginTop: 0, backgroundColor: colors.secondary }]}><Feather name="search" size={15} color={colors.primary} /><Text style={[styles.hintText, { flex: 1, color: colors.primary }]}>{stage === 'services' ? 'No service matches that search.' : 'No add-on matches that search.'}</Text></View>
+                ) : null}
+              </>
+            )}
+            <View style={[styles.summary, { backgroundColor: colors.accent }]}><Text style={[styles.summaryLabel, { color: colors.accentForeground }]}>{`${chosenServices.length + chosenAddons.length} ${chosenServices.length + chosenAddons.length === 1 ? 'ITEM' : 'ITEMS'} · ${minutesLabel(totalMinutes)}`}</Text><Text style={[styles.summaryValue, { color: colors.accentForeground }]}>{money(totalPrice)}</Text></View>
           </ScrollView>
           <View style={[styles.footer, { borderTopColor: colors.border, backgroundColor: colors.background, paddingBottom: Math.max(insets.bottom, Platform.OS === 'web' ? 34 : 16) }]}>
-            {saveError ? <Text style={[styles.footerNote, { color: colors.destructive }]}>{saveError}</Text> : null}
-            <TouchableOpacity disabled={saving || !service} testID="confirm-booking" onPress={saveBooking} style={[styles.primaryButton, { backgroundColor: service ? colors.primary : colors.muted }]}><Text style={[styles.primaryButtonText, { color: colors.primaryForeground }]}>{saving ? 'Saving…' : 'Add appointment'}</Text><Feather name="check" size={17} color={colors.primaryForeground} /></TouchableOpacity>
+            {saveError ? <Text style={[styles.footerNote, { color: colors.destructive, marginTop: 0, marginBottom: 8 }]}>{saveError}</Text> : null}
+            {stage === 'schedule' ? (
+              <TouchableOpacity disabled={saving || !slot} testID="confirm-booking" onPress={saveBooking} style={[styles.primaryButton, { backgroundColor: slot && !saving ? colors.primary : colors.muted }]}><Text style={[styles.primaryButtonText, { color: slot && !saving ? colors.primaryForeground : colors.mutedForeground }]}>{saving ? 'Saving…' : slot ? `Book ${new Date(slot.time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : 'Choose a time'}</Text></TouchableOpacity>
+            ) : (
+              <TouchableOpacity disabled={stage === 'services' && serviceIds.length === 0} testID="booking-next-step" onPress={goNext} style={[styles.primaryButton, { backgroundColor: stage === 'addons' || serviceIds.length > 0 ? colors.primary : colors.muted }]}><Text style={[styles.primaryButtonText, { color: stage === 'addons' || serviceIds.length > 0 ? colors.primaryForeground : colors.mutedForeground }]}>{stage === 'services' ? (serviceIds.length === 0 ? 'Choose a service' : 'Continue') : chosenAddons.length === 0 ? 'Skip add-ons' : 'Continue'}</Text></TouchableOpacity>
+            )}
             <Text style={[styles.footerNote, { color: colors.mutedForeground }]}>This appointment will be saved to Certxa.</Text>
           </View>
         </>

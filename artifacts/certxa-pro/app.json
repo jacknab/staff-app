@@ -12,6 +12,9 @@
       "bundleIdentifier": "com.fastcheckinllc.certxapro",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
+      },
+      "entitlements": {
+        "com.apple.developer.proximity-reader.payment.acceptance": true
       }
     },
     "android": {
@@ -42,7 +45,15 @@
           "tapToPayCheck": true
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "sounds": [
+            "./assets/sounds/soft_chime.wav"
+          ]
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

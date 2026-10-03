@@ -39,3 +39,6 @@ yarn-error.*
 .vercel
 
 .env
+# Local signing credentials for the preview-dev EAS profile. Never commit these.
+credentials.json
+credentials/

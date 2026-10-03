@@ -25,6 +25,7 @@ async function authenticatedRequest<T>(path: string, method: string, body?: unkn
 export const api = {
   get: <T = unknown>(path: string) => authenticatedRequest<T>(path, 'GET'),
   post: <T = unknown>(path: string, body?: unknown) => authenticatedRequest<T>(path, 'POST', body),
+  put: <T = unknown>(path: string, body?: unknown) => authenticatedRequest<T>(path, 'PUT', body),
   patch: <T = unknown>(path: string, body?: unknown) => authenticatedRequest<T>(path, 'PATCH', body),
   del: <T = unknown>(path: string) => authenticatedRequest<T>(path, 'DELETE'),
 };
