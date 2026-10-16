@@ -120,6 +120,9 @@ export default function LoginScreen() {
         <TouchableOpacity disabled={isSendingReset} onPress={() => void forgotPassword()} style={{ alignSelf: 'center', minHeight: 40, justifyContent: 'center' }} testID="login-forgot-password">
           <Text style={[styles.label, { color: colors.primary, marginBottom: 0 }]}>{isSendingReset ? 'Sending…' : 'Forgot password?'}</Text>
         </TouchableOpacity>
+        <TouchableOpacity onPress={() => router.push('/signup')} style={{ alignSelf: 'center', minHeight: 40, justifyContent: 'center' }} testID="login-create-account">
+          <Text style={[styles.label, { color: colors.primary, marginBottom: 0 }]}>Create an account</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={[styles.secureNote, { backgroundColor: colors.secondary }]}>

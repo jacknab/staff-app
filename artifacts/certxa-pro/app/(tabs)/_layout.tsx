@@ -50,12 +50,8 @@ function ClassicTabLayout() {
           ? <SymbolView name="person.2" tintColor={color} size={23} />
           : <Feather name="users" size={21} color={color} />,
       }} />
-      <Tabs.Screen name="checkout" options={{
-        title: 'Checkout',
-        tabBarIcon: ({ color }) => isIOS
-          ? <SymbolView name="creditcard" tintColor={color} size={23} />
-          : <Feather name="credit-card" size={21} color={color} />,
-      }} />
+      {/* Checkout has no tab: a payment always belongs to a booking, so it is opened from an appointment's Check Out. */}
+      <Tabs.Screen name="checkout" options={{ title: 'Checkout', href: null }} />
       <Tabs.Screen name="more" options={{
         title: 'More',
         tabBarIcon: ({ color }) => isIOS

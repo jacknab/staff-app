@@ -107,6 +107,25 @@ export function login(email: string, password: string): Promise<LoginResponse> {
   });
 }
 
+export type RegisterRequest = {
+  firstName: string;
+  lastName: string;
+  businessName: string;
+  businessType: string;
+  email: string;
+  password: string;
+  phone?: string;
+  timezone?: string;
+};
+
+/** Creates a Certxa Pro account (one calendar, free Solo plan) and signs it in. */
+export function register(body: RegisterRequest): Promise<LoginResponse> {
+  return certxaRequest<LoginResponse>('/api/solo/register', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
 export async function getStoredToken() {
   return storage.getItem(CERTXA_TOKEN_KEY);
 }

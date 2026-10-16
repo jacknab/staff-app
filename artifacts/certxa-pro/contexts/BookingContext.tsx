@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { api } from '@/lib/live-api';
+import { useAuth } from '@/contexts/AuthContext';
 
 export type ClientProfile = {
   id: string;
@@ -51,6 +52,8 @@ type BookingContextValue = {
   loading: boolean;
   error: string;
   calendarDate: Date;
+  /** The signed-in owner's own staff record. The app shows and books only this person's calendar. */
+  ownStaffId: number | null;
   setCalendarDate: (date: Date) => void;
   refresh: () => Promise<void>;
   addClient: (client: NewClient) => Promise<ClientProfile>;
@@ -98,41 +101,49 @@ export function BookingProvider({ children }: { children: ReactNode }) {
   const [calendarDate, setCalendarDate] = useState(new Date());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  // This app is one person's calendar: the account owner's. Other technicians of the same business are
+  // never shown or booked here. (An account with no staff record linked to it falls back to the whole business.)
+  const { user } = useAuth();
+  const ownStaffId = Number(user?.staffId) > 0 ? Number(user?.staffId) : null;
 
   const refresh = useCallback(async () => {
     setLoading(true); setError('');
     const from = new Date(calendarDate); from.setHours(0, 0, 0, 0);
     const to = new Date(calendarDate); to.setHours(23, 59, 59, 999);
     try {
-      const [customerRows, serviceRows, appointmentRows] = await Promise.all([
+      const [customerRows, serviceRows, appointmentRows, ownServices] = await Promise.all([
         api.get<ApiCustomer[]>('/api/customers'),
         api.get<ApiService[]>('/api/services'),
-        api.get<ApiAppointment[]>(`/api/appointments?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}`),
+        api.get<ApiAppointment[]>(`/api/appointments?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}${ownStaffId ? `&staffId=${ownStaffId}` : ''}`),
+        // The services the owner performs. An empty list means no restriction.
+        ownStaffId ? api.get<{ serviceIds?: number[] }>(`/api/staff/${ownStaffId}/services`).catch(() => null) : Promise.resolve(null),
       ]);
+      const ownServiceIds = Array.isArray(ownServices?.serviceIds) ? ownServices.serviceIds.map(Number) : [];
       setClients((Array.isArray(customerRows) ? customerRows : []).map(mapCustomer));
-      setServices((Array.isArray(serviceRows) ? serviceRows : []).map(mapService));
+      setServices((Array.isArray(serviceRows) ? serviceRows : []).filter((service) => ownServiceIds.length === 0 || ownServiceIds.includes(Number(service.id))).map(mapService));
       setBookings((Array.isArray(appointmentRows) ? appointmentRows : []).map(mapAppointment));
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not load Certxa data.'); }
     finally { setLoading(false); }
-  }, [calendarDate]);
+  }, [calendarDate, ownStaffId]);
 
   useEffect(() => { void refresh(); }, [refresh]);
 
   const value = useMemo<BookingContextValue>(() => ({
-    clients, bookings, services, loading, error, calendarDate, setCalendarDate, refresh,
+    clients, bookings, services, loading, error, calendarDate, ownStaffId, setCalendarDate, refresh,
     addClient: async (client) => {
       const created = await api.post<ApiCustomer>('/api/customers', { name: client.name, phone: client.phone || undefined });
       const record = mapCustomer(created, 0); setClients((current) => [record, ...current]); return record;
     },
     addBooking: async (appointment) => {
-      await api.post('/api/appointments', { customerId: appointment.customerId, serviceId: appointment.serviceId, duration: Number.parseInt(appointment.duration, 10) || 60, date: appointment.dateIso });
+      await api.post('/api/appointments', { customerId: appointment.customerId, serviceId: appointment.serviceId, ...(ownStaffId ? { staffId: ownStaffId } : {}), duration: Number.parseInt(appointment.duration, 10) || 60, date: appointment.dateIso });
       await refresh();
     },
     rescheduleBooking: async (appointmentId, dateIso, durationMinutes) => {
-      await api.patch(`/api/appointments/${appointmentId}`, { date: dateIso, duration: durationMinutes });
+      // Certxa refuses the move when it would land on another appointment of the same technician.
+      await api.patch(`/api/appointments/${appointmentId}`, { date: dateIso, duration: durationMinutes, checkConflicts: true });
       await refresh();
     },
-  }), [bookings, calendarDate, clients, error, loading, refresh, services]);
+  }), [bookings, calendarDate, clients, error, loading, ownStaffId, refresh, services]);
 
   return <BookingContext.Provider value={value}>{children}</BookingContext.Provider>;
 }

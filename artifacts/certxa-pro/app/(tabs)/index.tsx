@@ -9,22 +9,43 @@ import { AppointmentRecord, useBookingData } from '@/contexts/BookingContext';
 type ViewMode = 'Month' | 'Week' | 'Day';
 
 const PREVIEW_COLORS = ['#DDEAE2', '#F9E1BC', '#F3D4DE', '#DEE4F4'];
-const TIMELINE_START = 8 * 60;
-const TIMELINE_END = 18 * 60;
+// The day view shows 8 AM to 6 PM, and grows to take in any appointment earlier or later than that.
+const DEFAULT_START = 8 * 60;
+const DEFAULT_END = 18 * 60;
 const HOUR_HEIGHT = 64;
-const TIMELINE_HOURS = Array.from({ length: 11 }, (_, index) => TIMELINE_START + index * 60);
 const SNAP_MINUTES = 5;
 
 function dateKey(date: Date) {
   return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
 }
 
-function clockMinutes(value: string) {
-  const [clock, period = ''] = value.toUpperCase().split(' ');
-  const [hoursText, minutesText = '0'] = clock.split(':');
-  const hours = Number(hoursText);
-  const minutes = Number(minutesText);
-  return (hours % 12 + (period === 'PM' ? 12 : 0)) * 60 + minutes;
+/** Minutes after midnight an appointment starts, read from its date - never from the displayed "3:17 PM"
+ *  text, whose spacing differs between phones (an iPhone puts a narrow no-break space before AM/PM). */
+function startMinutes(item: AppointmentRecord) {
+  const date = new Date(item.dateIso);
+  const minutes = date.getHours() * 60 + date.getMinutes();
+  return Number.isFinite(minutes) ? minutes : DEFAULT_START;
+}
+
+/** Appointments that share any time are drawn side by side instead of on top of each other. Returns, for each
+ *  appointment id, which column it sits in and how many columns its group of overlapping appointments needs. */
+function overlapColumns(items: AppointmentRecord[]) {
+  const layout: Record<string, { column: number; columns: number }> = {};
+  let group: { id: string; column: number }[] = [];
+  let columnEnds: number[] = [];
+  let groupEnd = -1;
+  const closeGroup = () => { for (const entry of group) layout[entry.id] = { column: entry.column, columns: columnEnds.length }; group = []; columnEnds = []; };
+  for (const item of items) {
+    const start = startMinutes(item);
+    const end = start + durationMinutes(item.duration);
+    if (group.length > 0 && start >= groupEnd) closeGroup();
+    let column = columnEnds.findIndex((columnEnd) => columnEnd <= start);
+    if (column === -1) { column = columnEnds.length; columnEnds.push(end); } else columnEnds[column] = end;
+    group.push({ id: item.id, column });
+    groupEnd = Math.max(groupEnd, end);
+  }
+  closeGroup();
+  return layout;
 }
 
 function formatClock(minutes: number) {
@@ -33,14 +54,14 @@ function formatClock(minutes: number) {
   return `${hour}:${String(minutes % 60).padStart(2, '0')} ${hours >= 12 ? 'PM' : 'AM'}`;
 }
 
-function timelineTop(minutes: number) {
-  return ((minutes - TIMELINE_START) / 60) * HOUR_HEIGHT;
+function timelineTop(minutes: number, timelineStart: number) {
+  return ((minutes - timelineStart) / 60) * HOUR_HEIGHT;
 }
 
-function clampDropMinutes(minutes: number, duration: number) {
-  const latestStart = Math.max(TIMELINE_START, TIMELINE_END - duration);
+function clampDropMinutes(minutes: number, duration: number, timelineStart: number, timelineEnd: number) {
+  const latestStart = Math.max(timelineStart, timelineEnd - duration);
   const snapped = Math.round(minutes / SNAP_MINUTES) * SNAP_MINUTES;
-  return Math.min(latestStart, Math.max(TIMELINE_START, snapped));
+  return Math.min(latestStart, Math.max(timelineStart, snapped));
 }
 
 function dateAtMinutes(day: Date, minutes: number) {
@@ -120,6 +141,8 @@ function DraggableAppointment({
   item,
   top,
   height,
+  column,
+  columns,
   backgroundColor,
   isDragging,
   onTap,
@@ -130,6 +153,8 @@ function DraggableAppointment({
   item: AppointmentRecord;
   top: number;
   height: number;
+  column: number;
+  columns: number;
   backgroundColor: string;
   isDragging: boolean;
   onTap: (item: AppointmentRecord) => void;
@@ -161,6 +186,8 @@ function DraggableAppointment({
         {
           top,
           height,
+          left: `${(column / columns) * 100}%`,
+          width: `${100 / columns}%`,
           backgroundColor,
           zIndex: isDragging ? 2 : 1,
           transform: [{ scale: isDragging ? 1.025 : 1 }],
@@ -170,8 +197,9 @@ function DraggableAppointment({
       ]}
     >
       <Text numberOfLines={1} style={styles.timelineClient}>{item.name}</Text>
-      <Text numberOfLines={1} style={styles.timelineService}>{item.status === 'paid' ? `PAID · ${item.service}` : item.service}</Text>
-      <Text numberOfLines={1} style={styles.timelineDuration}>{item.duration}</Text>
+      {/* A short appointment only has room for the name, then the service; the length is shown when all three fit. */}
+      {height >= 40 && <Text numberOfLines={1} style={styles.timelineService}>{item.status === 'paid' ? `PAID · ${item.service}` : item.service}</Text>}
+      {height >= 56 && <Text numberOfLines={1} style={styles.timelineDuration}>{item.duration}</Text>}
     </View>
   );
 }
@@ -205,7 +233,18 @@ export default function CalendarScreen() {
     const date = new Date(override);
     return { ...item, dateKey: dateKey(date), dateIso: date.toISOString(), time: date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) };
   }), [previewOverrides, selectedDate]);
-  const appointments = useMemo(() => [...(bookings.length > 0 ? bookings : preview)].sort((a, b) => clockMinutes(a.time) - clockMinutes(b.time)), [bookings, preview]);
+  const appointments = useMemo(() => [...(bookings.length > 0 ? bookings : preview)].sort((a, b) => startMinutes(a) - startMinutes(b)), [bookings, preview]);
+  const columnsById = useMemo(() => overlapColumns(appointments), [appointments]);
+  const { timelineStart, timelineEnd, timelineHours } = useMemo(() => {
+    let start = DEFAULT_START;
+    let end = DEFAULT_END;
+    for (const item of appointments) {
+      const from = startMinutes(item);
+      start = Math.min(start, Math.floor(from / 60) * 60);
+      end = Math.max(end, Math.min(24 * 60, Math.ceil((from + durationMinutes(item.duration)) / 60) * 60));
+    }
+    return { timelineStart: start, timelineEnd: end, timelineHours: Array.from({ length: (end - start) / 60 + 1 }, (_, index) => start + index * 60) };
+  }, [appointments]);
   const isPreviewData = bookings.length === 0 && !loading;
   const topInset = Platform.OS === 'web' ? 67 : insets.top;
   const todayIsSelected = dateKey(selectedDate) === dateKey(new Date());
@@ -235,29 +274,29 @@ export default function CalendarScreen() {
   };
 
   const startDrag = useCallback((item: AppointmentRecord) => {
-    const top = Math.max(4, timelineTop(clockMinutes(item.time)));
+    const top = timelineTop(startMinutes(item), timelineStart);
     setActiveDrag({ id: item.id, top });
     setDropError('');
-  }, []);
+  }, [timelineStart]);
 
   const moveDrag = useCallback((item: AppointmentRecord, deltaY: number) => {
-    const startTop = Math.max(4, timelineTop(clockMinutes(item.time)));
+    const startTop = timelineTop(startMinutes(item), timelineStart);
     const duration = durationMinutes(item.duration);
-    const minutes = clampDropMinutes(TIMELINE_START + ((startTop + deltaY) / HOUR_HEIGHT) * 60, duration);
-    setActiveDrag({ id: item.id, top: Math.max(4, timelineTop(minutes)) });
-  }, []);
+    const minutes = clampDropMinutes(timelineStart + ((startTop + deltaY) / HOUR_HEIGHT) * 60, duration, timelineStart, timelineEnd);
+    setActiveDrag({ id: item.id, top: timelineTop(minutes, timelineStart) });
+  }, [timelineStart, timelineEnd]);
 
   const endDrag = useCallback((item: AppointmentRecord, deltaY: number) => {
-    const startTop = Math.max(4, timelineTop(clockMinutes(item.time)));
+    const startTop = timelineTop(startMinutes(item), timelineStart);
     const duration = durationMinutes(item.duration);
-    const minutes = clampDropMinutes(TIMELINE_START + ((startTop + deltaY) / HOUR_HEIGHT) * 60, duration);
+    const minutes = clampDropMinutes(timelineStart + ((startTop + deltaY) / HOUR_HEIGHT) * 60, duration, timelineStart, timelineEnd);
     setActiveDrag(null);
-    if (minutes !== clampDropMinutes(clockMinutes(item.time), duration)) {
+    if (minutes !== clampDropMinutes(startMinutes(item), duration, timelineStart, timelineEnd)) {
       setPendingDrop({ item, minutes });
       setNotifyClient(true);
       setDropError('');
     }
-  }, []);
+  }, [timelineStart, timelineEnd]);
 
   const confirmDrop = async () => {
     if (!pendingDrop) return;
@@ -384,21 +423,25 @@ export default function CalendarScreen() {
               <Text style={[styles.dragHintText, { color: colors.secondaryForeground }]}>Press and hold an appointment to move it in 5-minute increments.</Text>
             </View>
             {error && <View style={[styles.syncNotice, { backgroundColor: colors.secondary }]}><Feather name="info" size={14} color={colors.primary} /><Text style={[styles.syncText, { color: colors.secondaryForeground }]}>Showing preview appointments while Certxa is offline.</Text></View>}
-            <View style={[styles.timeline, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={[styles.timeline, { minHeight: ((timelineEnd - timelineStart) / 60) * HOUR_HEIGHT, backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={[styles.timelineLabels, { backgroundColor: colors.muted }]}>
-                {TIMELINE_HOURS.map((time) => <Text key={time} style={styles.timelineLabel}>{formatClock(time)}</Text>)}
+                {timelineHours.map((time) => <Text key={time} style={styles.timelineLabel}>{formatClock(time)}</Text>)}
               </View>
-              <View style={[styles.timelineTrack, { backgroundColor: colors.card }]}>
-                {TIMELINE_HOURS.map((time, index) => <View key={time} style={[styles.timelineLine, { top: index * HOUR_HEIGHT, backgroundColor: colors.border }]} />)}
+              <View style={[styles.timelineTrack, { minHeight: ((timelineEnd - timelineStart) / 60) * HOUR_HEIGHT, backgroundColor: colors.card }]}>
+                {timelineHours.map((time, index) => <View key={time} style={[styles.timelineLine, { top: index * HOUR_HEIGHT, backgroundColor: colors.border }]} />)}
                 {appointments.map((item, index) => {
-                  const top = Math.max(4, ((clockMinutes(item.time) - TIMELINE_START) / 60) * HOUR_HEIGHT);
-                  const height = Math.max(54, (durationMinutes(item.duration) / 60) * HOUR_HEIGHT - 7);
+                  const top = timelineTop(startMinutes(item), timelineStart);
+                  // The box is as tall as the appointment is long, so one never runs over the next unless they really overlap.
+                  const height = Math.max(26, (durationMinutes(item.duration) / 60) * HOUR_HEIGHT - 3);
+                  const place = columnsById[item.id] ?? { column: 0, columns: 1 };
                   return (
                     <DraggableAppointment
                       key={item.id}
                       item={item}
                       top={activeDrag?.id === item.id ? activeDrag.top : top}
                       height={height}
+                      column={place.column}
+                      columns={place.columns}
                       backgroundColor={PREVIEW_COLORS[index % PREVIEW_COLORS.length]}
                       isDragging={activeDrag?.id === item.id}
                       onTap={openAppointment}
@@ -409,7 +452,7 @@ export default function CalendarScreen() {
                   );
                 })}
                 {appointments.length === 0 && !loading && <View style={styles.timelineEmpty}><Feather name="sun" size={18} color="#A8B2AD" /><Text style={styles.timelineEmptyText}>Your schedule is open</Text></View>}
-                <View style={[styles.currentTime, { top: ((new Date().getHours() * 60 + new Date().getMinutes() - TIMELINE_START) / 60) * HOUR_HEIGHT }]} />
+                {todayIsSelected && <View style={[styles.currentTime, { top: timelineTop(new Date().getHours() * 60 + new Date().getMinutes(), timelineStart) }]} />}
               </View>
             </View>
           </View>
@@ -493,12 +536,12 @@ const styles = StyleSheet.create({
   dragHintText: { fontSize: 10, fontFamily: 'Inter_500Medium', flex: 1 },
   syncNotice: { flexDirection: 'row', alignItems: 'center', gap: 7, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 10 },
   syncText: { fontSize: 10, fontFamily: 'Inter_500Medium', flex: 1 },
-  timeline: { minHeight: HOUR_HEIGHT * 10, borderRadius: 14, borderWidth: 1, overflow: 'hidden', flexDirection: 'row' },
-  timelineLabels: { width: 68, paddingTop: 7 },
-  timelineLabel: { height: HOUR_HEIGHT, paddingTop: 1, paddingRight: 9, textAlign: 'right', color: '#7E8782', fontSize: 10, fontFamily: 'Inter_500Medium' },
-  timelineTrack: { flex: 1, minHeight: HOUR_HEIGHT * 10, position: 'relative' },
+  timeline: { borderRadius: 14, borderWidth: 1, overflow: 'hidden', flexDirection: 'row' },
+  timelineLabels: { width: 68 },
+  timelineLabel: { height: HOUR_HEIGHT, paddingTop: 3, paddingRight: 9, textAlign: 'right', color: '#7E8782', fontSize: 10, fontFamily: 'Inter_500Medium' },
+  timelineTrack: { flex: 1, position: 'relative' },
   timelineLine: { height: 1, left: 0, right: 0, position: 'absolute' },
-  timelineAppointment: { position: 'absolute', left: 7, right: 8, borderRadius: 8, paddingHorizontal: 11, paddingVertical: 6, justifyContent: 'center', overflow: 'hidden' },
+  timelineAppointment: { position: 'absolute', borderRadius: 8, borderWidth: 2, borderColor: '#FFFFFF', paddingHorizontal: 9, paddingVertical: 3, justifyContent: 'center', overflow: 'hidden' },
   timelineAppointmentDragging: { shadowColor: '#173B2E', shadowOpacity: 0.2, shadowRadius: 10, shadowOffset: { width: 0, height: 6 }, elevation: 6 },
   timelineClient: { color: '#26302B', fontSize: 12, lineHeight: 15, fontFamily: 'Inter_700Bold' },
   timelineService: { color: '#26302B', fontSize: 11, lineHeight: 14, fontFamily: 'Inter_600SemiBold', marginTop: 2 },

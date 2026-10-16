@@ -55,7 +55,7 @@ export default function BookingScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams<{ day?: string; phone?: string }>();
-  const { clients, services, addClient, refresh, calendarDate, setCalendarDate } = useBookingData();
+  const { clients, services, addClient, refresh, calendarDate, setCalendarDate, ownStaffId } = useBookingData();
   const initialPhone = (params.phone ?? '').replace(/\D/g, '').slice(0, 10);
   const [phone, setPhone] = useState(initialPhone);
   const [name, setName] = useState('');
@@ -139,11 +139,13 @@ export default function BookingScreen() {
     if (!storeSlug) { setSlots([]); setSlotsState('error'); return; }
     let cancelled = false;
     setSlotsState('loading');
-    api.get<Slot[]>(`/api/public/store/${encodeURIComponent(storeSlug)}/availability?serviceId=${primaryServiceId}&date=${dayParam}&duration=${totalMinutes + BUFFER_MINUTES}`)
+    api.get<Slot[]>(`/api/public/store/${encodeURIComponent(storeSlug)}/availability?serviceId=${primaryServiceId}&date=${dayParam}&duration=${totalMinutes + BUFFER_MINUTES}${ownStaffId ? `&staffId=${ownStaffId}` : ''}`)
       .then((rows) => {
         if (cancelled) return;
         const seen = new Set<string>();
         const unique = (Array.isArray(rows) ? rows : []).filter((row) => {
+          // Only the owner's own open times: this app never books another technician.
+          if (ownStaffId && Number(row?.staffId) !== ownStaffId) return false;
           if (!row?.time || seen.has(row.time)) return false;
           seen.add(row.time);
           return true;
@@ -154,7 +156,7 @@ export default function BookingScreen() {
       })
       .catch(() => { if (!cancelled) { setSlots([]); setSlotsState('error'); } });
     return () => { cancelled = true; };
-  }, [dayParam, primaryServiceId, stage, storeSlug, totalMinutes]);
+  }, [dayParam, ownStaffId, primaryServiceId, stage, storeSlug, totalMinutes]);
 
   const toggleItem = (id: number) => {
     const toggle = (current: number[]) => (current.includes(id) ? current.filter((value) => value !== id) : [...current, id]);

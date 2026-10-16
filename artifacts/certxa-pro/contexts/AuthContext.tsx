@@ -4,6 +4,8 @@ import {
   getStoredToken,
   getStoredUser,
   login as loginWithCertxa,
+  register as registerWithCertxa,
+  type RegisterRequest,
   storeSession,
   type CertxaUser,
 } from '@/lib/certxa-api';
@@ -15,6 +17,7 @@ type AuthContextValue = {
   token: string | null;
   user: CertxaUser | null;
   login: (email: string, password: string) => Promise<void>;
+  register: (details: RegisterRequest) => Promise<void>;
   logout: () => Promise<void>;
 };
 
@@ -49,6 +52,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user,
     login: async (email, password) => {
       const session = await loginWithCertxa(email.trim(), password);
+      await storeSession(session);
+      setToken(session.token);
+      setUser(session.user);
+    },
+    register: async (details) => {
+      const session = await registerWithCertxa(details);
       await storeSession(session);
       setToken(session.token);
       setUser(session.user);

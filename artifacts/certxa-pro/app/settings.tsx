@@ -232,6 +232,11 @@ export default function SettingsScreen() {
           <Row icon="briefcase" title="Business details" hint={store?.name || 'Name, type, phone, e-mail'} to="business" />
           <Row icon="map-pin" title="Location" hint={address || 'Your business address'} to="location" />
           <Row icon="clock" title="Business hours" hint="The days and times you are open" to="hours" />
+          <TouchableOpacity testID="settings-services" onPress={() => router.push('/services')} style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={[styles.rowIcon, { backgroundColor: colors.secondary }]}><Feather name="list" size={16} color={colors.primary} /></View>
+            <View style={{ flex: 1 }}><Text style={[styles.rowTitle, { color: colors.foreground }]}>Services</Text><Text numberOfLines={1} style={[styles.rowHint, { color: colors.mutedForeground }]}>What you offer, how long it takes and the price</Text></View>
+            <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+          </TouchableOpacity>
         </Group>
         <Group title="ONLINE BOOKING">
           <Row icon="sliders" title="Booking rules" hint="Who can book, notice, start times, cancelling" to="rules" />

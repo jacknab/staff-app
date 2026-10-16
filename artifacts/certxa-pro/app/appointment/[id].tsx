@@ -80,7 +80,17 @@ export default function AppointmentDetailScreen() {
     setError('');
     try {
       if (!isPreview) {
-        await api.patch(`/api/appointments/${appointmentId}`, { date: withTime(day, time).toISOString(), serviceId: selectedService.id, duration: selectedService.durationMinutes, status });
+        // Only what was changed is sent: an untouched time keeps the appointment exactly where it is, and an
+        // untouched service keeps its full length (services plus add-ons). A new time is checked against the
+        // technician's other appointments.
+        const nextDate = withTime(day, time);
+        const moved = Math.floor(nextDate.getTime() / 60000) !== Math.floor(originalDate.getTime() / 60000);
+        const serviceChanged = selectedService.id !== Number(params.serviceId);
+        await api.patch(`/api/appointments/${appointmentId}`, {
+          status,
+          ...(moved ? { date: nextDate.toISOString(), checkConflicts: status !== 'cancelled' } : {}),
+          ...(serviceChanged ? { serviceId: selectedService.id, duration: selectedService.durationMinutes, checkConflicts: status !== 'cancelled' } : {}),
+        });
         await refresh();
       }
       setEditing(false);

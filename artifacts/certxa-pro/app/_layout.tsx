@@ -49,13 +49,14 @@ function RootLayoutNav() {
 
   useEffect(() => {
     if (isLoading) return;
-    const isLoginRoute = pathname === '/login';
+    // Signed-out screens: sign in, and create an account.
+    const isLoginRoute = pathname === '/login' || pathname === '/signup';
     if (!isAuthenticated && !isLoginRoute) router.replace('/login');
     if (isAuthenticated && isLoginRoute) router.replace('/(tabs)');
   }, [isAuthenticated, isLoading, pathname, router]);
 
   if (isLoading) return null;
-  if (!isAuthenticated && pathname !== '/login') return <Redirect href="/login" />;
+  if (!isAuthenticated && pathname !== '/login' && pathname !== '/signup') return <Redirect href="/login" />;
 
   return (
     <Stack screenOptions={{ headerBackTitle: 'Back' }}>
@@ -65,7 +66,9 @@ function RootLayoutNav() {
       <Stack.Screen name="ai" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="settings" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="reviews" options={{ headerShown: false, presentation: 'card' }} />
+      <Stack.Screen name="services" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="login" options={{ headerShown: false }} />
+      <Stack.Screen name="signup" options={{ headerShown: false }} />
     </Stack>
   );
 }
