@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { addressLine, type HouseCallAddress } from '@/contexts/BookingContext';
 import { Feather } from '@expo/vector-icons';
 import { Alert, Linking, Platform, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -49,6 +50,9 @@ export default function AppointmentDetailScreen() {
     preview?: string;
     phone?: string;
     email?: string;
+    visitAt?: string;
+    clientAddress?: string;
+    travelFeeCents?: string;
   }>();
   const { services, refresh } = useBookingData();
   const originalDate = useMemo(() => params.dateIso ? new Date(params.dateIso) : new Date(), [params.dateIso]);
@@ -62,7 +66,15 @@ export default function AppointmentDetailScreen() {
   const appointmentId = Number(params.id);
   const isPreview = params.preview === '1';
   const selectedService = services.find((service) => service.id === serviceId);
-  const amountCents = selectedService ? Math.round(selectedService.priceValue * 100) : Number(params.amountCents ?? 0);
+  // The visit's total from the calendar (service, add-ons, extra services and any travel fee). Only a changed
+  // service is priced again here — the service's price alone would drop the add-ons and extras.
+  const travelFeeCents = Number(params.travelFeeCents ?? 0) || 0;
+  const serviceChanged = selectedService != null && serviceId !== Number(params.serviceId);
+  const amountCents = serviceChanged ? Math.round(selectedService.priceValue * 100) + travelFeeCents : Number(params.amountCents ?? 0);
+  const houseCallAddress = useMemo(() => {
+    if (params.visitAt !== 'client' || !params.clientAddress) return null;
+    try { return addressLine(JSON.parse(params.clientAddress) as HouseCallAddress) || null; } catch { return null; }
+  }, [params.visitAt, params.clientAddress]);
   const clientName = params.clientName || 'Walk-in';
   const serviceName = selectedService?.name || params.serviceName || 'Service';
   const duration = selectedService?.duration || params.duration || '60 min';
@@ -229,7 +241,17 @@ export default function AppointmentDetailScreen() {
             <View style={styles.detailRows}>
               <DetailRow icon="calendar" label={day.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} colors={colors} />
               <DetailRow icon="clock" label={`${time} · ${duration}`} colors={colors} />
+              {params.visitAt === 'client' ? <DetailRow icon="navigation" label={`House call${travelFeeCents ? ` · $${(travelFeeCents / 100).toFixed(2)} travel fee` : ''}`} colors={colors} /> : null}
             </View>
+            {houseCallAddress ? (
+              <TouchableOpacity testID="appointment-open-maps" onPress={() => void Linking.openURL(Platform.OS === 'ios' ? `http://maps.apple.com/?daddr=${encodeURIComponent(houseCallAddress)}` : `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(houseCallAddress)}`)} style={[styles.mapRow, { borderColor: colors.border }]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.metaLabel, { color: colors.mutedForeground }]}>CLIENT'S ADDRESS</Text>
+                  <Text style={[styles.mapAddress, { color: colors.foreground }]}>{houseCallAddress}</Text>
+                </View>
+                <Text style={[styles.mapLink, { color: colors.primary }]}>Open in Maps</Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
 
           {error ? <View style={[styles.errorBox, { backgroundColor: colors.accent }]}><Feather name="alert-circle" size={15} color={colors.accentForeground} /><Text style={[styles.errorText, { color: colors.accentForeground }]}>{error}</Text></View> : null}
@@ -308,6 +330,9 @@ function EditAppointment({ colors, day, error, save, saving, selectedService, se
 }
 
 const styles = StyleSheet.create({
+  mapRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderTopWidth: 1, marginTop: 14, paddingTop: 14 },
+  mapAddress: { fontSize: 14, lineHeight: 20, fontFamily: 'Inter_500Medium', marginTop: 4 },
+  mapLink: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   root: { flex: 1 },
   nav: { height: 55, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   navSide: { width: 74, minHeight: 42, flexDirection: 'row', alignItems: 'center', gap: 3 },

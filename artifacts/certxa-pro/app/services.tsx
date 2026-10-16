@@ -8,9 +8,10 @@ import { useColors } from '@/hooks/useColors';
 import { useBookingData } from '@/contexts/BookingContext';
 import { api } from '@/lib/live-api';
 
-type Service = { id: number; name: string; duration: number; price: number };
+type OfferedAt = 'place' | 'client' | 'any';
+type Service = { id: number; name: string; duration: number; price: number; offeredAt: OfferedAt };
 /** The service being added (id 0) or changed, as typed. */
-type Draft = { id: number; name: string; minutes: string; price: string };
+type Draft = { id: number; name: string; minutes: string; price: string; offeredAt: OfferedAt };
 
 function minutesLabel(minutes: number) {
   return minutes >= 60 ? `${Math.floor(minutes / 60)} hr${minutes % 60 ? ` ${minutes % 60} min` : ''}` : `${minutes} min`;
@@ -26,11 +27,13 @@ export default function ServicesScreen() {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  // Only a business with its own place and house calls chooses where each service is done.
+  const [offersBoth, setOffersBoth] = useState(false);
 
   const load = useCallback(async () => {
     try {
       const rows = await api.get<any[]>('/api/services');
-      setServices((Array.isArray(rows) ? rows : []).map((row) => ({ id: Number(row.id), name: String(row.name ?? 'Service'), duration: Number(row.duration) || 0, price: Number(row.price) || 0 })));
+      setServices((Array.isArray(rows) ? rows : []).map((row) => ({ id: Number(row.id), name: String(row.name ?? 'Service'), duration: Number(row.duration) || 0, price: Number(row.price) || 0, offeredAt: row.offeredAt === 'place' || row.offeredAt === 'client' ? row.offeredAt : 'any' })));
       setError('');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not load your services.');
@@ -39,6 +42,11 @@ export default function ServicesScreen() {
     }
   }, []);
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    api.get<{ eligible?: boolean; ownPlace?: string; houseCalls?: boolean }>('/api/work-places')
+      .then((p) => setOffersBoth(Boolean(p?.eligible && p.houseCalls && p.ownPlace !== 'none')))
+      .catch(() => undefined);
+  }, []);
 
   const save = async () => {
     if (!draft || saving) return;
@@ -51,7 +59,7 @@ export default function ServicesScreen() {
     setSaving(true);
     setError('');
     try {
-      const body = { name, duration: minutes, price: price.toFixed(2) };
+      const body = { name, duration: minutes, price: price.toFixed(2), ...(offersBoth ? { offeredAt: draft.offeredAt } : {}) };
       if (draft.id > 0) await api.patch(`/api/services/${draft.id}`, body);
       else await api.post('/api/services', { ...body, category: 'General' });
       setDraft(null);
@@ -93,7 +101,7 @@ export default function ServicesScreen() {
         <TouchableOpacity testID="services-back" accessibilityLabel="Back" onPress={() => (draft ? (setDraft(null), setError('')) : router.back())} style={styles.headerButton}><Feather name="arrow-left" size={21} color={colors.foreground} /></TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>{draft ? (draft.id > 0 ? 'Edit service' : 'New service') : 'Services'}</Text>
         {draft ? <View style={styles.headerButton} /> : (
-          <TouchableOpacity testID="services-add" accessibilityLabel="Add a service" onPress={() => { setError(''); setDraft({ id: 0, name: '', minutes: '', price: '' }); }} style={styles.headerButton}><Feather name="plus" size={22} color={colors.primary} /></TouchableOpacity>
+          <TouchableOpacity testID="services-add" accessibilityLabel="Add a service" onPress={() => { setError(''); setDraft({ id: 0, name: '', minutes: '', price: '', offeredAt: 'any' }); }} style={styles.headerButton}><Feather name="plus" size={22} color={colors.primary} /></TouchableOpacity>
         )}
       </View>
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
@@ -111,6 +119,21 @@ export default function ServicesScreen() {
                 <TextInput testID="service-price" keyboardType="decimal-pad" value={draft.price} onChangeText={(price) => setDraft({ ...draft, price: price.replace(/[^\d.]/g, '') })} placeholder="45.00" placeholderTextColor={colors.mutedForeground} style={[styles.input, input]} />
               </View>
             </View>
+            {offersBoth ? (
+              <>
+                <Text style={[styles.label, { color: colors.foreground }]}>Where you do it</Text>
+                <View style={styles.pair}>
+                  {([['any', 'Either'], ['place', 'My place'], ['client', 'House call']] as const).map(([value, label]) => {
+                    const picked = draft.offeredAt === value;
+                    return (
+                      <TouchableOpacity key={value} testID={`service-offered-${value}`} onPress={() => setDraft({ ...draft, offeredAt: value })} style={[styles.chip, { backgroundColor: picked ? colors.primary : colors.card, borderColor: picked ? colors.primary : colors.border }]}>
+                        <Text style={[styles.chipText, { color: picked ? colors.primaryForeground : colors.foreground }]}>{label}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </>
+            ) : null}
             {error ? <Text style={[styles.error, { color: colors.destructive }]}>{error}</Text> : null}
             <TouchableOpacity testID="service-save" disabled={saving} onPress={() => void save()} style={[styles.button, { backgroundColor: saving ? colors.muted : colors.primary }]}>
               <Text style={[styles.buttonText, { color: saving ? colors.mutedForeground : colors.primaryForeground }]}>{saving ? 'Saving…' : 'Save'}</Text>
@@ -129,7 +152,7 @@ export default function ServicesScreen() {
             {services.length === 0 && !error ? <Text style={[styles.empty, { color: colors.mutedForeground }]}>You have no services yet. Tap + to add the first one.</Text> : null}
             <View style={styles.list}>
               {services.map((service) => (
-                <TouchableOpacity key={service.id} testID={`service-${service.id}`} onPress={() => { setError(''); setDraft({ id: service.id, name: service.name, minutes: String(service.duration), price: service.price.toFixed(2) }); }} style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <TouchableOpacity key={service.id} testID={`service-${service.id}`} onPress={() => { setError(''); setDraft({ id: service.id, name: service.name, minutes: String(service.duration), price: service.price.toFixed(2), offeredAt: service.offeredAt }); }} style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}>
                   <View style={{ flex: 1 }}>
                     <Text numberOfLines={1} style={[styles.rowTitle, { color: colors.foreground }]}>{service.name}</Text>
                     <Text style={[styles.rowHint, { color: colors.mutedForeground }]}>{minutesLabel(service.duration)}</Text>
@@ -159,6 +182,8 @@ const styles = StyleSheet.create({
   label: { fontSize: 12, fontFamily: 'Inter_600SemiBold', marginTop: 18, marginBottom: 8 },
   input: { borderWidth: 1, borderRadius: 14, height: 52, paddingHorizontal: 14, fontSize: 14, fontFamily: 'Inter_400Regular' },
   pair: { flexDirection: 'row', gap: 10 },
+  chip: { flex: 1, borderWidth: 1, borderRadius: 12, height: 44, alignItems: 'center', justifyContent: 'center' },
+  chipText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   error: { fontSize: 12, lineHeight: 17, fontFamily: 'Inter_500Medium', marginTop: 14 },
   empty: { fontSize: 13, lineHeight: 19, fontFamily: 'Inter_400Regular', marginTop: 24, textAlign: 'center' },
   button: { height: 53, borderRadius: 15, alignItems: 'center', justifyContent: 'center', marginTop: 24 },

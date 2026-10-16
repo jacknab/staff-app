@@ -31,7 +31,19 @@ export type AppointmentRecord = {
   amountCents: number;
   status: string;
   note?: string;
+  /** Solo plan house calls: where the visit happens, the client's address and the travel fee (in the price). */
+  visitAt?: 'place' | 'client';
+  clientAddress?: HouseCallAddress | null;
+  travelFee?: number;
 };
+
+export type HouseCallAddress = { line1: string; line2?: string; city: string; state: string; postcode: string };
+
+/** One line for a client's address. */
+export function addressLine(a: HouseCallAddress | null | undefined): string {
+  if (!a) return '';
+  return [a.line1, a.line2, a.city, [a.state, a.postcode].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+}
 
 export type ServiceProfile = {
   id: number;
@@ -41,6 +53,8 @@ export type ServiceProfile = {
   priceValue: number;
   price: string;
   icon: 'eye' | 'droplet' | 'briefcase' | 'star';
+  /** Solo house calls: done at the professional's place, at the client's, or either. */
+  offeredAt: 'place' | 'client' | 'any';
 };
 
 type NewClient = Omit<ClientProfile, 'id' | 'customerId'>;
@@ -62,8 +76,8 @@ type BookingContextValue = {
 };
 
 type ApiCustomer = { id: number; name?: string | null; fullName?: string | null; firstName?: string | null; lastName?: string | null; phone?: string | null; email?: string | null; notes?: string | null };
-type ApiService = { id: number; name?: string | null; duration?: number | string | null; price?: number | string | null };
-type ApiAppointment = { appointmentAddons?: { addon?: { price?: number | string | null } | null }[] | null; customLines?: { label?: string; price?: number | string | null }[] | null; id: number; date: string; duration?: number | null; status?: string | null; notes?: string | null; customer?: ApiCustomer | null; service?: ApiService | null };
+type ApiService = { id: number; offeredAt?: string | null; name?: string | null; duration?: number | string | null; price?: number | string | null };
+type ApiAppointment = { visitAt?: string | null; clientAddress?: HouseCallAddress | null; travelFee?: number | null; appointmentAddons?: { addon?: { price?: number | string | null } | null }[] | null; customLines?: { label?: string; price?: number | string | null }[] | null; id: number; date: string; duration?: number | null; status?: string | null; notes?: string | null; customer?: ApiCustomer | null; service?: ApiService | null };
 
 const BookingContext = createContext<BookingContextValue | null>(null);
 
@@ -81,7 +95,7 @@ function mapCustomer(customer: ApiCustomer, index: number): ClientProfile {
 function mapService(service: ApiService, index: number): ServiceProfile {
   const minutes = durationMinutes(service.duration);
   const priceValue = Number(service.price ?? 0) || 0;
-  return { id: service.id, name: service.name || 'Service', durationMinutes: minutes, duration: minutes >= 60 ? `${Math.floor(minutes / 60)} hr${minutes % 60 ? ` ${minutes % 60} min` : ''}` : `${minutes} min`, priceValue, price: money(priceValue), icon: (['eye', 'droplet', 'briefcase', 'star'] as const)[index % 4] };
+  return { id: service.id, name: service.name || 'Service', durationMinutes: minutes, duration: minutes >= 60 ? `${Math.floor(minutes / 60)} hr${minutes % 60 ? ` ${minutes % 60} min` : ''}` : `${minutes} min`, priceValue, price: money(priceValue), icon: (['eye', 'droplet', 'briefcase', 'star'] as const)[index % 4], offeredAt: service.offeredAt === 'place' || service.offeredAt === 'client' ? service.offeredAt : 'any' };
 }
 
 function mapAppointment(appointment: ApiAppointment): AppointmentRecord {
@@ -89,9 +103,12 @@ function mapAppointment(appointment: ApiAppointment): AppointmentRecord {
   // What the visit comes to: the main service, its add-ons, and any extra services on the ticket.
   const priceValue = (Number(appointment.service?.price ?? 0) || 0)
     + (appointment.appointmentAddons ?? []).reduce((sum, row) => sum + (Number(row?.addon?.price ?? 0) || 0), 0)
-    + (Array.isArray(appointment.customLines) ? appointment.customLines : []).reduce((sum, line) => sum + (Number(line?.price ?? 0) || 0), 0);
+    + (Array.isArray(appointment.customLines) ? appointment.customLines : []).reduce((sum, line) => sum + (Number(line?.price ?? 0) || 0), 0)
+    // A house call's travel fee is part of what the client pays.
+    + (Number(appointment.travelFee ?? 0) || 0);
   const minutes = Number(appointment.duration ?? appointment.service?.duration ?? 60) || 60;
-  return { id: String(appointment.id), appointmentId: appointment.id, dateKey: dateKey(date), dateIso: date.toISOString(), time: date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }), name: nameOf(appointment.customer), service: appointment.service?.name || 'Service', serviceId: appointment.service?.id, duration: `${minutes} min`, price: money(priceValue), amountCents: Math.round(priceValue * 100), status: appointment.status === 'completed' ? 'paid' : appointment.status || 'pending', note: appointment.notes ?? undefined };
+  return { id: String(appointment.id), appointmentId: appointment.id, dateKey: dateKey(date), dateIso: date.toISOString(), time: date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }), name: nameOf(appointment.customer), service: appointment.service?.name || 'Service', serviceId: appointment.service?.id, duration: `${minutes} min`, price: money(priceValue), amountCents: Math.round(priceValue * 100), status: appointment.status === 'completed' ? 'paid' : appointment.status || 'pending', note: appointment.notes ?? undefined,
+    visitAt: appointment.visitAt === 'client' ? 'client' : 'place', clientAddress: appointment.clientAddress ?? null, travelFee: Number(appointment.travelFee ?? 0) || 0 };
 }
 
 export function BookingProvider({ children }: { children: ReactNode }) {
@@ -135,7 +152,11 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       const record = mapCustomer(created, 0); setClients((current) => [record, ...current]); return record;
     },
     addBooking: async (appointment) => {
-      await api.post('/api/appointments', { customerId: appointment.customerId, serviceId: appointment.serviceId, ...(ownStaffId ? { staffId: ownStaffId } : {}), duration: Number.parseInt(appointment.duration, 10) || 60, date: appointment.dateIso });
+      await api.post('/api/appointments', {
+        customerId: appointment.customerId, serviceId: appointment.serviceId, ...(ownStaffId ? { staffId: ownStaffId } : {}),
+        duration: Number.parseInt(appointment.duration, 10) || 60, date: appointment.dateIso,
+        ...(appointment.visitAt === 'client' ? { visitAt: 'client', clientAddress: appointment.clientAddress } : {}),
+      });
       await refresh();
     },
     rescheduleBooking: async (appointmentId, dateIso, durationMinutes) => {

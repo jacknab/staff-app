@@ -134,6 +134,9 @@ function appointmentParams(item: AppointmentRecord) {
       status: item.status,
       note: item.note ?? '',
       preview: item.id.startsWith('preview') ? '1' : '0',
+      visitAt: item.visitAt ?? 'place',
+      clientAddress: item.clientAddress ? JSON.stringify(item.clientAddress) : '',
+      travelFeeCents: String(Math.round((item.travelFee ?? 0) * 100)),
     },
   };
 }

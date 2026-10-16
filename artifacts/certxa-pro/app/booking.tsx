@@ -78,6 +78,17 @@ export default function BookingScreen() {
   const [selectedDate, setSelectedDate] = useState(() => params.day ? dateFromKey(params.day) : calendarDate);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
+  // Solo plan: where the visit happens. A house call needs the client's address; the travel fee is added.
+  const [places, setPlaces] = useState<{ ownPlace: 'salon' | 'home' | 'none'; houseCalls: boolean; houseCallFee: number } | null>(null);
+  const [visitAt, setVisitAt] = useState<'place' | 'client'>('place');
+  const [houseAddress, setHouseAddress] = useState({ line1: '', city: '', state: '', postcode: '' });
+  useEffect(() => {
+    api.get<{ ownPlace: 'salon' | 'home' | 'none'; houseCalls: boolean; houseCallFee: number }>('/api/work-places')
+      .then((p) => { setPlaces(p); if (p.ownPlace === 'none' && p.houseCalls) setVisitAt('client'); })
+      .catch(() => undefined);
+  }, []);
+  const offersBoth = Boolean(places?.houseCalls && places.ownPlace !== 'none');
+  const addressReady = Boolean(houseAddress.line1.trim() && houseAddress.city.trim() && /^[A-Za-z]{2}$/.test(houseAddress.state.trim()) && /^\d{5}$/.test(houseAddress.postcode.trim()));
   const weekDays = useMemo(() => {
     const monday = new Date(selectedDate);
     monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
@@ -129,6 +140,11 @@ export default function BookingScreen() {
   const totalMinutes = chosenServices.reduce((sum, item) => sum + item.durationMinutes, 0) + chosenAddons.reduce((sum, item) => sum + item.minutes, 0);
   const totalPrice = chosenServices.reduce((sum, item) => sum + item.priceValue, 0) + chosenAddons.reduce((sum, item) => sum + item.priceValue, 0);
   const primaryServiceId = serviceIds[0];
+  // A service done only at the client's (or only at the professional's place) decides where the visit is.
+  const fixedVisit = !places?.houseCalls ? 'place' : places.ownPlace === 'none' ? 'client'
+    : chosenServices.some((item) => item.offeredAt === 'client') ? 'client'
+    : chosenServices.some((item) => item.offeredAt === 'place') ? 'place' : null;
+  useEffect(() => { if (fixedVisit) setVisitAt(fixedVisit); }, [fixedVisit]);
   const dayParam = isoDay(selectedDate);
 
   // Open times for the chosen date: Certxa works them out from business hours, each technician's
@@ -139,7 +155,7 @@ export default function BookingScreen() {
     if (!storeSlug) { setSlots([]); setSlotsState('error'); return; }
     let cancelled = false;
     setSlotsState('loading');
-    api.get<Slot[]>(`/api/public/store/${encodeURIComponent(storeSlug)}/availability?serviceId=${primaryServiceId}&date=${dayParam}&duration=${totalMinutes + BUFFER_MINUTES}${ownStaffId ? `&staffId=${ownStaffId}` : ''}`)
+    api.get<Slot[]>(`/api/public/store/${encodeURIComponent(storeSlug)}/availability?serviceId=${primaryServiceId}&date=${dayParam}&duration=${totalMinutes + BUFFER_MINUTES}${ownStaffId ? `&staffId=${ownStaffId}` : ''}${visitAt === 'client' ? '&visitAt=client' : ''}`)
       .then((rows) => {
         if (cancelled) return;
         const seen = new Set<string>();
@@ -156,7 +172,7 @@ export default function BookingScreen() {
       })
       .catch(() => { if (!cancelled) { setSlots([]); setSlotsState('error'); } });
     return () => { cancelled = true; };
-  }, [dayParam, ownStaffId, primaryServiceId, stage, storeSlug, totalMinutes]);
+  }, [dayParam, ownStaffId, primaryServiceId, stage, storeSlug, totalMinutes, visitAt]);
 
   const toggleItem = (id: number) => {
     const toggle = (current: number[]) => (current.includes(id) ? current.filter((value) => value !== id) : [...current, id]);
@@ -236,6 +252,7 @@ export default function BookingScreen() {
   const saveBooking = async () => {
     const primary = chosenServices[0];
     if (!ticketClient || !primary || !slot || saving) return;
+    if (visitAt === 'client' && !addressReady) { setSaveError('Enter the client’s street address, city, 2-letter state and ZIP code.'); return; }
     setSaving(true); setSaveError('');
     try {
       const client = ticketClient.id.startsWith('draft-')
@@ -261,6 +278,7 @@ export default function BookingScreen() {
         duration: totalMinutes,
         date: slot.time,
         ...(extras.length > 0 ? { customLines: extras.map((item) => ({ label: item.name, price: item.priceValue })) } : {}),
+        ...(visitAt === 'client' ? { visitAt: 'client', clientAddress: { line1: houseAddress.line1.trim(), city: houseAddress.city.trim(), state: houseAddress.state.trim().toUpperCase(), postcode: houseAddress.postcode.trim() } } : {}),
       });
       const newId = Number(created?.id);
       if (chosenAddons.length > 0 && Number.isInteger(newId) && newId > 0) {
@@ -380,9 +398,34 @@ export default function BookingScreen() {
               <>
                 <View style={styles.intro}>
                   <Text style={[styles.eyebrow, { color: colors.primary }]}>STEP 4 · DATE AND TIME</Text>
-                  <Text style={[styles.heading, { color: colors.foreground }]}>When are they coming in?</Text>
+                  <Text style={[styles.heading, { color: colors.foreground }]}>{visitAt === 'client' ? 'When are you visiting?' : 'When are they coming in?'}</Text>
                   <Text style={[styles.subheading, { color: colors.mutedForeground }]}>{`Times shown have room for ${minutesLabel(totalMinutes)} plus ${BUFFER_MINUTES} minutes in case it runs over.`}</Text>
                 </View>
+                {offersBoth && !fixedVisit ? (
+                  <View style={styles.placeRow}>
+                    {([['place', 'At my place'], ['client', 'House call']] as const).map(([value, label]) => {
+                      const picked = visitAt === value;
+                      return (
+                        <TouchableOpacity key={value} testID={`booking-visit-${value}`} onPress={() => setVisitAt(value)} style={[styles.placeChip, { backgroundColor: picked ? colors.primary : colors.card, borderColor: picked ? colors.primary : colors.border }]}>
+                          <Text style={[styles.placeChipText, { color: picked ? colors.primaryForeground : colors.foreground }]}>{label}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                ) : null}
+                {visitAt === 'client' ? (
+                  <View style={styles.addressBlock}>
+                    <Text style={[styles.addressLabel, { color: colors.foreground }]}>Client’s address</Text>
+                    <TextInput testID="booking-house-line1" autoCapitalize="words" value={houseAddress.line1} onChangeText={(v) => setHouseAddress((a) => ({ ...a, line1: v }))} placeholder="Street address" placeholderTextColor={colors.mutedForeground} style={[styles.addressInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
+                    <TextInput testID="booking-house-city" autoCapitalize="words" value={houseAddress.city} onChangeText={(v) => setHouseAddress((a) => ({ ...a, city: v }))} placeholder="City" placeholderTextColor={colors.mutedForeground} style={[styles.addressInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
+                    <View style={styles.placeRow}>
+                      <TextInput testID="booking-house-state" autoCapitalize="characters" maxLength={2} value={houseAddress.state} onChangeText={(v) => setHouseAddress((a) => ({ ...a, state: v }))} placeholder="State" placeholderTextColor={colors.mutedForeground} style={[styles.addressInput, { flex: 1, backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
+                      <TextInput testID="booking-house-zip" keyboardType="number-pad" maxLength={5} value={houseAddress.postcode} onChangeText={(v) => setHouseAddress((a) => ({ ...a, postcode: v }))} placeholder="ZIP" placeholderTextColor={colors.mutedForeground} style={[styles.addressInput, { flex: 1, backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
+                    </View>
+                    {places?.houseCallFee ? <Text style={[styles.addressNote, { color: colors.mutedForeground }]}>{`$${Number(places.houseCallFee).toFixed(2)} travel fee is added. Times shown leave your travel time free.`}</Text>
+                      : <Text style={[styles.addressNote, { color: colors.mutedForeground }]}>Times shown leave your travel time free.</Text>}
+                  </View>
+                ) : null}
                 <View style={styles.monthRow}>
                   <View>
                     <Text style={[styles.monthTitle, { color: colors.foreground }]}>{selectedDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</Text>
@@ -464,6 +507,13 @@ export default function BookingScreen() {
 }
 
 const styles = StyleSheet.create({
+  placeRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
+  placeChip: { flex: 1, borderWidth: 1, borderRadius: 12, height: 44, alignItems: 'center', justifyContent: 'center' },
+  placeChipText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  addressBlock: { gap: 10, marginBottom: 18 },
+  addressLabel: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  addressInput: { borderWidth: 1, borderRadius: 12, height: 48, paddingHorizontal: 12, fontSize: 14, fontFamily: 'Inter_400Regular' },
+  addressNote: { fontSize: 12, lineHeight: 17, fontFamily: 'Inter_400Regular' },
   root: { flex: 1 },
   navbar: { minHeight: 55, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   wordmark: { fontSize: 20, letterSpacing: -0.7, fontFamily: 'Inter_700Bold' },
