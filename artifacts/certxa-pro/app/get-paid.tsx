@@ -5,13 +5,21 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ActivityIndicator, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { canTakeCards, getPaymentStatus, runPaymentsSetup, type PaymentStatus } from '@/lib/payments-setup';
+import { api } from '@/lib/live-api';
 
-type Stage = 'loading' | 'intro' | 'working' | 'more' | 'ready' | 'error';
+type Address = { address: string; city: string; state: string; postcode: string };
+type Store = Partial<Address> & { id: number };
+
+/** Stripe needs where the business takes payments (its Terminal location, which Tap to Pay requires). */
+const addressComplete = (a: Partial<Address> | null | undefined) =>
+  Boolean(a?.address?.trim() && a.city?.trim() && /^[A-Za-z]{2}$/.test(a.state?.trim() ?? '') && /^\d{5}$/.test(a.postcode?.trim() ?? ''));
+
+type Stage = 'loading' | 'intro' | 'address' | 'working' | 'more' | 'ready' | 'error';
 
 export default function GetPaidScreen() {
   const colors = useColors();
@@ -21,14 +29,21 @@ export default function GetPaidScreen() {
   const { from } = useLocalSearchParams<{ from?: string }>();
   const [stage, setStage] = useState<Stage>('loading');
   const [error, setError] = useState('');
+  const [store, setStore] = useState<Store | null>(null);
+  const [draft, setDraft] = useState<Address>({ address: '', city: '', state: '', postcode: '' });
 
   const show = (status: PaymentStatus) => setStage(canTakeCards(status) ? 'ready' : status.connected ? 'more' : 'intro');
 
   useEffect(() => {
     getPaymentStatus().then(show).catch(() => setStage('intro'));
+    api.get<Store[]>('/api/stores').then((rows) => {
+      const first = Array.isArray(rows) ? rows[0] ?? null : null;
+      setStore(first);
+      if (first) setDraft({ address: first.address ?? '', city: first.city ?? '', state: first.state ?? '', postcode: first.postcode ?? '' });
+    }).catch(() => undefined);
   }, []);
 
-  const start = useCallback(async () => {
+  const openStripe = useCallback(async () => {
     setError('');
     setStage('working');
     try {
@@ -38,6 +53,38 @@ export default function GetPaidScreen() {
       setStage('error');
     }
   }, []);
+
+  // The business address comes first when it's missing: Stripe's account and its Tap to Pay location are
+  // made with it, and a business with no address would otherwise get a placeholder one.
+  const start = useCallback(async () => {
+    // The business may not have loaded yet (slow connection): load it now rather than skip the address.
+    let current = store;
+    if (!current) {
+      const rows = await api.get<Store[]>('/api/stores').catch(() => null);
+      current = Array.isArray(rows) ? rows[0] ?? null : null;
+      if (current) {
+        setStore(current);
+        setDraft({ address: current.address ?? '', city: current.city ?? '', state: current.state ?? '', postcode: current.postcode ?? '' });
+      }
+    }
+    if (current && !addressComplete(current)) { setError(''); setStage('address'); return; }
+    void openStripe();
+  }, [store, openStripe]);
+
+  const saveAddress = useCallback(async () => {
+    const next = { address: draft.address.trim(), city: draft.city.trim(), state: draft.state.trim().toUpperCase(), postcode: draft.postcode.trim() };
+    if (!addressComplete(next)) { setError('Enter the street address, city, 2-letter state and 5-digit ZIP code.'); return; }
+    if (!store) return;
+    setError('');
+    setStage('working');
+    try {
+      setStore(await api.patch<Store>(`/api/stores/${store.id}`, next));
+      await openStripe();
+    } catch (cause: any) {
+      setError(cause?.message ?? 'We couldn’t save your address. Check your connection and try again.');
+      setStage('address');
+    }
+  }, [draft, store, openStripe]);
 
   const leave = () => (from === 'signup' || !router.canGoBack() ? router.replace('/(tabs)') : router.back());
   const topInset = Platform.OS === 'web' ? 67 : insets.top;
@@ -69,6 +116,34 @@ export default function GetPaidScreen() {
           <ActivityIndicator color={colors.primary} />
           <Text style={[styles.body, muted, { marginTop: 14 }]}>{stage === 'working' ? 'Opening Stripe…' : 'Checking your payments…'}</Text>
         </View>
+      ) : stage === 'address' ? (
+        <>
+          <Text style={[styles.title, text]}>Where do you work?</Text>
+          <Text style={[styles.body, muted]}>Stripe needs your business address to set up card payments and Tap to Pay. Clients won’t see it unless you choose to show it.</Text>
+          <View style={styles.form}>
+            {([['address', 'Street address', '123 Main Street'], ['city', 'City', 'City']] as const).map(([key, label, placeholder]) => (
+              <View key={key}>
+                <Text style={[styles.label, text]}>{label}</Text>
+                <TextInput autoCapitalize="words" onChangeText={(v) => setDraft((d) => ({ ...d, [key]: v }))} placeholder={placeholder} placeholderTextColor={colors.mutedForeground} style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} testID={`get-paid-${key}`} value={draft[key]} />
+              </View>
+            ))}
+            <View style={styles.pair}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.label, text]}>State</Text>
+                <TextInput autoCapitalize="characters" maxLength={2} onChangeText={(v) => setDraft((d) => ({ ...d, state: v }))} placeholder="CA" placeholderTextColor={colors.mutedForeground} style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} testID="get-paid-state" value={draft.state} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.label, text]}>ZIP code</Text>
+                <TextInput keyboardType="number-pad" maxLength={5} onChangeText={(v) => setDraft((d) => ({ ...d, postcode: v }))} placeholder="90001" placeholderTextColor={colors.mutedForeground} style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} testID="get-paid-postcode" value={draft.postcode} />
+              </View>
+            </View>
+          </View>
+          {error ? <Text style={[styles.error, { color: colors.destructive }]}>{error}</Text> : null}
+          <View style={styles.actions}>
+            {primary('Continue', () => void saveAddress(), 'get-paid-save-address')}
+            {secondary(from === 'signup' ? 'Not now' : 'Later', leave, 'get-paid-address-later')}
+          </View>
+        </>
       ) : stage === 'ready' ? (
         <>
           <Text style={[styles.title, text]}>You’re ready to take cards</Text>
@@ -127,6 +202,10 @@ const styles = StyleSheet.create({
   pointTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
   pointLine: { fontSize: 13, lineHeight: 19, fontFamily: 'Inter_400Regular', marginTop: 4 },
   error: { fontSize: 12, lineHeight: 17, fontFamily: 'Inter_500Medium', marginTop: 16 },
+  form: { gap: 16, marginTop: 24 },
+  pair: { flexDirection: 'row', gap: 10 },
+  label: { fontSize: 12, fontFamily: 'Inter_600SemiBold', marginBottom: 7 },
+  input: { borderWidth: 1, borderRadius: 14, height: 52, paddingHorizontal: 14, fontSize: 14, fontFamily: 'Inter_400Regular' },
   actions: { gap: 6, marginTop: 28 },
   button: { height: 53, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   buttonText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
