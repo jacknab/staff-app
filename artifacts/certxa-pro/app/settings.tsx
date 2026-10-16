@@ -125,7 +125,7 @@ export default function SettingsScreen() {
       const fee = Number(String(draft.houseCallFee ?? '0').replace(/[^0-9.]/g, '') || 0);
       if (!Number.isFinite(fee) || fee > 500) throw new Error('Enter a travel fee from $0 to $500.');
       const saved = await api.put<Record<string, any>>('/api/work-places', {
-        ownPlace: draft.ownPlace, houseCalls: !!draft.houseCalls, houseCallRadiusMiles: Number(draft.houseCallRadiusMiles),
+        ownPlace: draft.ownPlace, addressPrivate: !!draft.addressPrivate, houseCalls: !!draft.houseCalls, houseCallRadiusMiles: Number(draft.houseCallRadiusMiles),
         houseCallFee: fee, houseCallTravelMinutes: Number(draft.houseCallTravelMinutes),
       });
       setDraft({ ...saved, houseCallFee: String(saved.houseCallFee ?? 0) });
@@ -219,11 +219,11 @@ export default function SettingsScreen() {
       <Switch testID={`settings-toggle-${key}`} value={!!draft[key]} onValueChange={(value) => set(key, value)} trackColor={{ true: colors.primary, false: colors.border }} />
     </View>
   );
-  const choices = (key: string, options: { value: string | number | boolean; label: string }[]) => (
+  const choices = (key: string, options: { value: string | number | boolean; label: string }[], onPick?: (value: string | number | boolean) => void) => (
     <View style={styles.chips}>
       {options.map((option) => {
         const selected = draft[key] === option.value;
-        return <TouchableOpacity key={String(option.value)} testID={`settings-choice-${key}-${option.value}`} onPress={() => set(key, option.value)} style={[styles.chip, { backgroundColor: selected ? colors.primary : colors.card, borderColor: selected ? colors.primary : colors.border }]}><Text style={[styles.chipText, { color: selected ? colors.primaryForeground : colors.foreground }]}>{option.label}</Text></TouchableOpacity>;
+        return <TouchableOpacity key={String(option.value)} testID={`settings-choice-${key}-${option.value}`} onPress={() => (onPick ? onPick(option.value) : set(key, option.value))} style={[styles.chip, { backgroundColor: selected ? colors.primary : colors.card, borderColor: selected ? colors.primary : colors.border }]}><Text style={[styles.chipText, { color: selected ? colors.primaryForeground : colors.foreground }]}>{option.label}</Text></TouchableOpacity>;
       })}
     </View>
   );
@@ -279,12 +279,15 @@ export default function SettingsScreen() {
       <Help>Where you see clients is part of the Solo plan.</Help>
     ) : (<>
       <Label>Your place</Label>
-      {choices('ownPlace', [{ value: 'salon', label: 'Salon, suite or booth' }, { value: 'home', label: 'Home studio' }, { value: 'none', label: 'None' }])}
-      <Help>{draft.ownPlace === 'home'
-        ? 'Your address stays private. Clients see your city only, and get the full address once they have booked.'
-        : draft.ownPlace === 'salon'
-          ? 'Clients see your address on your booking website.'
-          : 'You only see clients at their place.'}</Help>
+      {/* Picking a place sets its usual privacy: a home studio starts private, a salon or suite public. */}
+      {choices('ownPlace', [{ value: 'salon', label: 'Salon, suite or booth' }, { value: 'home', label: 'Home studio' }, { value: 'none', label: 'None' }],
+        (value) => { set('ownPlace', value); set('addressPrivate', value === 'home'); })}
+      {draft.ownPlace === 'none'
+        ? <Help>You only see clients at their place, so your address is never shown to clients.</Help>
+        : <>
+          {toggle('addressPrivate', 'Keep my address private', 'Clients see your city only, and get the full address once they have booked.')}
+          <Help>{draft.addressPrivate ? 'Your booking website, search listings and Autumn show your city only.' : 'Clients see your full address on your booking website.'}</Help>
+        </>}
       {toggle('houseCalls', 'House calls', 'You go to your clients.')}
       {draft.houseCalls ? <>
         <Label>How far you travel</Label>
