@@ -72,10 +72,10 @@ export default function GetPaidScreen() {
       ) : stage === 'ready' ? (
         <>
           <Text style={[styles.title, text]}>You’re ready to take cards</Text>
-          <Text style={[styles.body, muted]}>Take payments with Tap to Pay on your iPhone or the Stripe M2 reader. Your money is paid out to your bank account.</Text>
+          <Text style={[styles.body, muted]}>When a client is done, open their appointment and tap Check Out to take payment with Tap to Pay on your iPhone or the Stripe M2 reader. Your money is paid out to your bank account.</Text>
           <View style={styles.actions}>
-            {primary('Take a payment', () => router.replace('/(tabs)/checkout'), 'get-paid-take-payment')}
-            {secondary('Done', () => router.replace('/(tabs)'), 'get-paid-done')}
+            {/* Checkout is reached only from an appointment's Check Out (owner's rule, 2026-10-13), never a shortcut. */}
+            {primary('Go to my calendar', () => router.replace('/(tabs)'), 'get-paid-done')}
           </View>
         </>
       ) : stage === 'more' ? (
