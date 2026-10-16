@@ -49,7 +49,8 @@ export default function SignupScreen() {
         firstName: firstName.trim(), lastName: lastName.trim(), businessName: businessName.trim(), businessType,
         email: email.trim(), password, phone: phoneDigits || undefined, timezone: deviceTimezone(),
       });
-      router.replace('/(tabs)');
+      // A new account goes straight to setting up card payments; they can choose "Not now".
+      router.replace('/get-paid?from=signup');
     } catch (cause) {
       setError(cause instanceof CertxaApiError ? cause.message : 'Could not create your account. Check your connection and try again.');
     } finally {

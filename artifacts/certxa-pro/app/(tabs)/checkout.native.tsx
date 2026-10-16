@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { PaymentsSetupBanner } from '@/components/PaymentsSetupBanner';
 import type { ComponentProps } from 'react';
 import { Feather } from '@expo/vector-icons';
 import {
@@ -542,6 +543,7 @@ export default function CheckoutScreen() {
       <StatusBar barStyle="dark-content" />
       <ScrollView contentContainerStyle={styles.pageContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={styles.topLine}><View><Text style={[styles.eyebrow, { color: colors.primary }]}>CERTXA PRO</Text><Text style={[styles.title, { color: colors.foreground }]}>Checkout</Text></View><View style={[styles.secureBadge, { backgroundColor: colors.secondary }]}><Feather name="lock" size={13} color={colors.primary} /><Text style={[styles.secureText, { color: colors.primary }]}>Certxa secure</Text></View></View>
+        <View style={{ marginBottom: 14 }}><PaymentsSetupBanner message="Set up card payments to take this payment with Tap to Pay or the M2 reader." /></View>
         <View style={[styles.amountPanel, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[styles.amountCaption, { color: colors.mutedForeground }]}>PAYMENT AMOUNT</Text>
           <Text testID="checkout-amount" style={[styles.amount, { color: colors.foreground }]}>{dollars(digits)}</Text>

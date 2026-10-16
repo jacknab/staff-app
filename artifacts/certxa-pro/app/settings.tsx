@@ -338,10 +338,13 @@ export default function SettingsScreen() {
           {line('Account', String(status.displayName || status.email || 'Connected'))}
           {line('Card payments', status.chargesEnabled ? 'Ready' : 'Not ready yet')}
           {line('Payouts to your bank', status.payoutsEnabled ? 'Ready' : 'Not ready yet')}
-          {status.chargesEnabled && status.payoutsEnabled ? null : <Help>Stripe still needs some details from you before it can pay you. Finish them at certxa.com under Payments.</Help>}
+          {status.chargesEnabled && status.payoutsEnabled ? null : <>
+            <Help>Stripe still needs some details from you before it can pay you.</Help>
+            <TouchableOpacity testID="settings-finish-stripe" onPress={() => router.push('/get-paid')} style={[styles.save, { backgroundColor: colors.primary }]}><Text style={[styles.saveText, { color: colors.primaryForeground }]}>Finish payment setup</Text></TouchableOpacity>
+          </>}
         </> : <>
           <Help>No Stripe account is connected, so card payments, Tap to Pay and the M2 reader are switched off.</Help>
-          <TouchableOpacity testID="settings-connect-stripe" onPress={() => void Linking.openURL(`${CERTXA_API_BASE_URL}/setup/payments`)} style={[styles.save, { backgroundColor: colors.primary }]}><Text style={[styles.saveText, { color: colors.primaryForeground }]}>Connect Stripe on certxa.com</Text></TouchableOpacity>
+          <TouchableOpacity testID="settings-connect-stripe" onPress={() => router.push('/get-paid')} style={[styles.save, { backgroundColor: colors.primary }]}><Text style={[styles.saveText, { color: colors.primaryForeground }]}>Set up payments</Text></TouchableOpacity>
         </>}
       </>);
     }

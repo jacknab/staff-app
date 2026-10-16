@@ -69,6 +69,7 @@ function RootLayoutNav() {
       <Stack.Screen name="services" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="login" options={{ headerShown: false }} />
       <Stack.Screen name="signup" options={{ headerShown: false }} />
+      <Stack.Screen name="get-paid" options={{ headerShown: false, presentation: 'card' }} />
     </Stack>
   );
 }

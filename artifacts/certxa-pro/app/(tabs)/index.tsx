@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import { PaymentsSetupBanner } from '@/components/PaymentsSetupBanner';
 import { Feather } from '@expo/vector-icons';
 import { Modal, PanResponder, Platform, ScrollView, StatusBar, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -321,6 +322,7 @@ export default function CalendarScreen() {
     <View style={[styles.root, { backgroundColor: colors.background, paddingTop: topInset }]}>
       <StatusBar barStyle="dark-content" />
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={{ marginBottom: 16 }}><PaymentsSetupBanner /></View>
         <View style={styles.header}>
           <View style={[styles.segmentedControl, { borderColor: colors.border, backgroundColor: colors.card }]}>
             {(['Month', 'Week', 'Day'] as ViewMode[]).map((mode) => (
