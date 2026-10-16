@@ -31,11 +31,14 @@ export default function GetPaidScreen() {
   const [error, setError] = useState('');
   const [store, setStore] = useState<Store | null>(null);
   const [draft, setDraft] = useState<Address>({ address: '', city: '', state: '', postcode: '' });
+  // A home studio's address, or a house-calls-only professional's base address, is never shown to clients.
+  const [ownPlace, setOwnPlace] = useState<'salon' | 'home' | 'none'>('salon');
 
   const show = (status: PaymentStatus) => setStage(canTakeCards(status) ? 'ready' : status.connected ? 'more' : 'intro');
 
   useEffect(() => {
     getPaymentStatus().then(show).catch(() => setStage('intro'));
+    api.get<{ ownPlace?: 'salon' | 'home' | 'none' }>('/api/work-places').then((p) => { if (p?.ownPlace) setOwnPlace(p.ownPlace); }).catch(() => undefined);
     api.get<Store[]>('/api/stores').then((rows) => {
       const first = Array.isArray(rows) ? rows[0] ?? null : null;
       setStore(first);
@@ -118,8 +121,12 @@ export default function GetPaidScreen() {
         </View>
       ) : stage === 'address' ? (
         <>
-          <Text style={[styles.title, text]}>Where do you work?</Text>
-          <Text style={[styles.body, muted]}>Stripe needs your business address to set up card payments and Tap to Pay. Clients won’t see it unless you choose to show it.</Text>
+          <Text style={[styles.title, text]}>{ownPlace === 'salon' ? 'Where do you work?' : 'Your base address'}</Text>
+          <Text style={[styles.body, muted]}>{ownPlace === 'home'
+            ? 'Stripe needs your address to set up card payments and Tap to Pay. It stays private: clients see your city only, and get the full address once they have booked.'
+            : ownPlace === 'none'
+              ? 'Stripe needs your address to set up card payments and Tap to Pay. Clients never see it. House calls are measured from it.'
+              : 'Stripe needs your business address to set up card payments and Tap to Pay. Clients see it on your booking website.'}</Text>
           <View style={styles.form}>
             {([['address', 'Street address', '123 Main Street'], ['city', 'City', 'City']] as const).map(([key, label, placeholder]) => (
               <View key={key}>

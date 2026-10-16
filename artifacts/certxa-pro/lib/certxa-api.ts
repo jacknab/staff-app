@@ -116,6 +116,9 @@ export type RegisterRequest = {
   password: string;
   phone?: string;
   timezone?: string;
+  /** Where they see clients: their own place (salon/suite or a private home studio, or none) and house calls. */
+  ownPlace?: 'salon' | 'home' | 'none';
+  houseCalls?: boolean;
 };
 
 /** Creates a Certxa Pro account (one calendar, free Solo plan) and signs it in. */

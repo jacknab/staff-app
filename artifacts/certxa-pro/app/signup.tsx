@@ -24,6 +24,9 @@ export default function SignupScreen() {
   const [lastName, setLastName] = useState('');
   const [businessName, setBusinessName] = useState('');
   const [businessType, setBusinessType] = useState('');
+  // Where they see clients: a salon/suite or a home studio (one or neither), and/or house calls.
+  const [ownPlace, setOwnPlace] = useState<'salon' | 'home' | 'none'>('none');
+  const [houseCalls, setHouseCalls] = useState(false);
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
@@ -38,6 +41,7 @@ export default function SignupScreen() {
     if (!firstName.trim() || !lastName.trim()) return setError('Enter your first and last name.');
     if (businessName.trim().length < 2) return setError('Enter the name of your business.');
     if (!businessType) return setError('Choose your type of business.');
+    if (ownPlace === 'none' && !houseCalls) return setError('Choose where you see clients.');
     if (!email.trim() || !email.includes('@')) return setError('Enter a valid e-mail address.');
     if (phoneDigits && phoneDigits.length !== 10) return setError('Enter a 10-digit phone number, or leave it empty.');
     if (password.length < 8) return setError('Choose a password of at least 8 characters.');
@@ -48,6 +52,7 @@ export default function SignupScreen() {
       await register({
         firstName: firstName.trim(), lastName: lastName.trim(), businessName: businessName.trim(), businessType,
         email: email.trim(), password, phone: phoneDigits || undefined, timezone: deviceTimezone(),
+        ownPlace, houseCalls,
       });
       // A new account goes straight to setting up card payments; they can choose "Not now".
       router.replace('/get-paid?from=signup');
@@ -103,6 +108,23 @@ export default function SignupScreen() {
           </View>
         </View>
         <View>
+          <Text style={[styles.label, { color: colors.foreground }]}>Where do you see clients?</Text>
+          <View style={styles.chips}>
+            {([['salon', 'Salon, suite or booth'], ['home', 'My home studio']] as const).map(([value, label]) => {
+              const picked = ownPlace === value;
+              return (
+                <TouchableOpacity key={value} accessibilityRole="checkbox" accessibilityState={{ checked: picked }} onPress={() => setOwnPlace(picked ? 'none' : value)} style={[styles.chip, { backgroundColor: picked ? colors.primary : colors.card, borderColor: picked ? colors.primary : colors.border }]} testID={`signup-place-${value}`}>
+                  <Text style={[styles.chipText, { color: picked ? colors.primaryForeground : colors.foreground }]}>{label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+            <TouchableOpacity accessibilityRole="checkbox" accessibilityState={{ checked: houseCalls }} onPress={() => setHouseCalls(!houseCalls)} style={[styles.chip, { backgroundColor: houseCalls ? colors.primary : colors.card, borderColor: houseCalls ? colors.primary : colors.border }]} testID="signup-place-house-calls">
+              <Text style={[styles.chipText, { color: houseCalls ? colors.primaryForeground : colors.foreground }]}>Clients' homes (house calls)</Text>
+            </TouchableOpacity>
+          </View>
+          {ownPlace === 'home' ? <Text style={[styles.hint, { color: colors.mutedForeground }]}>Your home address stays private. Clients see your city until they book.</Text> : null}
+        </View>
+        <View>
           <Text style={[styles.label, { color: colors.foreground }]}>Email</Text>
           <TextInput autoCapitalize="none" autoComplete="email" autoCorrect={false} keyboardType="email-address" onChangeText={setEmail} placeholder="you@example.com" placeholderTextColor={colors.mutedForeground} style={[styles.input, input]} testID="signup-email" value={email} />
         </View>
@@ -141,6 +163,7 @@ const styles = StyleSheet.create({
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { borderWidth: 1, borderRadius: 11, paddingHorizontal: 12, minHeight: 38, justifyContent: 'center' },
   chipText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  hint: { fontSize: 12, lineHeight: 17, fontFamily: 'Inter_400Regular', marginTop: 8 },
   error: { fontSize: 12, lineHeight: 17, fontFamily: 'Inter_500Medium', marginTop: -5 },
   button: { height: 53, borderRadius: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
   buttonText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },

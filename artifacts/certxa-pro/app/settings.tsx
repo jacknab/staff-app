@@ -25,7 +25,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/live-api';
 import { CERTXA_API_BASE_URL, certxaRequest, getStoredToken, login as checkPassword, registerTerminalReader } from '@/lib/certxa-api';
 
-type Screen = 'menu' | 'business' | 'location' | 'hours' | 'rules' | 'policy' | 'blocked' | 'website' | 'messages' | 'stripe' | 'readers' | 'tax' | 'account';
+type Screen = 'menu' | 'business' | 'location' | 'places' | 'hours' | 'rules' | 'policy' | 'blocked' | 'website' | 'messages' | 'stripe' | 'readers' | 'tax' | 'account';
 type Store = { id: number; name?: string | null; phone?: string | null; email?: string | null; category?: string | null; address?: string | null; city?: string | null; state?: string | null; postcode?: string | null; bookingSlug?: string | null };
 type Hours = { dayOfWeek: number; openTime: string; closeTime: string; isClosed: boolean };
 type FeatherName = ComponentProps<typeof Feather>['name'];
@@ -33,7 +33,7 @@ type FeatherName = ComponentProps<typeof Feather>['name'];
 const BUSINESS_TYPES = ['Nail Salon', 'Hair Salon', 'Barbershop', 'Lash and Brows', 'Esthetician', 'Makeup', 'Massage', 'Wax', 'Tattoo and Piercing', 'Pet Grooming', 'Other'];
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const TITLES: Record<Screen, string> = {
-  menu: 'Settings', business: 'Business details', location: 'Location', hours: 'Business hours', rules: 'Booking rules', policy: 'Cancellation policy',
+  menu: 'Settings', business: 'Business details', location: 'Location', places: 'Where you see clients', hours: 'Business hours', rules: 'Booking rules', policy: 'Cancellation policy',
   blocked: 'Blocked clients', website: 'Website', messages: 'Client messages', stripe: 'Stripe account', readers: 'Card readers', tax: 'Sales tax', account: 'Account',
 };
 
@@ -72,6 +72,10 @@ export default function SettingsScreen() {
       if (!current) throw new Error('No business was found for this account.');
       if (next === 'business') setDraft({ name: current.name ?? '', phone: current.phone ?? '', email: current.email ?? '', category: current.category ?? '' });
       else if (next === 'location') setDraft({ address: current.address ?? '', city: current.city ?? '', state: current.state ?? '', postcode: current.postcode ?? '' });
+      else if (next === 'places') {
+        const places = await api.get<Record<string, any>>('/api/work-places');
+        setDraft({ ...places, houseCallFee: String(places.houseCallFee ?? 0) });
+      }
       else if (next === 'hours') {
         const rows = await api.get<Hours[]>('/api/business-hours');
         const byDay = new Map((Array.isArray(rows) ? rows : []).map((row) => [row.dayOfWeek, row]));
@@ -115,6 +119,16 @@ export default function SettingsScreen() {
     if (screen === 'business') return run(async () => {
       if (!String(draft.name).trim()) throw new Error('Enter your business name.');
       setStore(await api.patch<Store>(`/api/stores/${store.id}`, { name: String(draft.name).trim(), phone: String(draft.phone).trim() || null, email: String(draft.email).trim() || null, category: draft.category || null }));
+    });
+    if (screen === 'places') return run(async () => {
+      if (draft.ownPlace === 'none' && !draft.houseCalls) throw new Error('Choose where you see clients: your own place, house calls, or both.');
+      const fee = Number(String(draft.houseCallFee ?? '0').replace(/[^0-9.]/g, '') || 0);
+      if (!Number.isFinite(fee) || fee > 500) throw new Error('Enter a travel fee from $0 to $500.');
+      const saved = await api.put<Record<string, any>>('/api/work-places', {
+        ownPlace: draft.ownPlace, houseCalls: !!draft.houseCalls, houseCallRadiusMiles: Number(draft.houseCallRadiusMiles),
+        houseCallFee: fee, houseCallTravelMinutes: Number(draft.houseCallTravelMinutes),
+      });
+      setDraft({ ...saved, houseCallFee: String(saved.houseCallFee ?? 0) });
     });
     if (screen === 'location') return run(async () => {
       if (!String(draft.address).trim() || !String(draft.city).trim()) throw new Error('Enter the street address and city.');
@@ -231,6 +245,7 @@ export default function SettingsScreen() {
         <Group title="MY BUSINESS">
           <Row icon="briefcase" title="Business details" hint={store?.name || 'Name, type, phone, e-mail'} to="business" />
           <Row icon="map-pin" title="Location" hint={address || 'Your business address'} to="location" />
+          <Row icon="navigation" title="Where you see clients" hint="Your place, house calls, or both" to="places" />
           <Row icon="clock" title="Business hours" hint="The days and times you are open" to="hours" />
           <TouchableOpacity testID="settings-services" onPress={() => router.push('/services')} style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={[styles.rowIcon, { backgroundColor: colors.secondary }]}><Feather name="list" size={16} color={colors.primary} /></View>
@@ -259,6 +274,29 @@ export default function SettingsScreen() {
       <Label>Business phone</Label>{field('phone', '(555) 555-5555', { keyboardType: 'phone-pad' })}
       <Label>Business e-mail</Label>{field('email', 'you@example.com', { keyboardType: 'email-address', autoCapitalize: 'none', autoCorrect: false })}
       <Help>Clients see these on your booking website and in the messages Certxa sends.</Help>{saveButton()}
+    </>);
+    if (screen === 'places') return draft.eligible === false ? (
+      <Help>Where you see clients is part of the Solo plan.</Help>
+    ) : (<>
+      <Label>Your place</Label>
+      {choices('ownPlace', [{ value: 'salon', label: 'Salon, suite or booth' }, { value: 'home', label: 'Home studio' }, { value: 'none', label: 'None' }])}
+      <Help>{draft.ownPlace === 'home'
+        ? 'Your address stays private. Clients see your city only, and get the full address once they have booked.'
+        : draft.ownPlace === 'salon'
+          ? 'Clients see your address on your booking website.'
+          : 'You only see clients at their place.'}</Help>
+      {toggle('houseCalls', 'House calls', 'You go to your clients.')}
+      {draft.houseCalls ? <>
+        <Label>How far you travel</Label>
+        {withCurrent('houseCallRadiusMiles', [5, 10, 15, 25, 40], (miles) => `${miles} miles`)}
+        <Help>Measured from your business address. Clients further away can't book a house call online.</Help>
+        <Label>Travel fee</Label>{field('houseCallFee', '0', { keyboardType: 'decimal-pad' })}
+        <Help>Added to every house call. Leave it at 0 for no fee.</Help>
+        <Label>Travel time</Label>
+        {withCurrent('houseCallTravelMinutes', [0, 10, 15, 30, 45], (minutes) => minutes ? `${minutes} min` : 'None')}
+        <Help>Kept free on your calendar before and after each house call.</Help>
+      </> : null}
+      {saveButton()}
     </>);
     if (screen === 'location') return (<>
       <Label>Street address</Label>{field('address', '123 Main Street', { autoCapitalize: 'words' })}
