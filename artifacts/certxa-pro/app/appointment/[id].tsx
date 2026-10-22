@@ -158,7 +158,7 @@ export default function AppointmentDetailScreen() {
 
   const checkout = () => router.push({
     pathname: '/(tabs)/checkout',
-    params: { appointmentId: String(appointmentId), clientName, serviceName, amountCents: String(amountCents) },
+    params: { appointmentId: String(appointmentId), clientName, serviceName, amountCents: String(amountCents), phone: params.phone ?? '', email: params.email ?? '' },
   });
 
   const openContact = async (type: 'text' | 'call' | 'email') => {

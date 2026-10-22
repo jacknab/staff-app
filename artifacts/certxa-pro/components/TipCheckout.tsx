@@ -8,21 +8,19 @@ import { useColors } from '@/hooks/useColors';
 type TipCheckoutProps = {
   baseCents: number;
   serviceName?: string;
+  /** The business's tip percentages (Certxa POS settings); Certxa's defaults until they load. */
+  presets?: number[];
   onConfirmTip: (tipCents: number) => void;
 };
 
-const tipOptions = [
-  { label: 'NO TIP', percent: 0 },
-  { label: '15%', percent: 15 },
-  { label: '20%', percent: 20 },
-  { label: '25%', percent: 25 },
-];
+const DEFAULT_PRESETS = [15, 18, 20, 25];
 
 function dollars(cents: number) {
   return `$${(Math.max(0, cents) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-export function TipCheckout({ baseCents, serviceName, onConfirmTip }: TipCheckoutProps) {
+export function TipCheckout({ baseCents, serviceName, presets, onConfirmTip }: TipCheckoutProps) {
+  const tipOptions = (presets && presets.length > 0 ? presets : DEFAULT_PRESETS).slice(0, 4).map((percent) => ({ label: `${percent}%`, percent }));
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
@@ -105,7 +103,7 @@ export function TipCheckout({ baseCents, serviceName, onConfirmTip }: TipCheckou
                 return (
                   <TouchableOpacity
                     key={label}
-                    testID={percent === 0 ? 'tip-no-tip' : `tip-${percent}`}
+                    testID={`tip-${percent}`}
                     onPress={() => choosePercent(percent)}
                     style={[styles.tipOption, { backgroundColor: selected ? colors.secondary : colors.card, borderColor: selected ? colors.primary : colors.border }]}
                     accessibilityRole="button"
@@ -117,6 +115,9 @@ export function TipCheckout({ baseCents, serviceName, onConfirmTip }: TipCheckou
                 );
               })}
             </View>
+            <TouchableOpacity testID="tip-no-tip" onPress={() => choosePercent(0)} accessibilityRole="button" accessibilityState={{ selected: selectedPercent === 0 }} style={[styles.customButton, { backgroundColor: selectedPercent === 0 ? colors.secondary : colors.card, borderColor: selectedPercent === 0 ? colors.primary : colors.border }]}>
+              <Text style={[styles.customButtonText, { color: selectedPercent === 0 ? colors.primary : colors.foreground }]}>No tip</Text>
+            </TouchableOpacity>
             <TouchableOpacity testID="custom-tip" onPress={() => setScreen('custom')} style={[styles.customButton, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Feather name="edit-3" size={16} color={colors.primary} />
               <Text style={[styles.customButtonText, { color: colors.foreground }]}>Custom tip</Text>

@@ -63,7 +63,7 @@ export default function CheckoutScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { refresh: refreshBookings } = useBookingData();
-  const params = useLocalSearchParams<{ appointmentId?: string; clientName?: string; serviceName?: string; amountCents?: string }>();
+  const params = useLocalSearchParams<{ appointmentId?: string; clientName?: string; serviceName?: string; amountCents?: string; phone?: string; email?: string }>();
   const [digits, setDigits] = useState('0');
   const [tipCents, setTipCents] = useState(0);
   const [appointmentId, setAppointmentId] = useState('');
@@ -213,10 +213,54 @@ export default function CheckoutScreen() {
     baseCentsParam,
     customDiscountCents > 0 ? customDiscountCents : Math.round(baseCentsParam * discountPercent / 100),
   );
+  // The business's sales tax (Settings → Sales tax; off unless they turn on tax on services) and tip presets.
+  const [tax, setTax] = useState<{ rate: number; services: boolean }>({ rate: 0, services: false });
+  const [tipPresets, setTipPresets] = useState<number[] | undefined>(undefined);
+  const [storeId, setStoreId] = useState<number | null>(null);
+  useEffect(() => {
+    if (EXPO_GO_PREVIEW) return;
+    api.get<{ presets?: number[] }>('/api/tip-presets').then((row) => { if (Array.isArray(row?.presets)) setTipPresets(row.presets); }).catch(() => undefined);
+    api.get<Array<{ id: number }>>('/api/stores').then(async (rows) => {
+      const id = Array.isArray(rows) ? Number(rows[0]?.id) : 0;
+      if (!id) return;
+      setStoreId(id);
+      const pos = await api.get<{ salesTaxRate?: string | number; taxServicesTaxable?: boolean }>(`/api/pos-settings/${id}`);
+      const rate = Number(pos?.salesTaxRate ?? 0);
+      setTax({ rate: Number.isFinite(rate) && rate > 0 && rate <= 0.3 ? rate : 0, services: Boolean(pos?.taxServicesTaxable) });
+    }).catch(() => undefined);
+  }, []);
+  // Tax is on the visit after the discount, never on the tip.
+  const taxCents = tax.services && tax.rate > 0 ? Math.round((baseCentsParam - discountCents) * tax.rate) : 0;
   useEffect(() => {
     if (step !== 'tap_intro' || baseCentsParam <= 0) return;
-    setDigits(String(baseCentsParam - discountCents + tipCents));
-  }, [baseCentsParam, discountCents, step, tipCents]);
+    setDigits(String(baseCentsParam - discountCents + taxCents + tipCents));
+  }, [baseCentsParam, discountCents, step, taxCents, tipCents]);
+
+  // Receipt after a card payment, by text and/or e-mail, to the client's details (editable).
+  const [receiptPhone, setReceiptPhone] = useState(String(params.phone ?? '').replace(/\D/g, '').slice(-10));
+  const [receiptEmail, setReceiptEmail] = useState(String(params.email ?? ''));
+  const [receiptNote, setReceiptNote] = useState('');
+  const [sendingReceipt, setSendingReceipt] = useState<'' | 'text' | 'email'>('');
+  const sendReceipt = async (kind: 'text' | 'email') => {
+    const visit = String(params.serviceName || 'Appointment');
+    const totals = { discountAmount: discountCents / 100, taxAmount: taxCents / 100, tipAmount: tipCents / 100, grandTotal: (Number(digits) || 0) / 100 };
+    setSendingReceipt(kind); setReceiptNote('');
+    try {
+      if (kind === 'text') {
+        await api.post('/api/pos/sms-receipt', { phone: receiptPhone, clientName, appointmentId: Number(appointmentId) || undefined, paymentMethod: 'card',
+          items: [{ label: visit, price: baseCentsParam / 100 }], ...totals });
+        setReceiptNote(`Receipt texted to ${receiptPhone}.`);
+      } else {
+        await api.post('/api/pos/email-receipt', { storeId: storeId ?? undefined, email: receiptEmail.trim(), clientName: clientName.trim().split(/\s+/)[0] || 'there',
+          items: [{ name: visit, price: baseCentsParam / 100 }], subtotal: baseCentsParam / 100, paymentMethod: 'Card', transactionId: paymentIntentId ?? '', ...totals });
+        setReceiptNote(`Receipt e-mailed to ${receiptEmail.trim()}.`);
+      }
+    } catch (cause) {
+      setReceiptNote(errorMessage(cause));
+    } finally {
+      setSendingReceipt('');
+    }
+  };
 
   const startReader = async (mode: ReaderMode) => {
     if (Number(digits) < 50) {
@@ -491,6 +535,18 @@ export default function CheckoutScreen() {
             <Text style={[styles.successTitle, { color: colors.foreground }]}>Payment successful</Text>
             <Text style={[styles.successAmount, { color: colors.foreground }]}>{dollars(digits)}</Text>
             <Text style={[styles.successNote, { color: colors.mutedForeground }]}>{paymentMethod === 'card' ? `Captured through Certxa · ${paymentIntentId}` : `${selectedMethod.label} payment recorded manually${paymentMethod === 'gift_card' && giftCardCode.trim() ? ` · ${giftCardCode.trim()}` : ''}`}</Text>
+            {paymentMethod === 'card' ? <View testID="receipt-block" style={{ width: '100%', gap: 8, marginBottom: 14 }}>
+              <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Send a receipt</Text>
+              <View style={styles.registrationRow}>
+                <TextInput testID="receipt-phone" keyboardType="phone-pad" value={receiptPhone} onChangeText={(v) => setReceiptPhone(v.replace(/\D/g, '').slice(0, 10))} placeholder="Client's phone" placeholderTextColor={colors.mutedForeground} style={[styles.fieldInput, styles.registrationInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
+                <TouchableOpacity testID="receipt-text" disabled={!!sendingReceipt || receiptPhone.length !== 10} onPress={() => void sendReceipt('text')} style={[styles.registerButton, { backgroundColor: receiptPhone.length === 10 ? colors.secondary : colors.muted }]}><Text style={[styles.registerButtonText, { color: receiptPhone.length === 10 ? colors.primary : colors.mutedForeground }]}>{sendingReceipt === 'text' ? 'Sending…' : 'Text'}</Text></TouchableOpacity>
+              </View>
+              <View style={styles.registrationRow}>
+                <TextInput testID="receipt-email" keyboardType="email-address" autoCapitalize="none" autoCorrect={false} value={receiptEmail} onChangeText={setReceiptEmail} placeholder="Client's e-mail" placeholderTextColor={colors.mutedForeground} style={[styles.fieldInput, styles.registrationInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
+                <TouchableOpacity testID="receipt-email-send" disabled={!!sendingReceipt || !/^\S+@\S+\.\S+$/.test(receiptEmail.trim())} onPress={() => void sendReceipt('email')} style={[styles.registerButton, { backgroundColor: /^\S+@\S+\.\S+$/.test(receiptEmail.trim()) ? colors.secondary : colors.muted }]}><Text style={[styles.registerButtonText, { color: /^\S+@\S+\.\S+$/.test(receiptEmail.trim()) ? colors.primary : colors.mutedForeground }]}>{sendingReceipt === 'email' ? 'Sending…' : 'E-mail'}</Text></TouchableOpacity>
+              </View>
+              {receiptNote ? <Text style={[styles.setupText, { color: colors.primary }]}>{receiptNote}</Text> : null}
+            </View> : null}
             <TouchableOpacity testID="new-checkout" onPress={resetCheckout} style={[styles.primaryButton, { backgroundColor: colors.primary }]}><Text style={[styles.primaryButtonText, { color: colors.primaryForeground }]}>New checkout</Text></TouchableOpacity>
           </View>
         ) : (
@@ -510,6 +566,7 @@ export default function CheckoutScreen() {
                </View>
                <TextInput keyboardType="numbers-and-punctuation" returnKeyType="done" onChangeText={setCustomDiscount} placeholder="Or a custom amount off, e.g. 39.00" placeholderTextColor={colors.mutedForeground} style={[styles.fieldInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} testID="discount-custom" value={customDiscount} />
              </View> : null}
+             {isTapIntro && taxCents > 0 ? <Text testID="sales-tax-line" style={[styles.fieldLabel, { width: '100%', marginTop: 12, color: colors.foreground }]}>{`Sales tax (${(tax.rate * 100).toFixed(2).replace(/\.?0+$/, '')}%) · ${dollars(String(taxCents))}`}</Text> : null}
              {isTapIntro ? <View testID="m2-registration-intro" style={[styles.formField, { width: '100%', marginTop: 18 }]}>
                <Text style={[styles.fieldLabel, { color: colors.foreground }]}>New Stripe M2 setup <Text style={{ color: colors.mutedForeground }}>(one time)</Text></Text>
                <View style={styles.registrationRow}>
@@ -529,6 +586,7 @@ export default function CheckoutScreen() {
 
   return <TipCheckout
     baseCents={Number(params.amountCents) || 0}
+    presets={tipPresets}
     serviceName={String(params.serviceName || '')}
     onConfirmTip={(nextTipCents) => {
       const baseCents = Number(params.amountCents) || 0;
