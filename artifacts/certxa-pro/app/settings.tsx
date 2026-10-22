@@ -22,11 +22,13 @@ import { ActivityIndicator, Alert, Linking, ScrollView, Share, StatusBar, StyleS
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/contexts/AuthContext';
+import { useBookingData } from '@/contexts/BookingContext';
+import { timeZoneName, US_TIME_ZONES, validTimeZone } from '@/lib/businessTime';
 import { api } from '@/lib/live-api';
 import { CERTXA_API_BASE_URL, certxaRequest, getStoredToken, login as checkPassword, registerTerminalReader } from '@/lib/certxa-api';
 
 type Screen = 'menu' | 'business' | 'location' | 'places' | 'hours' | 'rules' | 'policy' | 'blocked' | 'website' | 'messages' | 'stripe' | 'readers' | 'tax' | 'account';
-type Store = { id: number; name?: string | null; phone?: string | null; email?: string | null; category?: string | null; address?: string | null; city?: string | null; state?: string | null; postcode?: string | null; bookingSlug?: string | null };
+type Store = { id: number; name?: string | null; phone?: string | null; email?: string | null; category?: string | null; address?: string | null; city?: string | null; state?: string | null; postcode?: string | null; bookingSlug?: string | null; timezone?: string | null };
 type Hours = { dayOfWeek: number; openTime: string; closeTime: string; isClosed: boolean };
 type FeatherName = ComponentProps<typeof Feather>['name'];
 
@@ -48,6 +50,7 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, logout } = useAuth();
+  const { setTimeZone, refresh: refreshCalendar } = useBookingData();
   const [screen, setScreen] = useState<Screen>('menu');
   const [store, setStore] = useState<Store | null>(null);
   const [loading, setLoading] = useState(true);
@@ -79,7 +82,7 @@ export default function SettingsScreen() {
       else if (next === 'hours') {
         const rows = await api.get<Hours[]>('/api/business-hours');
         const byDay = new Map((Array.isArray(rows) ? rows : []).map((row) => [row.dayOfWeek, row]));
-        setDraft({ hours: DAYS.map((_, dayOfWeek) => { const row = byDay.get(dayOfWeek); return { dayOfWeek, openTime: (row?.openTime ?? '09:00').slice(0, 5), closeTime: (row?.closeTime ?? '17:00').slice(0, 5), isClosed: row ? !!row.isClosed : true }; }) });
+        setDraft({ timezone: validTimeZone(current.timezone), hours: DAYS.map((_, dayOfWeek) => { const row = byDay.get(dayOfWeek); return { dayOfWeek, openTime: (row?.openTime ?? '09:00').slice(0, 5), closeTime: (row?.closeTime ?? '17:00').slice(0, 5), isClosed: row ? !!row.isClosed : true }; }) });
       } else if (next === 'rules' || next === 'policy') {
         const [policies, calendar] = await Promise.all([api.get<Record<string, any>>('/api/booking-policies'), api.get<Record<string, any> | null>('/api/calendar-settings')]);
         setDraft({
@@ -132,7 +135,10 @@ export default function SettingsScreen() {
     });
     if (screen === 'location') return run(async () => {
       if (!String(draft.address).trim() || !String(draft.city).trim()) throw new Error('Enter the street address and city.');
-      setStore(await api.patch<Store>(`/api/stores/${store.id}`, { address: String(draft.address).trim(), city: String(draft.city).trim(), state: String(draft.state).trim().toUpperCase(), postcode: String(draft.postcode).trim() }));
+      const updated = await api.patch<Store>(`/api/stores/${store.id}`, { address: String(draft.address).trim(), city: String(draft.city).trim(), state: String(draft.state).trim().toUpperCase(), postcode: String(draft.postcode).trim() });
+      setStore(updated);
+      // Certxa sets the time zone from the address.
+      if (updated.timezone && updated.timezone !== store.timezone) { setTimeZone(validTimeZone(updated.timezone)); void refreshCalendar(); }
     });
     if (screen === 'hours') return run(async () => {
       const hours = draft.hours as Hours[];
@@ -140,6 +146,13 @@ export default function SettingsScreen() {
       const bad = hours.find((day) => !day.isClosed && minutesOf(day.closeTime) <= minutesOf(day.openTime));
       if (bad) throw new Error(`${DAYS[bad.dayOfWeek]}: closing time must be after opening time.`);
       await api.put('/api/business-hours', { storeId: store.id, hours });
+      // The time zone the calendar, the booking page and client messages all use.
+      if (draft.timezone && draft.timezone !== store.timezone) {
+        const updated = await api.patch<Store>(`/api/stores/${store.id}`, { timezone: draft.timezone });
+        setStore(updated);
+        setTimeZone(validTimeZone(updated.timezone));
+        void refreshCalendar();
+      }
     });
     if (screen === 'rules') return run(async () => {
       await api.put('/api/booking-policies', {
@@ -246,7 +259,7 @@ export default function SettingsScreen() {
           <Row icon="briefcase" title="Business details" hint={store?.name || 'Name, type, phone, e-mail'} to="business" />
           <Row icon="map-pin" title="Location" hint={address || 'Your business address'} to="location" />
           <Row icon="navigation" title="Where you see clients" hint="Your place, house calls, or both" to="places" />
-          <Row icon="clock" title="Business hours" hint="The days and times you are open" to="hours" />
+          <Row icon="clock" title="Business hours" hint="Your time zone, and the days and times you are open" to="hours" />
           <TouchableOpacity testID="settings-services" onPress={() => router.push('/services')} style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={[styles.rowIcon, { backgroundColor: colors.secondary }]}><Feather name="list" size={16} color={colors.primary} /></View>
             <View style={{ flex: 1 }}><Text style={[styles.rowTitle, { color: colors.foreground }]}>Services</Text><Text numberOfLines={1} style={[styles.rowHint, { color: colors.mutedForeground }]}>What you offer, how long it takes and the price</Text></View>
@@ -308,6 +321,10 @@ export default function SettingsScreen() {
       <Help>Certxa sets your time zone from this address.</Help>{saveButton()}
     </>);
     if (screen === 'hours') return (<>
+      <Label>Time zone</Label>
+      {choices('timezone', [...US_TIME_ZONES, ...(US_TIME_ZONES.some((zone) => zone.value === draft.timezone) || !draft.timezone ? [] : [{ value: String(draft.timezone), label: timeZoneName(String(draft.timezone)) }])])}
+      <Help>Your calendar, your booking page and the messages clients get all use this time zone.</Help>
+      <Label>Hours</Label>
       {(draft.hours as Hours[] | undefined ?? []).map((day, index) => {
         const change = (patch: Partial<Hours>) => set('hours', (draft.hours as Hours[]).map((row, n) => (n === index ? { ...row, ...patch } : row)));
         const stepper = (key: 'openTime' | 'closeTime') => (

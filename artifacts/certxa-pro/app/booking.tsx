@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { useBookingData, type ClientProfile, type ServiceProfile } from '@/contexts/BookingContext';
 import { api } from '@/lib/live-api';
+import { businessToday, zonedTimeLabel } from '@/lib/businessTime';
 
 type AddonOption = { id: number; name: string; priceValue: number; minutes: number; serviceIds: number[] };
 type Slot = { time: string; staffId: number; staffName: string };
@@ -55,7 +56,7 @@ export default function BookingScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams<{ day?: string; phone?: string }>();
-  const { clients, services, addClient, refresh, calendarDate, setCalendarDate, ownStaffId } = useBookingData();
+  const { clients, services, addClient, refresh, calendarDate, setCalendarDate, ownStaffId, timeZone } = useBookingData();
   const initialPhone = (params.phone ?? '').replace(/\D/g, '').slice(0, 10);
   const [phone, setPhone] = useState(initialPhone);
   const [name, setName] = useState('');
@@ -439,8 +440,9 @@ export default function BookingScreen() {
                 <View style={[styles.weekCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                   {weekDays.map((day) => {
                     const active = keyForDate(day) === keyForDate(selectedDate);
-                    const today = keyForDate(day) === keyForDate(new Date());
-                    const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
+                    // Today is the business's today (its time zone), not the phone's.
+                    const startOfToday = businessToday(timeZone);
+                    const today = keyForDate(day) === keyForDate(startOfToday);
                     const past = day.getTime() < startOfToday.getTime();
                     return (
                       <TouchableOpacity key={keyForDate(day)} testID={`booking-day-${day.getDate()}`} disabled={past} accessibilityRole="button" accessibilityState={{ selected: active, disabled: past }} onPress={() => setSelectedDate(day)} style={[styles.dayCell, active && { backgroundColor: colors.primary }, past && { opacity: 0.35 }]}>
@@ -456,7 +458,7 @@ export default function BookingScreen() {
                   <View style={styles.timeGrid}>
                     {slots.map((item) => {
                       const picked = slot?.time === item.time;
-                      return <TouchableOpacity key={item.time} testID={`booking-time-${item.time}`} onPress={() => setSlot(item)} style={[styles.timeChip, { backgroundColor: picked ? colors.primary : colors.card, borderColor: picked ? colors.primary : colors.border }]}><Text style={[styles.timeText, { color: picked ? colors.primaryForeground : colors.foreground }]}>{new Date(item.time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</Text></TouchableOpacity>;
+                      return <TouchableOpacity key={item.time} testID={`booking-time-${item.time}`} onPress={() => setSlot(item)} style={[styles.timeChip, { backgroundColor: picked ? colors.primary : colors.card, borderColor: picked ? colors.primary : colors.border }]}><Text style={[styles.timeText, { color: picked ? colors.primaryForeground : colors.foreground }]}>{zonedTimeLabel(item.time, timeZone)}</Text></TouchableOpacity>;
                     })}
                   </View>
                 ) : (
@@ -494,7 +496,7 @@ export default function BookingScreen() {
           <View style={[styles.footer, { borderTopColor: colors.border, backgroundColor: colors.background, paddingBottom: Math.max(insets.bottom, Platform.OS === 'web' ? 34 : 16) }]}>
             {saveError ? <Text style={[styles.footerNote, { color: colors.destructive, marginTop: 0, marginBottom: 8 }]}>{saveError}</Text> : null}
             {stage === 'schedule' ? (
-              <TouchableOpacity disabled={saving || !slot} testID="confirm-booking" onPress={saveBooking} style={[styles.primaryButton, { backgroundColor: slot && !saving ? colors.primary : colors.muted }]}><Text style={[styles.primaryButtonText, { color: slot && !saving ? colors.primaryForeground : colors.mutedForeground }]}>{saving ? 'Saving…' : slot ? `Book ${new Date(slot.time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : 'Choose a time'}</Text></TouchableOpacity>
+              <TouchableOpacity disabled={saving || !slot} testID="confirm-booking" onPress={saveBooking} style={[styles.primaryButton, { backgroundColor: slot && !saving ? colors.primary : colors.muted }]}><Text style={[styles.primaryButtonText, { color: slot && !saving ? colors.primaryForeground : colors.mutedForeground }]}>{saving ? 'Saving…' : slot ? `Book ${zonedTimeLabel(slot.time, timeZone)}` : 'Choose a time'}</Text></TouchableOpacity>
             ) : (
               <TouchableOpacity disabled={stage === 'services' && serviceIds.length === 0} testID="booking-next-step" onPress={goNext} style={[styles.primaryButton, { backgroundColor: stage === 'addons' || serviceIds.length > 0 ? colors.primary : colors.muted }]}><Text style={[styles.primaryButtonText, { color: stage === 'addons' || serviceIds.length > 0 ? colors.primaryForeground : colors.mutedForeground }]}>{stage === 'services' ? (serviceIds.length === 0 ? 'Choose a service' : 'Continue') : chosenAddons.length === 0 ? 'Skip add-ons' : 'Continue'}</Text></TouchableOpacity>
             )}

@@ -11,6 +11,8 @@ import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { canTakeCards, getPaymentStatus, runPaymentsSetup, type PaymentStatus } from '@/lib/payments-setup';
 import { api } from '@/lib/live-api';
+import { useBookingData } from '@/contexts/BookingContext';
+import { validTimeZone } from '@/lib/businessTime';
 
 type Address = { address: string; city: string; state: string; postcode: string };
 type Store = Partial<Address> & { id: number };
@@ -22,6 +24,7 @@ const addressComplete = (a: Partial<Address> | null | undefined) =>
 type Stage = 'loading' | 'intro' | 'address' | 'working' | 'more' | 'ready' | 'error';
 
 export default function GetPaidScreen() {
+  const { setTimeZone, refresh: refreshCalendar } = useBookingData();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -81,7 +84,10 @@ export default function GetPaidScreen() {
     setError('');
     setStage('working');
     try {
-      setStore(await api.patch<Store>(`/api/stores/${store.id}`, next));
+      const updated = await api.patch<Store & { timezone?: string | null }>(`/api/stores/${store.id}`, next);
+      setStore(updated);
+      // Certxa sets the time zone from the address; the calendar follows it.
+      if (updated.timezone) { setTimeZone(validTimeZone(updated.timezone)); void refreshCalendar(); }
       await openStripe();
     } catch (cause: any) {
       setError(cause?.message ?? 'We couldn’t save your address. Check your connection and try again.');

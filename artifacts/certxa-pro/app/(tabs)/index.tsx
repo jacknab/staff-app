@@ -8,6 +8,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { AppointmentRecord, useBookingData } from '@/contexts/BookingContext';
+import { businessToday, zonedMinutes, zonedMoment } from '@/lib/businessTime';
 
 type ViewMode = 'Month' | 'Week' | 'Day';
 
@@ -26,12 +27,9 @@ function dateKey(date: Date) {
   return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
 }
 
-/** Minutes after midnight an appointment starts, read from its date - never from the displayed "3:17 PM"
- *  text, whose spacing differs between phones (an iPhone puts a narrow no-break space before AM/PM). */
+/** Minutes after midnight an appointment starts, in business time (worked out once in BookingContext). */
 function startMinutes(item: AppointmentRecord) {
-  const date = new Date(item.dateIso);
-  const minutes = date.getHours() * 60 + date.getMinutes();
-  return Number.isFinite(minutes) ? minutes : DEFAULT_START;
+  return Number.isFinite(item.startMinutes) ? item.startMinutes : DEFAULT_START;
 }
 
 /** Appointments that share any time are drawn side by side instead of on top of each other. Returns, for each
@@ -71,11 +69,6 @@ function clampDropMinutes(minutes: number, duration: number, timelineStart: numb
   return Math.min(latestStart, Math.max(timelineStart, snapped));
 }
 
-function dateAtMinutes(day: Date, minutes: number) {
-  const result = new Date(day);
-  result.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0);
-  return result;
-}
 
 function durationMinutes(duration: string) {
   const minutes = Number.parseInt(duration, 10);
@@ -199,7 +192,9 @@ export default function CalendarScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { bookings, loading, error, refresh, rescheduleBooking, calendarDate: selectedDate, setCalendarDate } = useBookingData();
+  const { bookings, loading, error, refresh, rescheduleBooking, calendarDate: selectedDate, setCalendarDate, timeZone } = useBookingData();
+  // "Today" and "now" are the business's, not the phone's.
+  const todayKey = dateKey(businessToday(timeZone));
   const [viewMode, setViewMode] = useState<ViewMode>('Day');
   const [pendingDrop, setPendingDrop] = useState<{ item: AppointmentRecord; minutes: number } | null>(null);
   const [notifyClient, setNotifyClient] = useState(true);
@@ -237,7 +232,7 @@ export default function CalendarScreen() {
   }, [appointments]);
   const timelineHeight = ((timelineEnd - timelineStart) / 60) * HOUR_HEIGHT;
   const topInset = Platform.OS === 'web' ? 67 : insets.top;
-  const todayIsSelected = selectedKey === dateKey(new Date());
+  const todayIsSelected = selectedKey === todayKey;
 
   // ── The day timeline's own scroll ───────────────────────────────────────────────────────────────────
   // Only the timeline scrolls; the header above it stays put. While a booking is dragged the timeline stops
@@ -256,11 +251,11 @@ export default function CalendarScreen() {
   useEffect(() => {
     if (viewMode !== 'Day' || loading || scrolledFor.current === selectedKey) return;
     scrolledFor.current = selectedKey;
-    const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
+    const nowMinutes = zonedMinutes(new Date(), timeZone);
     const target = todayIsSelected ? nowMinutes - 60 : appointments.length > 0 ? startMinutes(appointments[0]) - 30 : 9 * 60;
     const y = Math.max(0, timelineTop(target, timelineStart));
     requestAnimationFrame(() => scrollRef.current?.scrollTo({ y, animated: false }));
-  }, [appointments, loading, selectedKey, timelineStart, todayIsSelected, viewMode]);
+  }, [appointments, loading, selectedKey, timeZone, timelineStart, todayIsSelected, viewMode]);
   useEffect(() => { if (viewMode !== 'Day') scrolledFor.current = ''; }, [viewMode]);
 
   // ── Dragging ────────────────────────────────────────────────────────────────────────────────────────
@@ -357,7 +352,7 @@ export default function CalendarScreen() {
     if (!pendingDrop) return;
     setSavingDrop(true);
     setDropError('');
-    const nextDate = dateAtMinutes(selectedDate, pendingDrop.minutes);
+    const nextDate = zonedMoment(selectedDate, pendingDrop.minutes, timeZone);
     try {
       await rescheduleBooking(pendingDrop.item.appointmentId, nextDate.toISOString(), durationMinutes(pendingDrop.item.duration));
       setPendingDrop(null);
@@ -368,7 +363,7 @@ export default function CalendarScreen() {
     }
   };
 
-  const nowTop = timelineTop(new Date().getHours() * 60 + new Date().getMinutes(), timelineStart);
+  const nowTop = timelineTop(zonedMinutes(new Date(), timeZone), timelineStart);
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background, paddingTop: topInset }]}>
@@ -416,7 +411,7 @@ export default function CalendarScreen() {
             <View style={styles.weekStrip}>
               {days.map((day) => {
                 const active = dateKey(day) === selectedKey;
-                const today = dateKey(day) === dateKey(new Date());
+                const today = dateKey(day) === todayKey;
                 const booked = (bookingsByDay[dateKey(day)]?.length ?? 0) > 0;
                 return (
                   <TouchableOpacity key={dateKey(day)} testID={`calendar-day-${day.getDate()}`} onPress={() => selectDate(day)} style={[styles.dayCell, active && { backgroundColor: colors.primary }]}>
@@ -449,7 +444,7 @@ export default function CalendarScreen() {
               {cells.map((day) => {
                 const inMonth = day.getMonth() === selectedDate.getMonth();
                 const active = dateKey(day) === selectedKey;
-                const isToday = dateKey(day) === dateKey(new Date());
+                const isToday = dateKey(day) === todayKey;
                 const hasBookings = (bookingsByDay[dateKey(day)]?.length ?? 0) > 0;
                 return (
                   <TouchableOpacity key={dateKey(day)} onPress={() => selectDate(day, true)} style={styles.monthCell}>

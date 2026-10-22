@@ -1,6 +1,7 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { api } from '@/lib/live-api';
 import { useAuth } from '@/contexts/AuthContext';
+import { businessToday, DEFAULT_TIME_ZONE, validTimeZone, zonedDay, zonedMinutes, zonedMoment, zonedTimeLabel } from '@/lib/businessTime';
 
 export type ClientProfile = {
   id: string;
@@ -22,6 +23,8 @@ export type AppointmentRecord = {
   appointmentId: number;
   dateKey: string;
   dateIso: string;
+  /** Minutes after midnight it starts, in business time. */
+  startMinutes: number;
   time: string;
   name: string;
   service: string;
@@ -71,6 +74,10 @@ type BookingContextValue = {
   calendarDate: Date;
   /** The signed-in owner's own staff record. The app shows and books only this person's calendar. */
   ownStaffId: number | null;
+  /** The business's IANA time zone. Every time in the app is shown and booked in it (lib/businessTime.ts). */
+  timeZone: string;
+  /** After the time zone is changed in Settings. */
+  setTimeZone: (timeZone: string) => void;
   setCalendarDate: (date: Date) => void;
   refresh: () => Promise<void>;
   addClient: (client: NewClient) => Promise<ClientProfile>;
@@ -101,8 +108,10 @@ function mapService(service: ApiService, index: number): ServiceProfile {
   return { id: service.id, name: service.name || 'Service', durationMinutes: minutes, duration: minutes >= 60 ? `${Math.floor(minutes / 60)} hr${minutes % 60 ? ` ${minutes % 60} min` : ''}` : `${minutes} min`, priceValue, price: money(priceValue), icon: (['eye', 'droplet', 'briefcase', 'star'] as const)[index % 4], offeredAt: service.offeredAt === 'place' || service.offeredAt === 'client' ? service.offeredAt : 'any' };
 }
 
-function mapAppointment(appointment: ApiAppointment): AppointmentRecord {
+function mapAppointment(appointment: ApiAppointment, timeZone: string): AppointmentRecord {
   const date = new Date(appointment.date);
+  // The business date and time, whatever zone the phone is in.
+  const businessDay = zonedDay(date, timeZone);
   // What the visit comes to: the main service, its add-ons, and any extra services on the ticket.
   const priceValue = (Number(appointment.service?.price ?? 0) || 0)
     + (appointment.appointmentAddons ?? []).reduce((sum, row) => sum + (Number(row?.addon?.price ?? 0) || 0), 0)
@@ -110,7 +119,7 @@ function mapAppointment(appointment: ApiAppointment): AppointmentRecord {
     // A house call's travel fee is part of what the client pays.
     + (Number(appointment.travelFee ?? 0) || 0);
   const minutes = Number(appointment.duration ?? appointment.service?.duration ?? 60) || 60;
-  return { id: String(appointment.id), appointmentId: appointment.id, dateKey: dateKey(date), dateIso: date.toISOString(), time: date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }), name: nameOf(appointment.customer), service: appointment.service?.name || 'Service', serviceId: appointment.service?.id, duration: `${minutes} min`, price: money(priceValue), amountCents: Math.round(priceValue * 100), status: appointment.status === 'completed' ? 'paid' : appointment.status || 'pending', note: appointment.notes ?? undefined,
+  return { id: String(appointment.id), appointmentId: appointment.id, dateKey: dateKey(businessDay), dateIso: date.toISOString(), startMinutes: zonedMinutes(date, timeZone), time: zonedTimeLabel(date, timeZone), name: nameOf(appointment.customer), service: appointment.service?.name || 'Service', serviceId: appointment.service?.id, duration: `${minutes} min`, price: money(priceValue), amountCents: Math.round(priceValue * 100), status: appointment.status === 'completed' ? 'paid' : appointment.status || 'pending', note: appointment.notes ?? undefined,
     phone: appointment.customer?.phone ?? undefined, email: appointment.customer?.email ?? undefined,
     visitAt: appointment.visitAt === 'client' ? 'client' : 'place', clientAddress: appointment.clientAddress ?? null, travelFee: Number(appointment.travelFee ?? 0) || 0 };
 }
@@ -126,15 +135,33 @@ export function BookingProvider({ children }: { children: ReactNode }) {
   // never shown or booked here. (An account with no staff record linked to it falls back to the whole business.)
   const { user } = useAuth();
   const ownStaffId = Number(user?.staffId) > 0 ? Number(user?.staffId) : null;
+  const [timeZone, setTimeZoneState] = useState(DEFAULT_TIME_ZONE);
+  const timeZoneLoaded = useRef(false);
+  const timeZoneRef = useRef(DEFAULT_TIME_ZONE);
 
   const refresh = useCallback(async () => {
     setLoading(true); setError('');
-    // The whole month grid around the chosen day (the Monday on or before the 1st, six weeks on), so the
-    // Day, Week and Month views all show the real bookings.
-    const from = new Date(calendarDate.getFullYear(), calendarDate.getMonth(), 1);
-    from.setDate(from.getDate() - ((from.getDay() + 6) % 7));
-    const to = new Date(from); to.setDate(to.getDate() + 42); to.setMilliseconds(-1);
     try {
+      // The business's time zone, once per session (Settings updates it through setTimeZone).
+      let tz = timeZoneRef.current;
+      if (!timeZoneLoaded.current) {
+        const stores = await api.get<Array<{ timezone?: string | null }>>('/api/stores').catch(() => null);
+        if (Array.isArray(stores) && stores[0]) {
+          tz = validTimeZone(stores[0].timezone);
+          timeZoneLoaded.current = true;
+          timeZoneRef.current = tz;
+          setTimeZoneState(tz);
+          // The calendar opened on the phone's today; when the business is already on another date, start there.
+          const today = businessToday(tz);
+          if (dateKey(today) !== dateKey(calendarDate) && dateKey(calendarDate) === dateKey(new Date())) { setCalendarDate(today); return; }
+        }
+      }
+      // The whole month grid around the chosen business day, from its first midnight to the last, in business time.
+      const gridStart = new Date(calendarDate.getFullYear(), calendarDate.getMonth(), 1);
+      gridStart.setDate(gridStart.getDate() - ((gridStart.getDay() + 6) % 7));
+      const gridEnd = new Date(gridStart); gridEnd.setDate(gridEnd.getDate() + 42);
+      const from = zonedMoment(gridStart, 0, tz);
+      const to = new Date(zonedMoment(gridEnd, 0, tz).getTime() - 1);
       const [customerRows, serviceRows, appointmentRows, ownServices] = await Promise.all([
         api.get<ApiCustomer[]>('/api/customers'),
         api.get<ApiService[]>('/api/services'),
@@ -145,7 +172,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       const ownServiceIds = Array.isArray(ownServices?.serviceIds) ? ownServices.serviceIds.map(Number) : [];
       setClients((Array.isArray(customerRows) ? customerRows : []).map(mapCustomer));
       setServices((Array.isArray(serviceRows) ? serviceRows : []).filter((service) => ownServiceIds.length === 0 || ownServiceIds.includes(Number(service.id))).map(mapService));
-      setBookings((Array.isArray(appointmentRows) ? appointmentRows : []).map(mapAppointment));
+      setBookings((Array.isArray(appointmentRows) ? appointmentRows : []).map((row) => mapAppointment(row, tz)));
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not load Certxa data.'); }
     finally { setLoading(false); }
   }, [calendarDate, ownStaffId]);
@@ -154,6 +181,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<BookingContextValue>(() => ({
     clients, bookings, services, loading, error, calendarDate, ownStaffId, setCalendarDate, refresh,
+    timeZone, setTimeZone: (next) => { timeZoneLoaded.current = true; timeZoneRef.current = validTimeZone(next); setTimeZoneState(timeZoneRef.current); },
     addClient: async (client) => {
       const created = await api.post<ApiCustomer>('/api/customers', { name: client.name, phone: client.phone || undefined });
       const record = mapCustomer(created, 0); setClients((current) => [record, ...current]); return record;
@@ -171,7 +199,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       await api.patch(`/api/appointments/${appointmentId}`, { date: dateIso, duration: durationMinutes, checkConflicts: true });
       await refresh();
     },
-  }), [bookings, calendarDate, clients, error, loading, ownStaffId, refresh, services]);
+  }), [bookings, calendarDate, clients, error, loading, ownStaffId, refresh, services, timeZone]);
 
   return <BookingContext.Provider value={value}>{children}</BookingContext.Provider>;
 }

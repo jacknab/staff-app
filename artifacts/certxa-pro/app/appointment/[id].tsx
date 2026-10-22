@@ -7,19 +7,18 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { useBookingData } from '@/contexts/BookingContext';
+import { zonedDay, zonedMoment, zonedTimeLabel } from '@/lib/businessTime';
 import { api, ApiError } from '@/lib/live-api';
 
 const timeSlots = ['9:00 AM', '10:30 AM', '12:00 PM', '2:00 PM', '3:30 PM', '5:00 PM'];
 
-function withTime(day: Date, label: string) {
-  const result = new Date(day);
+/** The moment of a business date (day carrier) at a "2:30 PM" label, in the business's time zone. */
+function withTime(day: Date, label: string, timeZone: string) {
   const match = label.match(/(\d+):(\d+)\s*(AM|PM)/i);
-  if (match) {
-    let hour = Number(match[1]) % 12;
-    if (match[3].toUpperCase() === 'PM') hour += 12;
-    result.setHours(hour, Number(match[2]), 0, 0);
-  }
-  return result;
+  if (!match) return zonedMoment(day, 0, timeZone);
+  let hour = Number(match[1]) % 12;
+  if (match[3].toUpperCase() === 'PM') hour += 12;
+  return zonedMoment(day, hour * 60 + Number(match[2]), timeZone);
 }
 
 function initialsFor(name: string) {
@@ -54,10 +53,11 @@ export default function AppointmentDetailScreen() {
     clientAddress?: string;
     travelFeeCents?: string;
   }>();
-  const { services, refresh } = useBookingData();
+  const { services, refresh, timeZone } = useBookingData();
   const originalDate = useMemo(() => params.dateIso ? new Date(params.dateIso) : new Date(), [params.dateIso]);
-  const [day, setDay] = useState(originalDate);
-  const [time, setTime] = useState(originalDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }));
+  // The date and time as the business sees them (its own time zone, not the phone's).
+  const [day, setDay] = useState(() => zonedDay(originalDate, timeZone));
+  const [time, setTime] = useState(() => zonedTimeLabel(originalDate, timeZone));
   const [serviceId, setServiceId] = useState(Number(params.serviceId) || services[0]?.id || 0);
   const [status, setStatus] = useState(params.status === 'completed' ? 'paid' : params.status || 'pending');
   const [editing, setEditing] = useState(false);
@@ -95,7 +95,7 @@ export default function AppointmentDetailScreen() {
         // Only what was changed is sent: an untouched time keeps the appointment exactly where it is, and an
         // untouched service keeps its full length (services plus add-ons). A new time is checked against the
         // technician's other appointments.
-        const nextDate = withTime(day, time);
+        const nextDate = withTime(day, time, timeZone);
         const moved = Math.floor(nextDate.getTime() / 60000) !== Math.floor(originalDate.getTime() / 60000);
         const serviceChanged = selectedService.id !== Number(params.serviceId);
         await api.patch(`/api/appointments/${appointmentId}`, {
