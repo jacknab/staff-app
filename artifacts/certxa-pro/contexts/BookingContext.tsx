@@ -31,6 +31,9 @@ export type AppointmentRecord = {
   amountCents: number;
   status: string;
   note?: string;
+  /** The client's phone and e-mail, for the Text / Call / Email shortcuts. */
+  phone?: string;
+  email?: string;
   /** Solo plan house calls: where the visit happens, the client's address and the travel fee (in the price). */
   visitAt?: 'place' | 'client';
   clientAddress?: HouseCallAddress | null;
@@ -108,6 +111,7 @@ function mapAppointment(appointment: ApiAppointment): AppointmentRecord {
     + (Number(appointment.travelFee ?? 0) || 0);
   const minutes = Number(appointment.duration ?? appointment.service?.duration ?? 60) || 60;
   return { id: String(appointment.id), appointmentId: appointment.id, dateKey: dateKey(date), dateIso: date.toISOString(), time: date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }), name: nameOf(appointment.customer), service: appointment.service?.name || 'Service', serviceId: appointment.service?.id, duration: `${minutes} min`, price: money(priceValue), amountCents: Math.round(priceValue * 100), status: appointment.status === 'completed' ? 'paid' : appointment.status || 'pending', note: appointment.notes ?? undefined,
+    phone: appointment.customer?.phone ?? undefined, email: appointment.customer?.email ?? undefined,
     visitAt: appointment.visitAt === 'client' ? 'client' : 'place', clientAddress: appointment.clientAddress ?? null, travelFee: Number(appointment.travelFee ?? 0) || 0 };
 }
 
@@ -125,8 +129,11 @@ export function BookingProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     setLoading(true); setError('');
-    const from = new Date(calendarDate); from.setHours(0, 0, 0, 0);
-    const to = new Date(calendarDate); to.setHours(23, 59, 59, 999);
+    // The whole month grid around the chosen day (the Monday on or before the 1st, six weeks on), so the
+    // Day, Week and Month views all show the real bookings.
+    const from = new Date(calendarDate.getFullYear(), calendarDate.getMonth(), 1);
+    from.setDate(from.getDate() - ((from.getDay() + 6) % 7));
+    const to = new Date(from); to.setDate(to.getDate() + 42); to.setMilliseconds(-1);
     try {
       const [customerRows, serviceRows, appointmentRows, ownServices] = await Promise.all([
         api.get<ApiCustomer[]>('/api/customers'),

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import Constants from 'expo-constants';
 import { Feather } from '@expo/vector-icons';
 import { Platform, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -234,7 +235,7 @@ export default function MoreScreen() {
             <TouchableOpacity testID="menu-settings" onPress={() => router.push('/settings')} style={[styles.menuRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.menuIcon, { backgroundColor: colors.secondary }]}><Feather name="settings" size={17} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>Settings</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>Business, booking, messages, payments, account</Text></View><Feather name="chevron-right" size={17} color={colors.mutedForeground} /></TouchableOpacity>
           </View>
           <View style={[styles.certxaCard, { backgroundColor: colors.primary }]}><Text style={[styles.certxaBrand, { color: colors.primaryForeground }]}>CERTXA PRO</Text><Text style={[styles.certxaTitle, { color: colors.primaryForeground }]}>Your business, beautifully in sync.</Text><Text style={[styles.certxaSub, { color: colors.primaryForeground }]}>Calendar, clients, services, appointments, and payments are connected to Certxa.</Text></View>
-          <Text style={[styles.version, { color: colors.mutedForeground }]}>LIVE · 1.0.5</Text>
+          <Text style={[styles.version, { color: colors.mutedForeground }]}>LIVE · {Constants.expoConfig?.version ?? ''}</Text>
         </ScrollView>
       )}
     </View>

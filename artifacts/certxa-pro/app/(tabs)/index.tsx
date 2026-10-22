@@ -83,33 +83,6 @@ function weekStarting(date: Date) {
   return monday;
 }
 
-function previewAppointments(date: Date): AppointmentRecord[] {
-  const create = (id: number, hour: number, minute: number, name: string, service: string, duration: number, price: number): AppointmentRecord => {
-    const appointmentDate = new Date(date);
-    appointmentDate.setHours(hour, minute, 0, 0);
-    return {
-      id: `preview-${id}`,
-      appointmentId: id,
-      dateKey: dateKey(date),
-      dateIso: appointmentDate.toISOString(),
-      time: appointmentDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
-      name,
-      service,
-      duration: `${duration} min`,
-      price: `$${price}`,
-      amountCents: price * 100,
-      status: 'confirmed',
-    };
-  };
-
-  return [
-    create(901, 9, 30, 'Maya Thompson', 'Lash lift + tint', 75, 95),
-    create(902, 11, 0, 'Jordan Lee', 'Signature facial', 60, 85),
-    create(903, 13, 30, 'Sofia Martinez', 'Gel manicure', 90, 68),
-    create(904, 15, 45, 'Avery Wilson', 'Brow shaping', 45, 42),
-  ];
-}
-
 function monthCells(date: Date) {
   const first = new Date(date.getFullYear(), date.getMonth(), 1);
   const offset = (first.getDay() + 6) % 7;
@@ -133,7 +106,8 @@ function appointmentParams(item: AppointmentRecord) {
       duration: item.duration,
       status: item.status,
       note: item.note ?? '',
-      preview: item.id.startsWith('preview') ? '1' : '0',
+      phone: item.phone ?? '',
+      email: item.email ?? '',
       visitAt: item.visitAt ?? 'place',
       clientAddress: item.clientAddress ? JSON.stringify(item.clientAddress) : '',
       travelFeeCents: String(Math.round((item.travelFee ?? 0) * 100)),
@@ -214,7 +188,6 @@ export default function CalendarScreen() {
   const router = useRouter();
   const { bookings, loading, error, refresh, rescheduleBooking, calendarDate: selectedDate, setCalendarDate } = useBookingData();
   const [viewMode, setViewMode] = useState<ViewMode>('Day');
-  const [previewOverrides, setPreviewOverrides] = useState<Record<string, string>>({});
   const [activeDrag, setActiveDrag] = useState<{ id: string; top: number } | null>(null);
   const [pendingDrop, setPendingDrop] = useState<{ item: AppointmentRecord; minutes: number } | null>(null);
   const [notifyClient, setNotifyClient] = useState(true);
@@ -231,13 +204,13 @@ export default function CalendarScreen() {
     });
   }, [selectedDate]);
   const cells = useMemo(() => monthCells(selectedDate), [selectedDate]);
-  const preview = useMemo(() => previewAppointments(selectedDate).map((item) => {
-    const override = previewOverrides[item.id];
-    if (!override) return item;
-    const date = new Date(override);
-    return { ...item, dateKey: dateKey(date), dateIso: date.toISOString(), time: date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) };
-  }), [previewOverrides, selectedDate]);
-  const appointments = useMemo(() => [...(bookings.length > 0 ? bookings : preview)].sort((a, b) => startMinutes(a) - startMinutes(b)), [bookings, preview]);
+  // Bookings are loaded for the whole month grid; each view picks out its own days.
+  const bookingsByDay = useMemo(() => {
+    const byDay: Record<string, AppointmentRecord[]> = {};
+    for (const item of [...bookings].sort((a, b) => new Date(a.dateIso).getTime() - new Date(b.dateIso).getTime())) (byDay[item.dateKey] ??= []).push(item);
+    return byDay;
+  }, [bookings]);
+  const appointments = useMemo(() => bookingsByDay[dateKey(selectedDate)] ?? [], [bookingsByDay, selectedDate]);
   const columnsById = useMemo(() => overlapColumns(appointments), [appointments]);
   const { timelineStart, timelineEnd, timelineHours } = useMemo(() => {
     let start = DEFAULT_START;
@@ -249,7 +222,6 @@ export default function CalendarScreen() {
     }
     return { timelineStart: start, timelineEnd: end, timelineHours: Array.from({ length: (end - start) / 60 + 1 }, (_, index) => start + index * 60) };
   }, [appointments]);
-  const isPreviewData = bookings.length === 0 && !loading;
   const topInset = Platform.OS === 'web' ? 67 : insets.top;
   const todayIsSelected = dateKey(selectedDate) === dateKey(new Date());
 
@@ -308,11 +280,7 @@ export default function CalendarScreen() {
     setDropError('');
     const nextDate = dateAtMinutes(selectedDate, pendingDrop.minutes);
     try {
-      if (pendingDrop.item.id.startsWith('preview')) {
-        setPreviewOverrides((current) => ({ ...current, [pendingDrop.item.id]: nextDate.toISOString() }));
-      } else {
-        await rescheduleBooking(pendingDrop.item.appointmentId, nextDate.toISOString(), durationMinutes(pendingDrop.item.duration));
-      }
+      await rescheduleBooking(pendingDrop.item.appointmentId, nextDate.toISOString(), durationMinutes(pendingDrop.item.duration));
       setPendingDrop(null);
     } catch (cause) {
       setDropError(cause instanceof Error ? cause.message : 'Could not reschedule appointment.');
@@ -387,12 +355,13 @@ export default function CalendarScreen() {
                 const inMonth = day.getMonth() === selectedDate.getMonth();
                 const active = dateKey(day) === dateKey(selectedDate);
                 const isToday = dateKey(day) === dateKey(new Date());
+                const hasBookings = (bookingsByDay[dateKey(day)]?.length ?? 0) > 0;
                 return (
                   <TouchableOpacity key={dateKey(day)} onPress={() => selectDate(day, true)} style={styles.monthCell}>
                     <View style={[styles.monthNumber, active && { backgroundColor: colors.primary }]}>
                       <Text style={[styles.monthNumberText, { color: active ? colors.primaryForeground : inMonth ? colors.foreground : colors.mutedForeground }]}>{day.getDate()}</Text>
                     </View>
-                    <View style={[styles.monthDot, { backgroundColor: active ? colors.primaryForeground : isToday ? colors.primary : inMonth ? colors.accentForeground : colors.border }]} />
+                    <View style={[styles.monthDot, { backgroundColor: !hasBookings ? 'transparent' : active ? colors.primaryForeground : colors.primary }]} />
                   </TouchableOpacity>
                 );
               })}
@@ -401,7 +370,7 @@ export default function CalendarScreen() {
         ) : viewMode === 'Week' ? (
           <View style={styles.weekAgenda}>
             {days.map((day) => {
-              const dayAppointments = dateKey(day) === dateKey(selectedDate) ? appointments : [];
+              const dayAppointments = bookingsByDay[dateKey(day)] ?? [];
               const active = dateKey(day) === dateKey(selectedDate);
               return (
                 <TouchableOpacity key={dateKey(day)} onPress={() => selectDate(day, true)} style={[styles.weekDayRow, { borderColor: colors.border, backgroundColor: colors.card }, active && { borderColor: colors.primary }]}>
@@ -421,13 +390,12 @@ export default function CalendarScreen() {
           <View>
             <View style={styles.scheduleMeta}>
               <Text style={[styles.scheduleCount, { color: colors.mutedForeground }]}>{selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · {appointments.length} appointments</Text>
-              {isPreviewData && <View style={[styles.previewPill, { backgroundColor: colors.accent }]}><Text style={[styles.previewPillText, { color: colors.accentForeground }]}>Preview schedule</Text></View>}
             </View>
             <View style={[styles.dragHint, { backgroundColor: colors.secondary }]}>
               <Feather name="move" size={14} color={colors.primary} />
               <Text style={[styles.dragHintText, { color: colors.secondaryForeground }]}>Press and hold an appointment to move it in 5-minute increments.</Text>
             </View>
-            {error && <View style={[styles.syncNotice, { backgroundColor: colors.secondary }]}><Feather name="info" size={14} color={colors.primary} /><Text style={[styles.syncText, { color: colors.secondaryForeground }]}>Showing preview appointments while Certxa is offline.</Text></View>}
+            {error && <View style={[styles.syncNotice, { backgroundColor: colors.secondary }]}><Feather name="info" size={14} color={colors.primary} /><Text style={[styles.syncText, { color: colors.secondaryForeground }]}>Could not load your calendar from Certxa. Tap refresh to try again.</Text></View>}
             <View style={[styles.timeline, { minHeight: ((timelineEnd - timelineStart) / 60) * HOUR_HEIGHT, backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={[styles.timelineLabels, { backgroundColor: colors.muted }]}>
                 {timelineHours.map((time) => <Text key={time} style={styles.timelineLabel}>{formatClock(time)}</Text>)}
@@ -535,8 +503,6 @@ const styles = StyleSheet.create({
   noEvents: { fontSize: 12, fontFamily: 'Inter_400Regular' },
   scheduleMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
   scheduleCount: { fontSize: 12, fontFamily: 'Inter_500Medium' },
-  previewPill: { borderRadius: 9, paddingHorizontal: 9, paddingVertical: 6 },
-  previewPillText: { fontSize: 10, fontFamily: 'Inter_600SemiBold' },
   dragHint: { flexDirection: 'row', alignItems: 'center', gap: 7, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 10 },
   dragHintText: { fontSize: 10, fontFamily: 'Inter_500Medium', flex: 1 },
   syncNotice: { flexDirection: 'row', alignItems: 'center', gap: 7, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 10 },
