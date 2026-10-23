@@ -54,8 +54,8 @@ export default function SignupScreen() {
         email: email.trim(), password, phone: phoneDigits || undefined, timezone: deviceTimezone(),
         ownPlace, houseCalls,
       });
-      // A new account goes straight to setting up card payments; they can choose "Not now".
-      router.replace('/get-paid?from=signup');
+      // A new account sets up its booking website (link, design, look - each step can be skipped), then card payments.
+      router.replace('/website-setup?from=signup');
     } catch (cause) {
       setError(cause instanceof CertxaApiError ? cause.message : 'Could not create your account. Check your connection and try again.');
     } finally {

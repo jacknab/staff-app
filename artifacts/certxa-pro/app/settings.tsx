@@ -377,7 +377,7 @@ export default function SettingsScreen() {
         <TouchableOpacity testID="settings-share-site" onPress={() => void Share.share({ message: website })} style={[styles.save, { backgroundColor: colors.primary }]}><Text style={[styles.saveText, { color: colors.primaryForeground }]}>Share my booking link</Text></TouchableOpacity>
         <TouchableOpacity testID="settings-open-site" onPress={() => void Linking.openURL(website)} style={styles.linkButton}><Text style={[styles.link, { color: colors.primary }]}>Open my website</Text></TouchableOpacity>
       </> : null}
-      <Help>Changing the name and choosing the photo at the top of your site are not available in the app yet.</Help>
+      <TouchableOpacity testID="settings-edit-site" onPress={() => router.push('/website-setup')} style={[styles.save, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}><Text style={[styles.saveText, { color: colors.foreground }]}>Edit my link, design and look</Text></TouchableOpacity>
     </>);
     if (screen === 'messages') return (<>
       <Label>Text messages</Label>

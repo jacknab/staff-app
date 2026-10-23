@@ -53,6 +53,14 @@
             "./assets/sounds/soft_chime.wav"
           ]
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Certxa Pro uses your photos for the cover photo and profile photo on your booking website.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
       ]
     ],
     "experiments": {
