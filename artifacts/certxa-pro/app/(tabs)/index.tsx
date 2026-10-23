@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { AppointmentRecord, useBookingData } from '@/contexts/BookingContext';
 import { businessToday, zonedMinutes, zonedMoment } from '@/lib/businessTime';
+import { listBookingRequests } from '@/lib/bookingRequests';
 
 type ViewMode = 'Month' | 'Week' | 'Day';
 
@@ -200,7 +201,12 @@ export default function CalendarScreen() {
   const [notifyClient, setNotifyClient] = useState(true);
   const [savingDrop, setSavingDrop] = useState(false);
   const [dropError, setDropError] = useState('');
-  useFocusEffect(useCallback(() => { void refresh(); }, [refresh]));
+  // Booking requests waiting for an answer (Settings → Booking approval): shown as a banner above the calendar.
+  const [openRequests, setOpenRequests] = useState(0);
+  useFocusEffect(useCallback(() => {
+    void refresh();
+    listBookingRequests().then((rows) => setOpenRequests(rows.filter((row) => row.status === 'requested').length)).catch(() => setOpenRequests(0));
+  }, [refresh]));
 
   const days = useMemo(() => {
     const monday = weekStarting(selectedDate);
@@ -371,6 +377,12 @@ export default function CalendarScreen() {
       {/* Fixed header: it never scrolls. */}
       <View style={styles.fixedHeader}>
         <View style={{ marginBottom: 10 }}><PaymentsSetupBanner /></View>
+        {openRequests > 0 ? (
+          <TouchableOpacity testID="calendar-requests-banner" onPress={() => router.push('/requests')} style={[styles.requestsBanner, { backgroundColor: colors.card, borderColor: colors.primary }]}>
+            <Text style={[styles.requestsText, { color: colors.foreground }]}>{openRequests === 1 ? '1 booking request is waiting for you' : `${openRequests} booking requests are waiting for you`}</Text>
+            <Feather name="chevron-right" size={17} color={colors.foreground} />
+          </TouchableOpacity>
+        ) : null}
         <View style={styles.header}>
           <View style={[styles.segmentedControl, { borderColor: colors.border, backgroundColor: colors.card }]}>
             {(['Month', 'Week', 'Day'] as ViewMode[]).map((mode) => (
@@ -564,6 +576,8 @@ export default function CalendarScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   fixedHeader: { paddingHorizontal: 18, paddingTop: 12 },
+  requestsBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1.5, borderRadius: 12, paddingHorizontal: 13, paddingVertical: 11, marginBottom: 10 },
+  requestsText: { flex: 1, fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   body: { flex: 1 },
   bodyContent: { paddingHorizontal: 18, paddingBottom: 112 },
   dayBody: { marginHorizontal: 18, borderWidth: 1, borderBottomWidth: 0, borderTopLeftRadius: 14, borderTopRightRadius: 14, overflow: 'hidden' },

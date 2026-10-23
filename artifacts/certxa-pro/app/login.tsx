@@ -120,8 +120,9 @@ export default function LoginScreen() {
         <TouchableOpacity disabled={isSendingReset} onPress={() => void forgotPassword()} style={{ alignSelf: 'center', minHeight: 40, justifyContent: 'center' }} testID="login-forgot-password">
           <Text style={[styles.label, { color: colors.primary, marginBottom: 0 }]}>{isSendingReset ? 'Sending…' : 'Forgot password?'}</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => router.push('/signup')} style={{ alignSelf: 'center', minHeight: 40, justifyContent: 'center' }} testID="login-create-account">
-          <Text style={[styles.label, { color: colors.primary, marginBottom: 0 }]}>Create an account</Text>
+        {/* New to Certxa Pro: a full-width outlined button under Sign in, so it is easy to find. */}
+        <TouchableOpacity onPress={() => router.push('/signup')} style={[styles.button, { backgroundColor: colors.card, borderWidth: 1.5, borderColor: colors.primary }]} testID="login-create-account">
+          <Text style={[styles.buttonText, { color: colors.primary }]}>Create an account</Text>
         </TouchableOpacity>
       </View>
 

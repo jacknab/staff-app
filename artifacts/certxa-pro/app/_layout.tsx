@@ -34,9 +34,12 @@ function PushBridge() {
   useEffect(() => {
     if (!isAuthenticated) return;
     void registerForBookingPushes();
-    return onBookingPush((_data, tapped) => {
+    return onBookingPush((data, tapped) => {
       void refresh();
-      if (tapped) router.push('/(tabs)');
+      if (!tapped) return;
+      // A booking request opens that request; anything else opens the calendar.
+      if (data.type === 'booking_request' && Number(data.requestId) > 0) router.push({ pathname: '/request/[id]', params: { id: String(data.requestId) } });
+      else router.push('/(tabs)');
     });
   }, [isAuthenticated, refresh, router]);
   return null;
@@ -71,6 +74,8 @@ function RootLayoutNav() {
       <Stack.Screen name="signup" options={{ headerShown: false }} />
       <Stack.Screen name="get-paid" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="website-setup" options={{ headerShown: false, presentation: 'card' }} />
+      <Stack.Screen name="requests" options={{ headerShown: false, presentation: 'card' }} />
+      <Stack.Screen name="request/[id]" options={{ headerShown: false, presentation: 'card' }} />
     </Stack>
   );
 }

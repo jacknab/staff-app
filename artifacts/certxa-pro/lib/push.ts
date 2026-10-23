@@ -60,8 +60,8 @@ export async function unregisterBookingPushes(authToken: string | null): Promise
 }
 
 /** Run `onBooking` when a booking notification arrives or is tapped. Returns the unsubscribe function. */
-export function onBookingPush(onBooking: (data: { type?: string; appointmentId?: number }, tapped: boolean) => void): () => void {
-  const read = (notification: Notifications.Notification) => (notification.request.content.data ?? {}) as { type?: string; appointmentId?: number };
+export function onBookingPush(onBooking: (data: { type?: string; appointmentId?: number; requestId?: number }, tapped: boolean) => void): () => void {
+  const read = (notification: Notifications.Notification) => (notification.request.content.data ?? {}) as { type?: string; appointmentId?: number; requestId?: number };
   const received = Notifications.addNotificationReceivedListener((notification) => onBooking(read(notification), false));
   const tapped = Notifications.addNotificationResponseReceivedListener((response) => onBooking(read(response.notification), true));
   return () => { received.remove(); tapped.remove(); };

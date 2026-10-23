@@ -80,3 +80,9 @@ export const US_TIME_ZONES: Array<{ value: string; label: string }> = [
 export function timeZoneName(tz: string): string {
   return US_TIME_ZONES.find((zone) => zone.value === tz)?.label ?? tz.split('/').pop()?.replace(/_/g, ' ') ?? tz;
 }
+
+/** "Sun, Oct 25" in business time. */
+export function zonedDateLabel(moment: Date | string, tz: string): string {
+  const date = typeof moment === 'string' ? new Date(moment) : moment;
+  return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: tz });
+}

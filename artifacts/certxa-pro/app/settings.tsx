@@ -27,7 +27,7 @@ import { timeZoneName, US_TIME_ZONES, validTimeZone } from '@/lib/businessTime';
 import { api } from '@/lib/live-api';
 import { CERTXA_API_BASE_URL, certxaRequest, getStoredToken, login as checkPassword, registerTerminalReader } from '@/lib/certxa-api';
 
-type Screen = 'menu' | 'business' | 'location' | 'places' | 'hours' | 'rules' | 'policy' | 'blocked' | 'website' | 'messages' | 'stripe' | 'readers' | 'tax' | 'account';
+type Screen = 'menu' | 'business' | 'location' | 'places' | 'hours' | 'rules' | 'approval' | 'policy' | 'blocked' | 'website' | 'messages' | 'stripe' | 'readers' | 'tax' | 'account';
 type Store = { id: number; name?: string | null; phone?: string | null; email?: string | null; category?: string | null; address?: string | null; city?: string | null; state?: string | null; postcode?: string | null; bookingSlug?: string | null; timezone?: string | null };
 type Hours = { dayOfWeek: number; openTime: string; closeTime: string; isClosed: boolean };
 type FeatherName = ComponentProps<typeof Feather>['name'];
@@ -36,7 +36,7 @@ const BUSINESS_TYPES = ['Nail Salon', 'Hair Salon', 'Barbershop', 'Lash and Brow
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const TITLES: Record<Screen, string> = {
   menu: 'Settings', business: 'Business details', location: 'Location', places: 'Where you see clients', hours: 'Business hours', rules: 'Booking rules', policy: 'Cancellation policy',
-  blocked: 'Blocked clients', website: 'Website', messages: 'Client messages', stripe: 'Stripe account', readers: 'Card readers', tax: 'Sales tax', account: 'Account',
+  approval: 'Booking approval', blocked: 'Blocked clients', website: 'Website', messages: 'Client messages', stripe: 'Stripe account', readers: 'Card readers', tax: 'Sales tax', account: 'Account',
 };
 
 function errorText(cause: unknown, fallback: string) { return cause instanceof Error && cause.message ? cause.message : fallback; }
@@ -83,6 +83,9 @@ export default function SettingsScreen() {
         const rows = await api.get<Hours[]>('/api/business-hours');
         const byDay = new Map((Array.isArray(rows) ? rows : []).map((row) => [row.dayOfWeek, row]));
         setDraft({ timezone: validTimeZone(current.timezone), hours: DAYS.map((_, dayOfWeek) => { const row = byDay.get(dayOfWeek); return { dayOfWeek, openTime: (row?.openTime ?? '09:00').slice(0, 5), closeTime: (row?.closeTime ?? '17:00').slice(0, 5), isClosed: row ? !!row.isClosed : true }; }) });
+      } else if (next === 'approval') {
+        const places = await api.get<Record<string, any>>('/api/work-places');
+        setDraft({ eligible: places.eligible, bookingApproval: places.bookingApproval ?? 'auto', bookingRequestExpiryHours: Number(places.bookingRequestExpiryHours ?? 48), bookingOfferValidDays: Number(places.bookingOfferValidDays ?? 3) });
       } else if (next === 'rules' || next === 'policy') {
         const [policies, calendar] = await Promise.all([api.get<Record<string, any>>('/api/booking-policies'), api.get<Record<string, any> | null>('/api/calendar-settings')]);
         setDraft({
@@ -153,6 +156,12 @@ export default function SettingsScreen() {
         setTimeZone(validTimeZone(updated.timezone));
         void refreshCalendar();
       }
+    });
+    if (screen === 'approval') return run(async () => {
+      const saved = await api.put<Record<string, any>>('/api/work-places', {
+        bookingApproval: draft.bookingApproval, bookingRequestExpiryHours: Number(draft.bookingRequestExpiryHours), bookingOfferValidDays: Number(draft.bookingOfferValidDays),
+      });
+      setDraft({ eligible: saved.eligible, bookingApproval: saved.bookingApproval, bookingRequestExpiryHours: Number(saved.bookingRequestExpiryHours), bookingOfferValidDays: Number(saved.bookingOfferValidDays) });
     });
     if (screen === 'rules') return run(async () => {
       await api.put('/api/booking-policies', {
@@ -268,6 +277,7 @@ export default function SettingsScreen() {
         </Group>
         <Group title="ONLINE BOOKING">
           <Row icon="sliders" title="Booking rules" hint="Who can book, notice, start times, cancelling" to="rules" />
+          <Row icon="check-square" title="Booking approval" hint="Accept bookings automatically, or review each one" to="approval" />
           <Row icon="file-text" title="Cancellation policy" hint="What clients agree to when they book" to="policy" />
           <Row icon="slash" title="Blocked clients" hint="Phone numbers that cannot book online" to="blocked" />
         </Group>
@@ -342,6 +352,24 @@ export default function SettingsScreen() {
         );
       })}
       <Help>Clients can only book online inside these hours.</Help>{saveButton()}
+    </>);
+    if (screen === 'approval') return draft.eligible === false ? (
+      <Help>Booking approval is part of the Solo plan.</Help>
+    ) : (<>
+      <Label>New online bookings</Label>
+      {choices('bookingApproval', [{ value: 'auto', label: 'Accept automatically' }, { value: 'manual', label: 'Review each one first' }])}
+      <Help>{draft.bookingApproval === 'manual'
+        ? 'Clients send a request. You approve it, offer other times, or decline it. The time is only booked once you approve.'
+        : 'Clients book straight into your calendar.'}</Help>
+      {draft.bookingApproval === 'manual' ? <>
+        <Label>Answer requests within</Label>
+        {withCurrent('bookingRequestExpiryHours', [12, 24, 48, 72], (value) => (value % 24 === 0 ? `${value / 24} ${value === 24 ? 'day' : 'days'}` : `${value} hours`))}
+        <Help>A request you haven't answered by then expires, and the client is told by text.</Help>
+        <Label>Offered times stay open for</Label>
+        {withCurrent('bookingOfferValidDays', [2, 3, 4, 5, 6, 7], (value) => `${value} ${value === 1 ? 'day' : 'days'}`)}
+        <Help>When you offer a client other times, the link in their text works for this many days.</Help>
+      </> : null}
+      {saveButton()}
     </>);
     if (screen === 'rules') return (<>
       <Label>Who can book online</Label>{choices('onlineBookingMode', [{ value: 'all', label: 'Everyone' }, { value: 'existing', label: 'Existing clients' }, { value: 'off', label: 'Nobody' }])}
