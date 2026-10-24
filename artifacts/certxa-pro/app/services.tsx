@@ -9,9 +9,10 @@ import { useBookingData } from '@/contexts/BookingContext';
 import { api } from '@/lib/live-api';
 
 type OfferedAt = 'place' | 'client' | 'any';
-type Service = { id: number; name: string; duration: number; price: number; offeredAt: OfferedAt };
+type Service = { id: number; name: string; duration: number; price: number; offeredAt: OfferedAt; categoryId: number | null };
+type Category = { id: number; name: string; sortOrder: number };
 /** The service being added (id 0) or changed, as typed. */
-type Draft = { id: number; name: string; minutes: string; price: string; offeredAt: OfferedAt };
+type Draft = { id: number; name: string; minutes: string; price: string; offeredAt: OfferedAt; categoryId: number | null };
 
 function minutesLabel(minutes: number) {
   return minutes >= 60 ? `${Math.floor(minutes / 60)} hr${minutes % 60 ? ` ${minutes % 60} min` : ''}` : `${minutes} min`;
@@ -23,6 +24,7 @@ export default function ServicesScreen() {
   const router = useRouter();
   const { refresh } = useBookingData();
   const [services, setServices] = useState<Service[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
@@ -32,8 +34,9 @@ export default function ServicesScreen() {
 
   const load = useCallback(async () => {
     try {
-      const rows = await api.get<any[]>('/api/services');
-      setServices((Array.isArray(rows) ? rows : []).map((row) => ({ id: Number(row.id), name: String(row.name ?? 'Service'), duration: Number(row.duration) || 0, price: Number(row.price) || 0, offeredAt: row.offeredAt === 'place' || row.offeredAt === 'client' ? row.offeredAt : 'any' })));
+      const [rows, cats] = await Promise.all([api.get<any[]>('/api/services'), api.get<any[]>('/api/service-categories')]);
+      setServices((Array.isArray(rows) ? rows : []).map((row) => ({ id: Number(row.id), name: String(row.name ?? 'Service'), duration: Number(row.duration) || 0, price: Number(row.price) || 0, offeredAt: row.offeredAt === 'place' || row.offeredAt === 'client' ? row.offeredAt : 'any', categoryId: row.categoryId == null ? null : Number(row.categoryId) })));
+      setCategories((Array.isArray(cats) ? cats : []).map((row) => ({ id: Number(row.id), name: String(row.name ?? ''), sortOrder: Number(row.sortOrder) || 0 })).sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id));
       setError('');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not load your services.');
@@ -59,9 +62,10 @@ export default function ServicesScreen() {
     setSaving(true);
     setError('');
     try {
-      const body = { name, duration: minutes, price: price.toFixed(2), ...(offersBoth ? { offeredAt: draft.offeredAt } : {}) };
+      const category = categories.find((row) => row.id === draft.categoryId);
+      const body = { name, duration: minutes, price: price.toFixed(2), categoryId: category?.id ?? null, category: category?.name ?? 'General', ...(offersBoth ? { offeredAt: draft.offeredAt } : {}) };
       if (draft.id > 0) await api.patch(`/api/services/${draft.id}`, body);
-      else await api.post('/api/services', { ...body, category: 'General' });
+      else await api.post('/api/services', body);
       setDraft(null);
       await load();
       // The booking screens read services from the shared list.
@@ -93,6 +97,11 @@ export default function ServicesScreen() {
 
   const input = { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground };
   const editing = draft && draft.id > 0 ? services.find((service) => service.id === draft.id) : undefined;
+  // The list under each category (in the Categories order), then the services with none.
+  const groups = [
+    ...categories.map((category) => ({ id: category.id, name: category.name, services: services.filter((service) => service.categoryId === category.id) })),
+    { id: 0, name: 'Uncategorized', services: services.filter((service) => !categories.some((category) => category.id === service.categoryId)) },
+  ].filter((group) => group.services.length > 0);
 
   return (
     <KeyboardAvoidingView style={[styles.root, { backgroundColor: colors.background, paddingTop: insets.top }]} behavior="padding" keyboardVerticalOffset={0}>
@@ -101,7 +110,7 @@ export default function ServicesScreen() {
         <TouchableOpacity testID="services-back" accessibilityLabel="Back" onPress={() => (draft ? (setDraft(null), setError('')) : router.back())} style={styles.headerButton}><Feather name="arrow-left" size={21} color={colors.foreground} /></TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>{draft ? (draft.id > 0 ? 'Edit service' : 'New service') : 'Services'}</Text>
         {draft ? <View style={styles.headerButton} /> : (
-          <TouchableOpacity testID="services-add" accessibilityLabel="Add a service" onPress={() => { setError(''); setDraft({ id: 0, name: '', minutes: '', price: '', offeredAt: 'any' }); }} style={styles.headerButton}><Feather name="plus" size={22} color={colors.primary} /></TouchableOpacity>
+          <TouchableOpacity testID="services-add" accessibilityLabel="Add a service" onPress={() => { setError(''); setDraft({ id: 0, name: '', minutes: '', price: '', offeredAt: 'any', categoryId: null }); }} style={styles.headerButton}><Feather name="plus" size={22} color={colors.primary} /></TouchableOpacity>
         )}
       </View>
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
@@ -119,6 +128,21 @@ export default function ServicesScreen() {
                 <TextInput testID="service-price" keyboardType="decimal-pad" value={draft.price} onChangeText={(price) => setDraft({ ...draft, price: price.replace(/[^\d.]/g, '') })} placeholder="45.00" placeholderTextColor={colors.mutedForeground} style={[styles.input, input]} />
               </View>
             </View>
+            {categories.length > 0 ? (
+              <>
+                <Text style={[styles.label, { color: colors.foreground }]}>Category</Text>
+                <View style={styles.wrap}>
+                  {[{ id: 0, name: 'None' }, ...categories].map((category) => {
+                    const picked = (draft.categoryId ?? 0) === category.id;
+                    return (
+                      <TouchableOpacity key={category.id} testID={`service-category-${category.id}`} onPress={() => setDraft({ ...draft, categoryId: category.id || null })} style={[styles.wrapChip, { backgroundColor: picked ? colors.primary : colors.card, borderColor: picked ? colors.primary : colors.border }]}>
+                        <Text style={[styles.chipText, { color: picked ? colors.primaryForeground : colors.foreground }]}>{category.name}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </>
+            ) : null}
             {offersBoth ? (
               <>
                 <Text style={[styles.label, { color: colors.foreground }]}>Where you do it</Text>
@@ -150,9 +174,12 @@ export default function ServicesScreen() {
           <>
             {error ? <Text style={[styles.error, { color: colors.destructive, marginBottom: 12 }]}>{error}</Text> : null}
             {services.length === 0 && !error ? <Text style={[styles.empty, { color: colors.mutedForeground }]}>You have no services yet. Tap + to add the first one.</Text> : null}
+            {groups.map((group) => (
+            <View key={group.id} style={styles.group}>
+              {categories.length > 0 ? <Text style={[styles.groupTitle, { color: colors.mutedForeground }]}>{group.name.toUpperCase()}</Text> : null}
             <View style={styles.list}>
-              {services.map((service) => (
-                <TouchableOpacity key={service.id} testID={`service-${service.id}`} onPress={() => { setError(''); setDraft({ id: service.id, name: service.name, minutes: String(service.duration), price: service.price.toFixed(2), offeredAt: service.offeredAt }); }} style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              {group.services.map((service) => (
+                <TouchableOpacity key={service.id} testID={`service-${service.id}`} onPress={() => { setError(''); setDraft({ id: service.id, name: service.name, minutes: String(service.duration), price: service.price.toFixed(2), offeredAt: service.offeredAt, categoryId: service.categoryId }); }} style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}>
                   <View style={{ flex: 1 }}>
                     <Text numberOfLines={1} style={[styles.rowTitle, { color: colors.foreground }]}>{service.name}</Text>
                     <Text style={[styles.rowHint, { color: colors.mutedForeground }]}>{minutesLabel(service.duration)}</Text>
@@ -162,6 +189,8 @@ export default function ServicesScreen() {
                 </TouchableOpacity>
               ))}
             </View>
+            </View>
+            ))}
           </>
         )}
       </ScrollView>
@@ -183,6 +212,10 @@ const styles = StyleSheet.create({
   input: { borderWidth: 1, borderRadius: 14, height: 52, paddingHorizontal: 14, fontSize: 14, fontFamily: 'Inter_400Regular' },
   pair: { flexDirection: 'row', gap: 10 },
   chip: { flex: 1, borderWidth: 1, borderRadius: 12, height: 44, alignItems: 'center', justifyContent: 'center' },
+  wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  wrapChip: { borderWidth: 1, borderRadius: 12, minHeight: 40, paddingHorizontal: 14, alignItems: 'center', justifyContent: 'center' },
+  group: { marginBottom: 14 },
+  groupTitle: { fontSize: 11, letterSpacing: 0.8, fontFamily: 'Inter_700Bold', marginBottom: 8 },
   chipText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   error: { fontSize: 12, lineHeight: 17, fontFamily: 'Inter_500Medium', marginTop: 14 },
   empty: { fontSize: 13, lineHeight: 19, fontFamily: 'Inter_400Regular', marginTop: 24, textAlign: 'center' },

@@ -5,7 +5,6 @@ import { Platform, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View 
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
-import { useBookingData } from '@/contexts/BookingContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/live-api';
 
@@ -56,7 +55,6 @@ export default function MoreScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams<{ screen?: string }>();
-  const { services } = useBookingData();
   const { user } = useAuth();
   const [stripeReady, setStripeReady] = useState(false);
   const [availability, setAvailability] = useState<DaySchedule[]>(initialHours);
@@ -91,7 +89,7 @@ export default function MoreScreen() {
 
   const goToAvailability = () => router.push('/(tabs)/more?screen=availability');
   const leaveAvailability = () => router.replace('/(tabs)/more');
-  const goToSection = (screen: 'services' | 'payments') => router.push(`/(tabs)/more?screen=${screen}`);
+  const goToSection = (screen: 'payments') => router.push(`/(tabs)/more?screen=${screen}`);
   const shiftAvailabilityWeek = (amount: number) => {
     const next = new Date(selectedDate);
     next.setDate(next.getDate() + amount * 7);
@@ -199,17 +197,6 @@ export default function MoreScreen() {
           <TouchableOpacity testID="block-time" onPress={() => setBlockedDates((current) => current.includes(availabilityDateKey(selectedDate)) ? current.filter((date) => date !== availabilityDateKey(selectedDate)) : [...current, availabilityDateKey(selectedDate)])} style={[styles.timeOffCard, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.timeOffIcon, { backgroundColor: colors.accent }]}><Feather name="calendar" size={17} color={colors.accentForeground} /></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>{blockedDates.includes(availabilityDateKey(selectedDate)) ? selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }) : 'Block out this day'}</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>{blockedDates.includes(availabilityDateKey(selectedDate)) ? 'Unavailable all day · Tap to restore slots' : `Mark ${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} unavailable`}</Text></View><Feather name={blockedDates.includes(availabilityDateKey(selectedDate)) ? 'x-circle' : 'plus'} size={18} color={colors.primary} /></TouchableOpacity>
           <Text style={[styles.previewNote, { color: colors.mutedForeground }]}>Availability changes are saved in this preview session only.</Text>
         </ScrollView>
-      ) : params.screen === 'services' ? (
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <TouchableOpacity testID="services-back" onPress={leaveAvailability} style={styles.backRow}><Feather name="arrow-left" size={19} color={colors.foreground} /><Text style={[styles.backText, { color: colors.foreground }]}>More</Text></TouchableOpacity>
-          <Text style={[styles.eyebrow, { color: colors.primary }]}>YOUR MENU</Text>
-          <Text style={[styles.title, { color: colors.foreground }]}>Services & pricing</Text>
-          <Text style={[styles.caption, { color: colors.mutedForeground }]}>Your live Certxa service menu.</Text>
-          <View style={styles.serviceList}>
-            {services.map((service) => <View key={service.id} style={[styles.serviceRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.menuIcon, { backgroundColor: colors.secondary }]}><Feather name={service.icon} size={17} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>{service.name}</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>{service.duration}</Text></View><Text style={[styles.servicePrice, { color: colors.foreground }]}>{service.price}</Text></View>)}
-          </View>
-          <View style={[styles.readOnlyNote, { backgroundColor: colors.accent }]}><Feather name="check-circle" size={16} color={colors.accentForeground} /><Text style={[styles.readOnlyText, { color: colors.accentForeground }]}>Synced from your Certxa catalog.</Text></View>
-        </ScrollView>
       ) : params.screen === 'payments' ? (
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <TouchableOpacity testID="payments-back" onPress={leaveAvailability} style={styles.backRow}><Feather name="arrow-left" size={19} color={colors.foreground} /><Text style={[styles.backText, { color: colors.foreground }]}>More</Text></TouchableOpacity>
@@ -229,7 +216,7 @@ export default function MoreScreen() {
           <View style={styles.menuList}>
              <View testID="menu-availability" style={[styles.menuRow, { backgroundColor: colors.card, borderColor: colors.border, opacity: 0.65 }]}><View style={[styles.menuIcon, { backgroundColor: colors.secondary }]}><Feather name="clock" size={17} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>Availability</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>Manage in Certxa web settings</Text></View><Feather name="lock" size={15} color={colors.mutedForeground} /></View>
              <View testID="menu-business-ai" style={[styles.menuRow, { backgroundColor: colors.card, borderColor: colors.border, opacity: 0.65 }]}><View style={[styles.menuIcon, { backgroundColor: colors.primary }]}><Feather name="message-circle" size={17} color={colors.primaryForeground} /></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>Business AI</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>Live AI endpoint not enabled yet</Text></View><Feather name="lock" size={15} color={colors.mutedForeground} /></View>
-            <TouchableOpacity testID="menu-services" onPress={() => goToSection('services')} style={[styles.menuRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.menuIcon, { backgroundColor: colors.accent }]}><Feather name="scissors" size={17} color={colors.accentForeground} /></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>Services & pricing</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>Your menu, duration, and rates</Text></View><Feather name="chevron-right" size={17} color={colors.mutedForeground} /></TouchableOpacity>
+            <TouchableOpacity testID="menu-catalog" onPress={() => router.push('/catalog')} style={[styles.menuRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.menuIcon, { backgroundColor: colors.accent }]}><Feather name="scissors" size={17} color={colors.accentForeground} /></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>Catalog</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>Categories, services, add-ons, packages, deals, products</Text></View><Feather name="chevron-right" size={17} color={colors.mutedForeground} /></TouchableOpacity>
             <TouchableOpacity testID="menu-payment" onPress={() => goToSection('payments')} style={[styles.menuRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.menuIcon, { backgroundColor: colors.muted }]}><Feather name="credit-card" size={17} color={colors.foreground} /></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>Payments</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>{stripeReady ? 'Stripe M2 ready' : 'Payment setup required'}</Text></View><Feather name="chevron-right" size={17} color={colors.mutedForeground} /></TouchableOpacity>
             <TouchableOpacity testID="menu-requests" onPress={() => router.push('/requests')} style={[styles.menuRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.menuIcon, { backgroundColor: colors.secondary }]}><Feather name="inbox" size={17} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>Booking requests</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>Approve, offer other times, or decline</Text></View><Feather name="chevron-right" size={17} color={colors.mutedForeground} /></TouchableOpacity>
             <TouchableOpacity testID="menu-reviews" onPress={() => router.push('/reviews')} style={[styles.menuRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.menuIcon, { backgroundColor: colors.accent }]}><Feather name="star" size={17} color={colors.accentForeground} /></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>Reviews</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>See what clients said and reply</Text></View><Feather name="chevron-right" size={17} color={colors.mutedForeground} /></TouchableOpacity>
@@ -314,11 +301,6 @@ const styles = StyleSheet.create({
   dayInitial: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
   timeOffCard: { borderWidth: 1, borderRadius: 15, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 11, marginTop: 12 },
   timeOffIcon: { width: 38, height: 38, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-  serviceList: { gap: 9, marginTop: 4 },
-  serviceRow: { borderWidth: 1, borderRadius: 15, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 11, minHeight: 66 },
-  servicePrice: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  readOnlyNote: { borderRadius: 14, padding: 13, flexDirection: 'row', alignItems: 'flex-start', gap: 9, marginTop: 18 },
-  readOnlyText: { flex: 1, fontSize: 11, lineHeight: 16, fontFamily: 'Inter_500Medium' },
   paymentCard: { borderWidth: 1, borderRadius: 16, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 5 },
   paymentMark: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   statusPill: { paddingHorizontal: 9, paddingVertical: 6, borderRadius: 10 },

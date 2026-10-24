@@ -70,6 +70,12 @@ function RootLayoutNav() {
       <Stack.Screen name="settings" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="reviews" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="services" options={{ headerShown: false, presentation: 'card' }} />
+      <Stack.Screen name="catalog/index" options={{ headerShown: false, presentation: 'card' }} />
+      <Stack.Screen name="catalog/categories" options={{ headerShown: false, presentation: 'card' }} />
+      <Stack.Screen name="catalog/addons" options={{ headerShown: false, presentation: 'card' }} />
+      <Stack.Screen name="catalog/packages" options={{ headerShown: false, presentation: 'card' }} />
+      <Stack.Screen name="catalog/deals" options={{ headerShown: false, presentation: 'card' }} />
+      <Stack.Screen name="catalog/products" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="login" options={{ headerShown: false }} />
       <Stack.Screen name="signup" options={{ headerShown: false }} />
       <Stack.Screen name="get-paid" options={{ headerShown: false, presentation: 'card' }} />
