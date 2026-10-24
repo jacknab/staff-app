@@ -27,7 +27,7 @@ import { timeZoneName, US_TIME_ZONES, validTimeZone } from '@/lib/businessTime';
 import { api } from '@/lib/live-api';
 import { CERTXA_API_BASE_URL, certxaRequest, getStoredToken, login as checkPassword, registerTerminalReader } from '@/lib/certxa-api';
 
-type Screen = 'menu' | 'business' | 'location' | 'places' | 'hours' | 'rules' | 'approval' | 'policy' | 'blocked' | 'website' | 'messages' | 'stripe' | 'readers' | 'tax' | 'account';
+type Screen = 'menu' | 'business' | 'location' | 'places' | 'hours' | 'rules' | 'approval' | 'policy' | 'blocked' | 'website' | 'messages' | 'stripe' | 'readers' | 'deposits' | 'tax' | 'account';
 type Store = { id: number; name?: string | null; phone?: string | null; email?: string | null; category?: string | null; address?: string | null; city?: string | null; state?: string | null; postcode?: string | null; bookingSlug?: string | null; timezone?: string | null };
 type Hours = { dayOfWeek: number; openTime: string; closeTime: string; isClosed: boolean };
 type FeatherName = ComponentProps<typeof Feather>['name'];
@@ -36,7 +36,7 @@ const BUSINESS_TYPES = ['Nail Salon', 'Hair Salon', 'Barbershop', 'Lash and Brow
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const TITLES: Record<Screen, string> = {
   menu: 'Settings', business: 'Business details', location: 'Location', places: 'Where you see clients', hours: 'Business hours', rules: 'Booking rules', policy: 'Cancellation policy',
-  approval: 'Booking approval', blocked: 'Blocked clients', website: 'Website', messages: 'Client messages', stripe: 'Stripe account', readers: 'Card readers', tax: 'Sales tax', account: 'Account',
+  approval: 'Booking approval', blocked: 'Blocked clients', website: 'Website', messages: 'Client messages', stripe: 'Stripe account', readers: 'Card readers', deposits: 'Deposits', tax: 'Sales tax', account: 'Account',
 };
 
 function errorText(cause: unknown, fallback: string) { return cause instanceof Error && cause.message ? cause.message : fallback; }
@@ -83,6 +83,17 @@ export default function SettingsScreen() {
         const rows = await api.get<Hours[]>('/api/business-hours');
         const byDay = new Map((Array.isArray(rows) ? rows : []).map((row) => [row.dayOfWeek, row]));
         setDraft({ timezone: validTimeZone(current.timezone), hours: DAYS.map((_, dayOfWeek) => { const row = byDay.get(dayOfWeek); return { dayOfWeek, openTime: (row?.openTime ?? '09:00').slice(0, 5), closeTime: (row?.closeTime ?? '17:00').slice(0, 5), isClosed: row ? !!row.isClosed : true }; }) });
+      } else if (next === 'deposits') {
+        const [policies, status, places] = await Promise.all([
+          api.get<Record<string, any>>('/api/booking-policies'),
+          api.get<Record<string, any>>('/api/payments/stripe/status').catch(() => null),
+          api.get<Record<string, any>>('/api/work-places').catch(() => null),
+        ]);
+        setDraft({
+          policy: policies.bookingPaymentPolicy ?? 'none', depositType: policies.depositType === 'percentage' ? 'percentage' : 'fixed',
+          depositValue: policies.depositValue != null ? String(Number(policies.depositValue)) : '',
+          cardsReady: Boolean(status?.chargesEnabled), approval: places?.bookingApproval ?? 'auto',
+        });
       } else if (next === 'approval') {
         const places = await api.get<Record<string, any>>('/api/work-places');
         setDraft({ eligible: places.eligible, bookingApproval: places.bookingApproval ?? 'auto', bookingRequestExpiryHours: Number(places.bookingRequestExpiryHours ?? 48), bookingOfferValidDays: Number(places.bookingOfferValidDays ?? 3) });
@@ -156,6 +167,18 @@ export default function SettingsScreen() {
         setTimeZone(validTimeZone(updated.timezone));
         void refreshCalendar();
       }
+    });
+    if (screen === 'deposits') return run(async () => {
+      if (draft.policy !== 'deposit') {
+        await api.put('/api/booking-policies', { bookingPaymentPolicy: draft.policy === 'card_on_file' ? 'card_on_file' : 'none' });
+        return;
+      }
+      if (!draft.cardsReady) throw new Error('Set up card payments first (Settings → Stripe account).');
+      const value = Number(String(draft.depositValue ?? '').replace(/[^0-9.]/g, ''));
+      if (draft.depositType === 'percentage' ? !(value >= 1 && value <= 100) : !(value >= 1 && value <= 999)) {
+        throw new Error(draft.depositType === 'percentage' ? 'Enter a percentage from 1 to 100.' : 'Enter an amount from $1 to $999.');
+      }
+      await api.put('/api/booking-policies', { bookingPaymentPolicy: 'deposit', depositType: draft.depositType, depositValue: value });
     });
     if (screen === 'approval') return run(async () => {
       const saved = await api.put<Record<string, any>>('/api/work-places', {
@@ -286,6 +309,7 @@ export default function SettingsScreen() {
         <Group title="PAYMENTS">
           <Row icon="credit-card" title="Stripe account" hint="Where your card payments are paid out" to="stripe" />
           <Row icon="smartphone" title="Card readers" hint="Register and view Stripe M2 readers" to="readers" />
+          <Row icon="dollar-sign" title="Deposits" hint="Ask clients for a deposit when they book" to="deposits" />
           <Row icon="percent" title="Sales tax" hint="Tax added at checkout" to="tax" />
         </Group>
         <Group title="ACCOUNT"><Row icon="user" title="Account" hint={user?.email ?? 'Password, sign out, delete account'} to="account" /></Group>
@@ -352,6 +376,24 @@ export default function SettingsScreen() {
         );
       })}
       <Help>Clients can only book online inside these hours.</Help>{saveButton()}
+    </>);
+    if (screen === 'deposits') return (<>
+      <Label>Deposit when clients book online</Label>
+      {choices('policy', [{ value: 'none', label: 'No deposit' }, { value: 'deposit', label: 'Ask for a deposit' }, ...(draft.policy === 'card_on_file' ? [{ value: 'card_on_file', label: 'Card on file' }] : [])])}
+      {draft.policy === 'deposit' ? <>
+        <Label>How much</Label>
+        {choices('depositType', [{ value: 'fixed', label: 'A set amount' }, { value: 'percentage', label: 'A percent of the price' }])}
+        {field('depositValue', draft.depositType === 'percentage' ? 'Percent, e.g. 20' : 'Dollars, e.g. 25', { keyboardType: 'decimal-pad' })}
+        <Help>{draft.approval === 'manual'
+          ? 'You review each booking first, so the deposit is asked for after you approve: the client gets a text with a payment link and has 24 hours to pay. The time is only confirmed once it is paid; if not, it is released and the client is told.'
+          : 'Clients pay the deposit by card right after they book. If it isn\'t paid within an hour, the time is released.'}</Help>
+        <Help>The deposit comes off the price at checkout. Payments go to your Stripe account.</Help>
+        {!draft.cardsReady ? <>
+          <Help>Card payments aren't set up yet, so clients can't pay a deposit.</Help>
+          <TouchableOpacity testID="settings-deposits-get-paid" onPress={() => router.push('/get-paid')} style={[styles.save, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}><Text style={[styles.saveText, { color: colors.foreground }]}>Set up card payments</Text></TouchableOpacity>
+        </> : null}
+      </> : null}
+      {saveButton()}
     </>);
     if (screen === 'approval') return draft.eligible === false ? (
       <Help>Booking approval is part of the Solo plan.</Help>

@@ -20,6 +20,8 @@ export type BookingRequest = {
   expiresAt: string;
   createdAt: string;
   staffId: number | null;
+  /** The deposit an approved booking waits for (Settings → Deposits): due by when, and whether it's paid. */
+  deposit: { amountCents: number; dueBy: string | null; paid: boolean } | null;
 };
 
 export const listBookingRequests = () => api.get<BookingRequest[]>('/api/booking-requests');

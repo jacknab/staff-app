@@ -37,7 +37,7 @@ import {
 // Stripe M2 does not require that Apple entitlement.
 const TAP_TO_PAY_ENABLED = true;
 // Shown on the payment screen so a tester can tell which build is installed.
-const BUILD_LABEL = 'Build Oct 23 · B';
+const BUILD_LABEL = 'Build Oct 24 · A';
 const EXPO_GO_PREVIEW = process.env.EXPO_PUBLIC_EXPO_GO_PREVIEW === '1';
 
 type PaymentStep = 'idle' | 'tap_intro' | 'initializing' | 'discovering' | 'connecting' | 'ready' | 'processing' | 'capture_pending' | 'success' | 'error';
@@ -63,7 +63,7 @@ export default function CheckoutScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { refresh: refreshBookings } = useBookingData();
-  const params = useLocalSearchParams<{ appointmentId?: string; clientName?: string; serviceName?: string; amountCents?: string; phone?: string; email?: string }>();
+  const params = useLocalSearchParams<{ appointmentId?: string; clientName?: string; serviceName?: string; amountCents?: string; depositCents?: string; phone?: string; email?: string }>();
   const [digits, setDigits] = useState('0');
   const [tipCents, setTipCents] = useState(0);
   const [appointmentId, setAppointmentId] = useState('');
@@ -231,10 +231,12 @@ export default function CheckoutScreen() {
   }, []);
   // Tax is on the visit after the discount, never on the tip.
   const taxCents = tax.services && tax.rate > 0 ? Math.round((baseCentsParam - discountCents) * tax.rate) : 0;
+  // A deposit the client paid when booking comes off this charge (it is recorded as already paid).
+  const depositCents = Math.max(0, Math.round(Number(params.depositCents) || 0));
   useEffect(() => {
     if (step !== 'tap_intro' || baseCentsParam <= 0) return;
-    setDigits(String(baseCentsParam - discountCents + taxCents + tipCents));
-  }, [baseCentsParam, discountCents, step, taxCents, tipCents]);
+    setDigits(String(Math.max(0, baseCentsParam - discountCents + taxCents + tipCents - depositCents)));
+  }, [baseCentsParam, depositCents, discountCents, step, taxCents, tipCents]);
 
   // Receipt after a card payment, by text and/or e-mail, to the client's details (editable).
   const [receiptPhone, setReceiptPhone] = useState(String(params.phone ?? '').replace(/\D/g, '').slice(-10));
@@ -243,7 +245,7 @@ export default function CheckoutScreen() {
   const [sendingReceipt, setSendingReceipt] = useState<'' | 'text' | 'email'>('');
   const sendReceipt = async (kind: 'text' | 'email') => {
     const visit = String(params.serviceName || 'Appointment');
-    const totals = { discountAmount: discountCents / 100, taxAmount: taxCents / 100, tipAmount: tipCents / 100, grandTotal: (Number(digits) || 0) / 100 };
+    const totals = { discountAmount: discountCents / 100, taxAmount: taxCents / 100, tipAmount: tipCents / 100, grandTotal: ((Number(digits) || 0) + depositCents) / 100 };
     setSendingReceipt(kind); setReceiptNote('');
     try {
       if (kind === 'text') {
@@ -363,7 +365,7 @@ export default function CheckoutScreen() {
         method: readerMode,
         tipCents,
         discountCents,
-        priorTenderedCents: 0,
+        priorTenderedCents: depositCents,
       });
       createdPaymentIntentId = created.paymentIntentId;
       setPaymentIntentId(created.paymentIntentId);
@@ -566,6 +568,7 @@ export default function CheckoutScreen() {
                </View>
                <TextInput keyboardType="numbers-and-punctuation" returnKeyType="done" onChangeText={setCustomDiscount} placeholder="Or a custom amount off, e.g. 39.00" placeholderTextColor={colors.mutedForeground} style={[styles.fieldInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} testID="discount-custom" value={customDiscount} />
              </View> : null}
+             {isTapIntro && depositCents > 0 ? <Text testID="deposit-line" style={[styles.fieldLabel, { width: '100%', marginTop: 12, color: colors.foreground }]}>{`Deposit already paid · −${dollars(String(depositCents))}`}</Text> : null}
              {isTapIntro && taxCents > 0 ? <Text testID="sales-tax-line" style={[styles.fieldLabel, { width: '100%', marginTop: 12, color: colors.foreground }]}>{`Sales tax (${(tax.rate * 100).toFixed(2).replace(/\.?0+$/, '')}%) · ${dollars(String(taxCents))}`}</Text> : null}
              {isTapIntro ? <View testID="m2-registration-intro" style={[styles.formField, { width: '100%', marginTop: 18 }]}>
                <Text style={[styles.fieldLabel, { color: colors.foreground }]}>New Stripe M2 setup <Text style={{ color: colors.mutedForeground }}>(one time)</Text></Text>

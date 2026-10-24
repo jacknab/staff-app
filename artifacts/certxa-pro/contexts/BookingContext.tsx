@@ -25,6 +25,10 @@ export type AppointmentRecord = {
   dateIso: string;
   /** Minutes after midnight it starts, in business time. */
   startMinutes: number;
+  /** Held until the client pays the deposit (the payment link was texted); not confirmed yet. */
+  depositDue?: boolean;
+  /** A deposit the client already paid: it comes off what checkout charges. */
+  depositPaidCents?: number;
   time: string;
   name: string;
   service: string;
@@ -87,7 +91,7 @@ type BookingContextValue = {
 
 type ApiCustomer = { id: number; name?: string | null; fullName?: string | null; firstName?: string | null; lastName?: string | null; phone?: string | null; email?: string | null; notes?: string | null };
 type ApiService = { id: number; offeredAt?: string | null; name?: string | null; duration?: number | string | null; price?: number | string | null };
-type ApiAppointment = { visitAt?: string | null; clientAddress?: HouseCallAddress | null; travelFee?: number | null; appointmentAddons?: { addon?: { price?: number | string | null } | null }[] | null; customLines?: { label?: string; price?: number | string | null }[] | null; id: number; date: string; duration?: number | null; status?: string | null; notes?: string | null; customer?: ApiCustomer | null; service?: ApiService | null };
+type ApiAppointment = { paymentStatus?: string | null; depositCollected?: number | null; visitAt?: string | null; clientAddress?: HouseCallAddress | null; travelFee?: number | null; appointmentAddons?: { addon?: { price?: number | string | null } | null }[] | null; customLines?: { label?: string; price?: number | string | null }[] | null; id: number; date: string; duration?: number | null; status?: string | null; notes?: string | null; customer?: ApiCustomer | null; service?: ApiService | null };
 
 const BookingContext = createContext<BookingContextValue | null>(null);
 
@@ -121,6 +125,8 @@ function mapAppointment(appointment: ApiAppointment, timeZone: string): Appointm
   const minutes = Number(appointment.duration ?? appointment.service?.duration ?? 60) || 60;
   return { id: String(appointment.id), appointmentId: appointment.id, dateKey: dateKey(businessDay), dateIso: date.toISOString(), startMinutes: zonedMinutes(date, timeZone), time: zonedTimeLabel(date, timeZone), name: nameOf(appointment.customer), service: appointment.service?.name || 'Service', serviceId: appointment.service?.id, duration: `${minutes} min`, price: money(priceValue), amountCents: Math.round(priceValue * 100), status: appointment.status === 'completed' ? 'paid' : appointment.status || 'pending', note: appointment.notes ?? undefined,
     phone: appointment.customer?.phone ?? undefined, email: appointment.customer?.email ?? undefined,
+    depositDue: appointment.paymentStatus === 'awaiting_payment',
+    depositPaidCents: appointment.paymentStatus === 'awaiting_payment' ? 0 : Math.round((Number(appointment.depositCollected ?? 0) || 0) * 100),
     visitAt: appointment.visitAt === 'client' ? 'client' : 'place', clientAddress: appointment.clientAddress ?? null, travelFee: Number(appointment.travelFee ?? 0) || 0 };
 }
 

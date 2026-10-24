@@ -52,6 +52,8 @@ export default function AppointmentDetailScreen() {
     visitAt?: string;
     clientAddress?: string;
     travelFeeCents?: string;
+    depositDue?: string;
+    depositPaidCents?: string;
   }>();
   const { services, refresh, timeZone } = useBookingData();
   const originalDate = useMemo(() => params.dateIso ? new Date(params.dateIso) : new Date(), [params.dateIso]);
@@ -69,6 +71,9 @@ export default function AppointmentDetailScreen() {
   // The visit's total from the calendar (service, add-ons, extra services and any travel fee). Only a changed
   // service is priced again here — the service's price alone would drop the add-ons and extras.
   const travelFeeCents = Number(params.travelFeeCents ?? 0) || 0;
+  // Held for its deposit (link texted to the client), or a deposit already paid that checkout takes off.
+  const depositDue = params.depositDue === '1';
+  const depositPaidCents = Number(params.depositPaidCents ?? 0) || 0;
   const serviceChanged = selectedService != null && serviceId !== Number(params.serviceId);
   const amountCents = serviceChanged ? Math.round(selectedService.priceValue * 100) + travelFeeCents : Number(params.amountCents ?? 0);
   const houseCallAddress = useMemo(() => {
@@ -158,7 +163,7 @@ export default function AppointmentDetailScreen() {
 
   const checkout = () => router.push({
     pathname: '/(tabs)/checkout',
-    params: { appointmentId: String(appointmentId), clientName, serviceName, amountCents: String(amountCents), phone: params.phone ?? '', email: params.email ?? '' },
+    params: { appointmentId: String(appointmentId), clientName, serviceName, amountCents: String(amountCents), depositCents: String(depositPaidCents), phone: params.phone ?? '', email: params.email ?? '' },
   });
 
   const openContact = async (type: 'text' | 'call' | 'email') => {
@@ -233,7 +238,7 @@ export default function AppointmentDetailScreen() {
               <View style={[styles.serviceIcon, { backgroundColor: colors.secondary }]}><Feather name="scissors" size={19} color={colors.primary} /></View>
               <View style={styles.statusStack}>
                 <Text style={[styles.metaLabel, { color: colors.mutedForeground }]}>APPOINTMENT</Text>
-                <Text style={[styles.statusText, { color: status === 'cancelled' ? colors.destructive : colors.primary }]}>{statusLabel(status)}</Text>
+                <Text style={[styles.statusText, { color: status === 'cancelled' ? colors.destructive : colors.primary }]}>{depositDue && status !== 'cancelled' ? 'DEPOSIT DUE' : statusLabel(status)}</Text>
               </View>
               <Text style={[styles.amount, { color: colors.foreground }]}>${(amountCents / 100).toFixed(2)}</Text>
             </View>
@@ -241,6 +246,8 @@ export default function AppointmentDetailScreen() {
             <View style={styles.detailRows}>
               <DetailRow icon="calendar" label={day.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} colors={colors} />
               <DetailRow icon="clock" label={`${time} · ${duration}`} colors={colors} />
+              {depositDue ? <DetailRow icon="clock" label="Waiting for the client to pay the deposit (link sent by text)" colors={colors} /> : null}
+              {depositPaidCents > 0 ? <DetailRow icon="check" label={`Deposit paid · $${(depositPaidCents / 100).toFixed(2)} comes off at checkout`} colors={colors} /> : null}
               {params.visitAt === 'client' ? <DetailRow icon="navigation" label={`House call${travelFeeCents ? ` · $${(travelFeeCents / 100).toFixed(2)} travel fee` : ''}`} colors={colors} /> : null}
             </View>
             {houseCallAddress ? (

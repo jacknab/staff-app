@@ -109,7 +109,12 @@ export default function RequestScreen() {
   const statusText: Record<string, string> = {
     requested: `Waiting for you · answer by ${request ? `${zonedDateLabel(request.expiresAt, timeZone)} ${zonedTimeLabel(request.expiresAt, timeZone)}` : ''}`,
     offered: `Times offered · the link is open until ${request ? zonedDateLabel(request.expiresAt, timeZone) : ''}`,
-    approved: 'Approved · it is on your calendar', booked: 'Booked · the client picked one of your times',
+    approved: request?.deposit && !request.deposit.paid
+      ? `Approved · waiting for the $${(request.deposit.amountCents / 100).toFixed(2)} deposit${request.deposit.dueBy ? ` (due by ${zonedDateLabel(request.deposit.dueBy, timeZone)} ${zonedTimeLabel(request.deposit.dueBy, timeZone)})` : ''}. The client got a payment link by text.`
+      : request?.deposit?.paid ? 'Approved · deposit paid · it is on your calendar' : 'Approved · it is on your calendar',
+    booked: request?.deposit && !request.deposit.paid
+      ? `The client picked one of your times · waiting for the $${(request.deposit.amountCents / 100).toFixed(2)} deposit`
+      : 'Booked · the client picked one of your times',
     booking: 'Booking…', declined: 'Declined', expired: 'Expired · nobody answered in time',
   };
 

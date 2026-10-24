@@ -108,6 +108,8 @@ function appointmentParams(item: AppointmentRecord) {
       note: item.note ?? '',
       phone: item.phone ?? '',
       email: item.email ?? '',
+      depositDue: item.depositDue ? '1' : '0',
+      depositPaidCents: String(item.depositPaidCents ?? 0),
       visitAt: item.visitAt ?? 'place',
       clientAddress: item.clientAddress ? JSON.stringify(item.clientAddress) : '',
       travelFeeCents: String(Math.round((item.travelFee ?? 0) * 100)),
@@ -182,7 +184,7 @@ function DraggableAppointment({
       >
         <Text numberOfLines={1} style={styles.timelineClient}>{isDragging ? `${dragLabel} · ${item.name}` : item.name}</Text>
         {/* A short appointment only has room for the name, then the service; the length is shown when all three fit. */}
-        {height >= 40 && <Text numberOfLines={1} style={styles.timelineService}>{item.status === 'paid' ? `PAID · ${item.service}` : item.service}</Text>}
+        {height >= 40 && <Text numberOfLines={1} style={styles.timelineService}>{item.status === 'paid' ? `PAID · ${item.service}` : item.depositDue ? `DEPOSIT DUE · ${item.service}` : item.service}</Text>}
         {height >= 56 && <Text numberOfLines={1} style={styles.timelineDuration}>{item.duration}</Text>}
       </View>
     </GestureDetector>
