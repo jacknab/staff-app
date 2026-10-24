@@ -17,7 +17,7 @@
 import { useCallback, useEffect, useState, type ComponentProps, type ReactNode } from 'react';
 import { Feather } from '@expo/vector-icons';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { ActivityIndicator, Alert, Linking, ScrollView, Share, StatusBar, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
@@ -67,6 +67,12 @@ export default function SettingsScreen() {
     setStore(first);
     return first;
   }, []);
+
+  // Coming back from website setup (or anywhere else): load the business again, so a new link shows straight away.
+  // Done in website setup brings the pro back to the Settings menu (?done=<time>).
+  const { done } = useLocalSearchParams<{ done?: string }>();
+  useFocusEffect(useCallback(() => { void loadStore().catch(() => undefined); }, [loadStore]));
+  useEffect(() => { if (done) { setScreen('menu'); setError(''); setNotice(''); } }, [done]);
 
   const open = useCallback(async (next: Screen) => {
     setScreen(next); setError(''); setNotice(''); setDraft({}); setLoading(true);

@@ -1,6 +1,6 @@
 /**
  * Your booking website (<slug>.certxa.com), in three steps: the link, the design, and the look (colour, cover
- * photo, profile photo or logo, about text, Instagram). Shown after sign-up (?from=signup, then Get paid) and
+ * photo, profile photo or logo, about text, Instagram, Facebook). Shown after sign-up (?from=signup, then Get paid) and
  * from Settings → Website. Every step can be skipped and changed later. Server: routes/bookingSite.ts.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -13,10 +13,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollViewCompat';
 import { useColors } from '@/hooks/useColors';
 import { api, ApiError } from '@/lib/live-api';
-import { CERTXA_API_BASE_URL, getStoredToken } from '@/lib/certxa-api';
 
 type Theme = 'bloom' | 'simple' | 'classic' | 'mobile';
-type Look = { accent?: string; coverImage?: string; logoImage?: string; about?: string; instagram?: string };
+type Look = { accent?: string; coverImage?: string; logoImage?: string; about?: string; instagram?: string; facebook?: string };
 type SiteState = { slug: string | null; url: string | null; theme: Theme; site: Look; businessName: string; oldSlugs: string[] };
 type Check = { slug: string; available: boolean; message: string | null; suggestions: string[] };
 type Step = 'link' | 'design' | 'look' | 'done';
@@ -29,17 +28,12 @@ const THEMES: Array<{ value: Theme; name: string; about: string }> = [
 ];
 const COLOURS = ['#C2185B', '#D9776E', '#B45309', '#2E7D5B', '#0F766E', '#1F6FB2', '#6D28D9', '#111827'];
 
-/** Upload a photo the pro picked; Certxa stores it and returns its address. */
-async function uploadPhoto(uri: string, mimeType: string | undefined): Promise<string> {
-  const token = await getStoredToken();
-  if (!token) throw new ApiError('Your Certxa session has expired. Please sign in again.', 401);
-  const form = new FormData();
-  const type = mimeType || 'image/jpeg';
-  form.append('image', { uri, name: `photo.${type.split('/')[1] || 'jpg'}`, type } as unknown as Blob);
-  const response = await fetch(`${CERTXA_API_BASE_URL}/api/uploads/image`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, body: form });
-  const payload = (await response.json().catch(() => null)) as { url?: string; message?: string } | null;
-  if (!response.ok || !payload?.url) throw new ApiError(payload?.message || 'Could not upload the photo.', response.status);
-  return payload.url;
+/** Send a photo the pro picked to Certxa (stored in R2) and return its address. The photo goes as base64 in a
+ *  normal request, not a file upload, which never reached the server from the phone. */
+async function uploadPhoto(base64: string, mimeType: string | undefined): Promise<string> {
+  const { url } = await api.post<{ url: string }>('/api/booking-site/photo', { data: base64, mimeType: mimeType === 'image/png' ? 'image/png' : 'image/jpeg' });
+  if (!url) throw new ApiError('Could not upload the photo.', 500);
+  return url;
 }
 
 export default function WebsiteSetupScreen() {
@@ -62,6 +56,7 @@ export default function WebsiteSetupScreen() {
   // Step 3: the look
   const [look, setLook] = useState<Look>({});
   const [uploading, setUploading] = useState<'' | 'coverImage' | 'logoImage'>('');
+  const [photoError, setPhotoError] = useState<{ field: 'coverImage' | 'logoImage'; message: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoadError('');
@@ -91,7 +86,7 @@ export default function WebsiteSetupScreen() {
 
   const leave = () => {
     if (fromSignup) router.replace('/get-paid?from=signup');
-    else router.back();
+    else router.dismissTo({ pathname: '/settings', params: { done: String(Date.now()) } });
   };
 
   const run = async (work: () => Promise<void>) => {
@@ -115,21 +110,24 @@ export default function WebsiteSetupScreen() {
   });
 
   const saveLook = () => run(async () => {
-    const site = { accent: look.accent ?? '', coverImage: look.coverImage ?? '', logoImage: look.logoImage ?? '', about: (look.about ?? '').trim(), instagram: (look.instagram ?? '').trim() };
+    const site = { accent: look.accent ?? '', coverImage: look.coverImage ?? '', logoImage: look.logoImage ?? '', about: (look.about ?? '').trim(), instagram: (look.instagram ?? '').trim(), facebook: (look.facebook ?? '').trim() };
     setState(await api.put<SiteState>('/api/booking-site', { site }));
     setStep('done');
   });
 
   const pickPhoto = async (field: 'coverImage' | 'logoImage') => {
-    setError('');
-    const picked = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: field === 'coverImage' ? [16, 9] : [1, 1], quality: 0.8 });
-    if (picked.canceled || !picked.assets[0]) return;
-    setUploading(field);
+    setError(''); setPhotoError(null);
     try {
-      const url = await uploadPhoto(picked.assets[0].uri, picked.assets[0].mimeType);
+      const picked = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: field === 'coverImage' ? [16, 9] : [1, 1], quality: 0.7, base64: true });
+      const asset = picked.canceled ? null : picked.assets?.[0];
+      if (!asset) return;
+      if (!asset.base64) throw new Error('That photo could not be read. Try another one.');
+      setUploading(field);
+      const url = await uploadPhoto(asset.base64, asset.mimeType);
       setLook((current) => ({ ...current, [field]: url }));
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not upload the photo.'); }
-    finally { setUploading(''); }
+    } catch (cause) {
+      setPhotoError({ field, message: cause instanceof Error && cause.message ? cause.message : 'Could not upload the photo. Try again.' });
+    } finally { setUploading(''); }
   };
 
   const preview = (value: Theme) => {
@@ -253,6 +251,7 @@ export default function WebsiteSetupScreen() {
             {look.coverImage ? <Image source={{ uri: look.coverImage }} style={StyleSheet.absoluteFill} resizeMode="cover" /> : null}
             {uploading === 'coverImage' ? <ActivityIndicator color={colors.foreground} /> : !look.coverImage ? <Text style={[styles.photoText, { color: colors.mutedForeground }]}>Choose a photo of your work or space</Text> : null}
           </TouchableOpacity>
+          {photoError?.field === 'coverImage' ? <Text testID="website-cover-error" style={[styles.photoError, { color: colors.destructive }]}>{photoError.message}</Text> : null}
           {look.coverImage ? <TouchableOpacity onPress={() => setLook((current) => ({ ...current, coverImage: '' }))} style={styles.remove}><Text style={[styles.removeText, { color: colors.mutedForeground }]}>Remove cover photo</Text></TouchableOpacity> : null}
 
           <Text style={[styles.label, { color: colors.foreground }]}>Profile photo or logo</Text>
@@ -265,6 +264,7 @@ export default function WebsiteSetupScreen() {
               {look.logoImage ? <TouchableOpacity onPress={() => setLook((current) => ({ ...current, logoImage: '' }))}><Text style={[styles.removeText, { color: colors.mutedForeground, marginTop: 8 }]}>Remove</Text></TouchableOpacity> : null}
             </View>
           </View>
+          {photoError?.field === 'logoImage' ? <Text testID="website-logo-error" style={[styles.photoError, { color: colors.destructive }]}>{photoError.message}</Text> : null}
 
           <Text style={[styles.label, { color: colors.foreground }]}>About you</Text>
           <TextInput testID="website-about" value={look.about ?? ''} onChangeText={(value) => setLook((current) => ({ ...current, about: value.slice(0, 600) }))} multiline placeholder="A few lines about you and your work" placeholderTextColor={colors.mutedForeground} style={[styles.input, styles.textArea, input]} />
@@ -272,6 +272,9 @@ export default function WebsiteSetupScreen() {
 
           <Text style={[styles.label, { color: colors.foreground }]}>Instagram</Text>
           <TextInput testID="website-instagram" value={look.instagram ?? ''} onChangeText={(value) => setLook((current) => ({ ...current, instagram: value.replace(/^@/, '').replace(/\s/g, '') }))} autoCapitalize="none" autoCorrect={false} placeholder="yourstudio" placeholderTextColor={colors.mutedForeground} style={[styles.input, input]} />
+
+          <Text style={[styles.label, { color: colors.foreground }]}>Facebook</Text>
+          <TextInput testID="website-facebook" value={look.facebook ?? ''} onChangeText={(value) => setLook((current) => ({ ...current, facebook: value.replace(/\s/g, '') }))} autoCapitalize="none" autoCorrect={false} keyboardType="url" placeholder="Your page name or link" placeholderTextColor={colors.mutedForeground} style={[styles.input, input]} />
 
           {error ? <Text style={[styles.error, { color: colors.destructive }]}>{error}</Text> : null}
           <TouchableOpacity disabled={saving || uploading !== ''} onPress={() => void saveLook()} style={[styles.button, { backgroundColor: saving || uploading ? colors.muted : colors.primary }]} testID="website-look-save">
@@ -336,6 +339,7 @@ const styles = StyleSheet.create({
   cover: { height: 150, borderRadius: 14, borderWidth: 1, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   photoText: { fontSize: 12, fontFamily: 'Inter_500Medium' },
   remove: { marginTop: 8 },
+  photoError: { fontSize: 12, fontFamily: 'Inter_500Medium', marginTop: 8 },
   removeText: { fontSize: 12, fontFamily: 'Inter_500Medium' },
   logoRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   logo: { width: 78, height: 78, borderRadius: 39, borderWidth: 1, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
