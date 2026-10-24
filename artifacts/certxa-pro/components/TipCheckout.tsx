@@ -11,6 +11,8 @@ type TipCheckoutProps = {
   /** The business's tip percentages (Certxa POS settings); Certxa's defaults until they load. */
   presets?: number[];
   onConfirmTip: (tipCents: number) => void;
+  /** Back out of checkout (to the appointment it was opened from). */
+  onBack?: () => void;
 };
 
 const DEFAULT_PRESETS = [15, 18, 20, 25];
@@ -19,7 +21,7 @@ function dollars(cents: number) {
   return `$${(Math.max(0, cents) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-export function TipCheckout({ baseCents, serviceName, presets, onConfirmTip }: TipCheckoutProps) {
+export function TipCheckout({ baseCents, serviceName, presets, onConfirmTip, onBack }: TipCheckoutProps) {
   const tipOptions = (presets && presets.length > 0 ? presets : DEFAULT_PRESETS).slice(0, 4).map((percent) => ({ label: `${percent}%`, percent }));
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -79,13 +81,17 @@ export function TipCheckout({ baseCents, serviceName, presets, onConfirmTip }: T
     <View style={[styles.root, { backgroundColor: colors.background, paddingTop: topInset }]}>
       <StatusBar barStyle="dark-content" />
       <View style={styles.header}>
-        {screen === 'custom' ? (
-          <TouchableOpacity testID="tip-back" onPress={() => setScreen('select')} style={styles.headerButton}>
+        {/* Back: from the custom tip to the tip choices; from the tip choices to the appointment (user, 2026-10-24:
+            the checkout pages had no easy way back). */}
+        {screen === 'custom' || onBack ? (
+          <TouchableOpacity testID="tip-back" onPress={() => (screen === 'custom' ? setScreen('select') : onBack?.())} style={styles.backButton}
+            accessibilityRole="button" accessibilityLabel="Back">
             <Feather name="arrow-left" size={20} color={colors.foreground} />
+            <Text style={[styles.backText, { color: colors.foreground }]}>Back</Text>
           </TouchableOpacity>
-        ) : <View style={styles.headerButton} />}
+        ) : <View style={styles.backButton} />}
         <Text style={[styles.eyebrow, { color: colors.mutedForeground }]}>CHECKOUT</Text>
-        <View style={styles.headerButton} />
+        <View style={styles.backButton} />
       </View>
 
       <View style={styles.content}>
@@ -161,6 +167,8 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   header: { height: 55, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerButton: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
+  backButton: { minWidth: 84, height: 42, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  backText: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
   eyebrow: { fontSize: 10, letterSpacing: 1.4, fontFamily: 'Inter_700Bold' },
   content: { flex: 1, paddingHorizontal: 20, paddingTop: 16 },
   title: { fontSize: 29, letterSpacing: -0.8, fontFamily: 'Inter_600SemiBold', marginTop: 5 },

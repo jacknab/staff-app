@@ -12,7 +12,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useStripeTerminal } from '@stripe/stripe-terminal-react-native';
 import { useColors } from '@/hooks/useColors';
 import { TipCheckout } from '@/components/TipCheckout';
@@ -37,7 +37,7 @@ import {
 // Stripe M2 does not require that Apple entitlement.
 const TAP_TO_PAY_ENABLED = true;
 // Shown on the payment screen so a tester can tell which build is installed.
-const BUILD_LABEL = 'Build Oct 24 · A';
+const BUILD_LABEL = 'Build Oct 24 · B';
 const EXPO_GO_PREVIEW = process.env.EXPO_PUBLIC_EXPO_GO_PREVIEW === '1';
 
 type PaymentStep = 'idle' | 'tap_intro' | 'initializing' | 'discovering' | 'connecting' | 'ready' | 'processing' | 'capture_pending' | 'success' | 'error';
@@ -527,9 +527,16 @@ export default function CheckoutScreen() {
       <View style={[styles.root, { backgroundColor: colors.background, paddingTop: topInset }]}>
         <StatusBar barStyle="dark-content" />
         <View style={styles.tapHeader}>
-          <TouchableOpacity disabled={isCapturePending} testID="cancel-reader" onPress={exitReaderCheckout} style={styles.iconButton}><Feather name="x" size={23} color={isCapturePending ? colors.muted : colors.foreground} /></TouchableOpacity>
+          {/* Back to the tip screen. Not while a card payment is going through, or one is waiting to be finalized. */}
+          {isSuccess ? <View style={{ width: 84 }} /> : (
+            <TouchableOpacity disabled={isCapturePending || step === 'processing'} testID="cancel-reader" onPress={exitReaderCheckout}
+              style={styles.backButton} accessibilityRole="button" accessibilityLabel="Back">
+              <Feather name="arrow-left" size={20} color={isCapturePending || step === 'processing' ? colors.muted : colors.foreground} />
+              <Text style={[styles.backText, { color: isCapturePending || step === 'processing' ? colors.muted : colors.foreground }]}>Back</Text>
+            </TouchableOpacity>
+          )}
           <Text style={[styles.eyebrow, { color: colors.mutedForeground }]}>IN-PERSON CHECKOUT</Text>
-          <View style={{ width: 42 }} />
+          <View style={{ width: 84 }} />
         </View>
         {isSuccess ? (
           <View style={styles.successContent}>
@@ -591,6 +598,7 @@ export default function CheckoutScreen() {
     baseCents={Number(params.amountCents) || 0}
     presets={tipPresets}
     serviceName={String(params.serviceName || '')}
+    onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))}
     onConfirmTip={(nextTipCents) => {
       const baseCents = Number(params.amountCents) || 0;
       setTipCents(nextTipCents);
@@ -692,6 +700,8 @@ const styles = StyleSheet.create({
   disclaimer: { textAlign: 'center', fontSize: 10, lineHeight: 15, fontFamily: 'Inter_400Regular', marginTop: 17 },
   tapHeader: { paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   iconButton: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
+  backButton: { minWidth: 84, height: 42, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  backText: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
   tapContent: { flex: 1, alignItems: 'center', paddingHorizontal: 22, paddingTop: 28 },
   nfcCircle: { width: 76, height: 76, borderRadius: 38, alignItems: 'center', justifyContent: 'center', marginBottom: 19 },
   tapTitle: { fontSize: 22, fontFamily: 'Inter_600SemiBold', letterSpacing: -0.5 },
