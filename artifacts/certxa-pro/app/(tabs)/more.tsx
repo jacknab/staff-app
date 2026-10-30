@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import Constants from 'expo-constants';
 import { Feather } from '@expo/vector-icons';
-import { Image, Platform, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Platform, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
@@ -63,6 +64,18 @@ export default function MoreScreen() {
   const [blockedDates, setBlockedDates] = useState<string[]>([]);
   const [showWeeklyHours, setShowWeeklyHours] = useState(false);
   const [reminders, setReminders] = useState(true);
+  const [openingPlus, setOpeningPlus] = useState(false);
+  const openPlus = async () => {
+    setOpeningPlus(true);
+    try {
+      const { url } = await api.post<{ url: string }>('/api/solo/plus/web-link');
+      await WebBrowser.openAuthSessionAsync(url, 'certxa-pro://plus');
+    } catch (cause) {
+      Alert.alert('Plus', cause instanceof Error ? cause.message : 'Could not open the Plus page. Please try again.');
+    } finally {
+      setOpeningPlus(false);
+    }
+  };
   const topInset = Platform.OS === 'web' ? 67 : insets.top;
   const showingAvailability = params.screen === 'availability';
   const displayName = String(user?.name ?? user?.email ?? 'Certxa professional');
@@ -212,9 +225,13 @@ export default function MoreScreen() {
           <Text style={[styles.eyebrow, { color: colors.primary }]}>YOUR BUSINESS</Text>
           <Text style={[styles.title, { color: colors.foreground }]}>More</Text>
           <View style={[styles.profileCard, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.profileAvatar, { backgroundColor: colors.secondary }]}><Text style={[styles.avatarText, { color: colors.primary }]}>{profileInitials}</Text></View><View style={{ flex: 1 }}><Text style={[styles.profileName, { color: colors.foreground }]}>{displayName}</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>Independent beauty professional</Text></View></View>
-          {/* Plus plan card (owner, 2026-10-30): the artwork only, from /apps/CM/3plan.png. */}
-          <Image testID="more-plus-plan" source={require('@/assets/images/plus-plan.jpg')} resizeMode="contain"
-            accessibilityLabel="Plus Plan: unlock the app with unlimited SMS notifications" style={styles.planCard} />
+          {/* Plus plan card (owner, 2026-10-30): opens certxa.com/pro-plus, already signed in, to pay by card.
+              Apple allows a US app to send people to a website for this, not a card form inside the app. */}
+          <TouchableOpacity testID="more-plus-plan" disabled={openingPlus} onPress={() => void openPlus()} activeOpacity={0.85}
+            accessibilityRole="button" accessibilityLabel="Plus Plan: unlock the app with unlimited SMS notifications">
+            <Image source={require('@/assets/images/plus-plan.jpg')} resizeMode="contain" style={styles.planCard} />
+            {openingPlus ? <View style={styles.planBusy}><ActivityIndicator color="#FFFFFF" /></View> : null}
+          </TouchableOpacity>
           <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 28, marginBottom: 12 }]}>Manage</Text>
           <View style={styles.menuList}>
              <View testID="menu-availability" style={[styles.menuRow, { backgroundColor: colors.card, borderColor: colors.border, opacity: 0.65 }]}><View style={[styles.menuIcon, { backgroundColor: colors.secondary }]}><Feather name="clock" size={17} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>Availability</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>Manage in Certxa web settings</Text></View><Feather name="lock" size={15} color={colors.mutedForeground} /></View>
@@ -239,6 +256,7 @@ const styles = StyleSheet.create({
   eyebrow: { fontSize: 10, letterSpacing: 1.4, fontFamily: 'Inter_700Bold' },
   title: { fontSize: 27, letterSpacing: -0.5, fontFamily: 'Inter_600SemiBold', marginTop: 4 },
   caption: { fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 7, marginBottom: 22 },
+  planBusy: { position: 'absolute', left: 0, right: 0, bottom: 0, top: 16, borderRadius: 17, backgroundColor: 'rgba(0,0,0,0.25)', alignItems: 'center', justifyContent: 'center' },
   planCard: { width: '100%', height: undefined, aspectRatio: 1200 / 675, borderRadius: 17, marginTop: 16, overflow: 'hidden' },
   profileCard: { borderWidth: 1, borderRadius: 17, padding: 13, flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 23 },
   profileAvatar: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
