@@ -7,7 +7,7 @@
  *   Booking rules                GET · PUT /api/booking-policies, GET · PUT /api/calendar-settings
  *   Cancellation policy          GET · PUT /api/booking-policies
  *   Blocked clients              GET · POST · DELETE /api/booking-ban-list
- *   Client messages              GET · PUT /api/sms-settings/:storeId and /api/mail-settings/:storeId
+ *   Client notifications         its own screen, app/notifications.tsx
  *   Stripe account               GET /api/payments/stripe/status
  *   Card readers                 GET /api/payments/terminal/reader/list · POST …/reader/register
  *   Sales tax                    GET · PATCH /api/pos-settings/:storeId
@@ -27,7 +27,7 @@ import { timeZoneName, US_TIME_ZONES, validTimeZone } from '@/lib/businessTime';
 import { api } from '@/lib/live-api';
 import { CERTXA_API_BASE_URL, certxaRequest, getStoredToken, login as checkPassword, registerTerminalReader } from '@/lib/certxa-api';
 
-type Screen = 'menu' | 'business' | 'location' | 'places' | 'hours' | 'rules' | 'approval' | 'policy' | 'blocked' | 'website' | 'messages' | 'stripe' | 'readers' | 'deposits' | 'tax' | 'account';
+type Screen = 'menu' | 'business' | 'location' | 'places' | 'hours' | 'rules' | 'approval' | 'policy' | 'blocked' | 'website' | 'stripe' | 'readers' | 'deposits' | 'tax' | 'account';
 type Store = { id: number; name?: string | null; phone?: string | null; email?: string | null; category?: string | null; address?: string | null; city?: string | null; state?: string | null; postcode?: string | null; bookingSlug?: string | null; timezone?: string | null };
 type Hours = { dayOfWeek: number; openTime: string; closeTime: string; isClosed: boolean };
 type FeatherName = ComponentProps<typeof Feather>['name'];
@@ -36,7 +36,7 @@ const BUSINESS_TYPES = ['Nail Salon', 'Hair Salon', 'Barbershop', 'Lash and Brow
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const TITLES: Record<Screen, string> = {
   menu: 'Settings', business: 'Business details', location: 'Location', places: 'Where you see clients', hours: 'Business hours', rules: 'Booking rules', policy: 'Cancellation policy',
-  approval: 'Booking approval', blocked: 'Blocked clients', website: 'Website', messages: 'Client messages', stripe: 'Stripe account', readers: 'Card readers', deposits: 'Deposits', tax: 'Sales tax', account: 'Account',
+  approval: 'Booking approval', blocked: 'Blocked clients', website: 'Website', stripe: 'Stripe account', readers: 'Card readers', deposits: 'Deposits', tax: 'Sales tax', account: 'Account',
 };
 
 function errorText(cause: unknown, fallback: string) { return cause instanceof Error && cause.message ? cause.message : fallback; }
@@ -112,14 +112,7 @@ export default function SettingsScreen() {
           bookingWindowHours: Number(calendar?.bookingWindowHours ?? 0), timeSlotInterval: Number(calendar?.timeSlotInterval ?? 15), bufferMinutes: Number(calendar?.bufferMinutes ?? 0),
         });
       } else if (next === 'blocked') setDraft({ list: await api.get<any[]>('/api/booking-ban-list'), phone: '', reason: '' });
-      else if (next === 'messages') {
-        const [sms, mail] = await Promise.all([api.get<Record<string, any> | null>(`/api/sms-settings/${current.id}`), api.get<Record<string, any> | null>(`/api/mail-settings/${current.id}`)]);
-        setDraft({
-          smsConfirmation: !!sms?.bookingConfirmationEnabled, smsReminder: !!sms?.reminderEnabled, smsCancellation: !!sms?.smsCancellationEnabled, smsReview: !!sms?.reviewRequestEnabled,
-          mailConfirmation: !!mail?.bookingConfirmationEnabled, mailReminder: !!mail?.reminderEnabled, mailReview: !!mail?.reviewRequestEnabled,
-          reminderHoursBefore: Number(sms?.reminderHoursBefore ?? mail?.reminderHoursBefore ?? 24), googleReviewUrl: sms?.googleReviewUrl ?? mail?.googleReviewUrl ?? '',
-        });
-      } else if (next === 'stripe') setDraft({ status: await api.get<Record<string, any>>('/api/payments/stripe/status') });
+      else if (next === 'stripe') setDraft({ status: await api.get<Record<string, any>>('/api/payments/stripe/status') });
       else if (next === 'readers') { const result = await api.get<{ readers?: any[] }>('/api/payments/terminal/reader/list'); setDraft({ readers: Array.isArray(result?.readers) ? result.readers : [], code: '' }); }
       else if (next === 'tax') { const tax = await api.get<Record<string, any>>(`/api/pos-settings/${current.id}`); setDraft({ percent: String(Number((Number(tax.salesTaxRate ?? 0) * 100).toFixed(3))), services: !!tax.taxServicesTaxable, products: tax.taxProductsTaxable !== false }); }
     } catch (cause) { setError(errorText(cause, 'Could not load this from Certxa.')); }
@@ -202,11 +195,6 @@ export default function SettingsScreen() {
     if (screen === 'policy') return run(async () => {
       if (draft.cancellationPolicyRequired && !String(draft.cancellationPolicyText).trim()) throw new Error('Write the policy before requiring clients to accept it.');
       await api.put('/api/booking-policies', { cancellationPolicyText: draft.cancellationPolicyText, cancellationPolicyRequired: draft.cancellationPolicyRequired });
-    });
-    if (screen === 'messages') return run(async () => {
-      const link = String(draft.googleReviewUrl).trim() || null;
-      await api.put(`/api/sms-settings/${store.id}`, { bookingConfirmationEnabled: draft.smsConfirmation, reminderEnabled: draft.smsReminder, smsCancellationEnabled: draft.smsCancellation, reviewRequestEnabled: draft.smsReview, reminderHoursBefore: draft.reminderHoursBefore, googleReviewUrl: link });
-      await api.put(`/api/mail-settings/${store.id}`, { bookingConfirmationEnabled: draft.mailConfirmation, reminderEnabled: draft.mailReminder, reviewRequestEnabled: draft.mailReview, reminderHoursBefore: draft.reminderHoursBefore, googleReviewUrl: link });
     });
     if (screen === 'tax') return run(async () => {
       const percent = Number(String(draft.percent).replace(/[^0-9.]/g, ''));
@@ -311,7 +299,14 @@ export default function SettingsScreen() {
           <Row icon="slash" title="Blocked clients" hint="Phone numbers that cannot book online" to="blocked" />
         </Group>
         <Group title="WEBSITE"><Row icon="globe" title="Website" hint={website.replace('https://', '') || 'Your booking website'} to="website" /></Group>
-        <Group title="CLIENT MESSAGES"><Row icon="message-square" title="Reminders and alerts" hint="Texts and e-mails Certxa sends for you" to="messages" /></Group>
+        <Group title="CLIENT MESSAGES">
+          {/* Its own screen, like the website's Settings › Client Notifications (app/notifications.tsx). */}
+          <TouchableOpacity testID="settings-notifications" onPress={() => router.push('/notifications')} style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={[styles.rowIcon, { backgroundColor: colors.secondary }]}><Feather name="bell" size={16} color={colors.primary} /></View>
+            <View style={{ flex: 1 }}><Text style={[styles.rowTitle, { color: colors.foreground }]}>Client notifications</Text><Text numberOfLines={1} style={[styles.rowHint, { color: colors.mutedForeground }]}>Reminders, confirmations and review requests</Text></View>
+            <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+          </TouchableOpacity>
+        </Group>
         <Group title="PAYMENTS">
           <Row icon="credit-card" title="Stripe account" hint="Where your card payments are paid out" to="stripe" />
           <Row icon="smartphone" title="Card readers" hint="Register and view Stripe M2 readers" to="readers" />
@@ -454,15 +449,6 @@ export default function SettingsScreen() {
         <TouchableOpacity testID="settings-open-site" onPress={() => void Linking.openURL(website)} style={styles.linkButton}><Text style={[styles.link, { color: colors.primary }]}>Open my website</Text></TouchableOpacity>
       </> : null}
       <TouchableOpacity testID="settings-edit-site" onPress={() => router.push('/website-setup')} style={[styles.save, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}><Text style={[styles.saveText, { color: colors.foreground }]}>Edit my link, design and look</Text></TouchableOpacity>
-    </>);
-    if (screen === 'messages') return (<>
-      <Label>Text messages</Label>
-      {toggle('smsConfirmation', 'Booking confirmation')}{toggle('smsReminder', 'Appointment reminder')}{toggle('smsCancellation', 'Cancellation notice')}{toggle('smsReview', 'Review request', 'Sent after the appointment.')}
-      <Label>E-mails</Label>
-      {toggle('mailConfirmation', 'Booking confirmation')}{toggle('mailReminder', 'Appointment reminder')}{toggle('mailReview', 'Review request', 'Sent after the appointment.')}
-      <Label>Send reminders</Label>{withCurrent('reminderHoursBefore', [2, 4, 12, 24, 48], (value) => `${value} hr before`)}
-      <Label>Google review link</Label>{field('googleReviewUrl', 'https://g.page/r/…', { autoCapitalize: 'none', autoCorrect: false, keyboardType: 'url' })}
-      <Help>Review requests send clients to this link. Leave it empty to use your Certxa page.</Help>{saveButton()}
     </>);
     if (screen === 'stripe') {
       const status = draft.status as Record<string, any> | undefined;
