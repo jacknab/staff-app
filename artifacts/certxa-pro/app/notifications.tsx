@@ -12,7 +12,9 @@ import { api } from '@/lib/live-api';
  * appointment reminders, booking confirmations, review requests (by text, e-mail or both, each with its own wording),
  * cancellation replies, and checking which client numbers can receive texts. Same server settings as the website:
  *   GET · PUT /api/sms-settings/:storeId and /api/mail-settings/:storeId
- *   GET /api/google-business/review-link · GET /api/clients/phone-types/summary · POST /api/clients/phone-types/backfill
+ *   GET /api/clients/phone-types/summary · POST /api/clients/phone-types/backfill
+ * Review requests always open Certxa's own review form (Solo plan, owner 2026-10-30): reviews show on the booking
+ * site and in Reviews, where the owner replies — so there is no Google review link here.
  */
 type Channel = {
   bookingConfirmationEnabled: boolean; reminderEnabled: boolean; reminderHoursBefore: number; reviewRequestEnabled: boolean;
@@ -60,7 +62,6 @@ export default function NotificationsScreen() {
   const [sms, setSms] = useState<Sms>(SMS_DEFAULTS);
   const [mail, setMail] = useState<Channel>(MAIL_DEFAULTS);
   const [baseline, setBaseline] = useState('');
-  const [googleLink, setGoogleLink] = useState<string | null>(null);
   const [phones, setPhones] = useState<PhoneTypes | null>(null);
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
@@ -87,7 +88,6 @@ export default function NotificationsScreen() {
         const nextSms = pick<Sms>(s, SMS_DEFAULTS);
         const nextMail = pick<Channel>(m, MAIL_DEFAULTS);
         setSms(nextSms); setMail(nextMail); setBaseline(JSON.stringify({ s: nextSms, m: nextMail }));
-        void api.get<{ reviewLink: string | null }>(`/api/google-business/review-link?storeId=${id}`).then((r) => setGoogleLink(r?.reviewLink ?? null)).catch(() => undefined);
         void loadPhones(id);
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : 'Could not load your notification settings.');
@@ -150,7 +150,6 @@ export default function NotificationsScreen() {
   );
 
   const reminderOn = sms.reminderEnabled || mail.reminderEnabled;
-  const reviewOn = sms.reviewRequestEnabled || mail.reviewRequestEnabled;
 
   return (
     <KeyboardAvoidingView style={[styles.root, { backgroundColor: colors.background, paddingTop: insets.top }]} behavior="padding" keyboardVerticalOffset={0}>
@@ -186,7 +185,7 @@ export default function NotificationsScreen() {
               {customize("confirmation", sms.bookingConfirmationEnabled, mail.bookingConfirmationEnabled, "confirmationTemplate", BOOKING_VARS)}
             </Section>
 
-            <Section colors={colors} icon="star" title="Review request" hint="Ask clients for a Google review after their visit.">
+            <Section colors={colors} icon="star" title="Review request" hint="Ask clients to review their visit. Reviews show on your booking site and in Reviews, where you can reply.">
               {toggle("review-text", "message-square", "Text", sms.reviewRequestEnabled, (v) => setSms((s) => ({ ...s, reviewRequestEnabled: v })))}
               {toggle("review-email", "mail", "E-mail", mail.reviewRequestEnabled, (v) => setMail((m) => ({ ...m, reviewRequestEnabled: v })))}
               {sms.reviewRequestEnabled && (
@@ -194,19 +193,6 @@ export default function NotificationsScreen() {
                   <Text style={[styles.label, { color: colors.foreground }]}>How often to text</Text>
                   <Chips colors={colors} onTouch={change} id="frequency" options={REVIEW_FREQUENCY} value={sms.reviewRequestEveryVisits} onPick={(v) => setSms((s) => ({ ...s, reviewRequestEveryVisits: v }))} />
                   <Text style={[styles.small, { color: colors.mutedForeground, marginTop: 6 }]}>A new client is asked after their first visit. After that, a client is asked again only once this many visits have passed since the last review text, so regulars aren't asked every time.</Text>
-                </View>
-              )}
-              {reviewOn && (
-                <View>
-                  <Text style={[styles.label, { color: colors.foreground }]}>Google review link</Text>
-                  <TextInput testID="notifications-review-link" value={sms.googleReviewUrl} onChangeText={(v) => setBoth({ googleReviewUrl: v })}
-                    placeholder="https://g.page/r/your-business/review" placeholderTextColor={colors.mutedForeground} autoCapitalize="none" autoCorrect={false} keyboardType="url"
-                    style={[styles.input, { borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background }]} />
-                  {googleLink && googleLink !== sms.googleReviewUrl ? (
-                    <TouchableOpacity testID="notifications-use-google-link" onPress={() => setBoth({ googleReviewUrl: googleLink })} style={styles.linkButton}>
-                      <Text style={[styles.link, { color: colors.primary }]}>Use the link from your Google Business Profile</Text>
-                    </TouchableOpacity>
-                  ) : null}
                 </View>
               )}
               {customize("review", sms.reviewRequestEnabled, mail.reviewRequestEnabled, "reviewTemplate", REVIEW_VARS)}
