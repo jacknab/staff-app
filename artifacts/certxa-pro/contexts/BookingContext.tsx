@@ -38,6 +38,8 @@ export type AppointmentRecord = {
   amountCents: number;
   status: string;
   note?: string;
+  /** The client's record (for their notes). Missing when the ticket has no client. */
+  customerId?: number;
   /** The client's phone and e-mail, for the Text / Call / Email shortcuts. */
   phone?: string;
   email?: string;
@@ -126,7 +128,7 @@ function mapAppointment(appointment: ApiAppointment, timeZone: string): Appointm
     // A house call's travel fee is part of what the client pays.
     + (Number(appointment.travelFee ?? 0) || 0);
   const minutes = Number(appointment.duration ?? appointment.service?.duration ?? 60) || 60;
-  return { id: String(appointment.id), appointmentId: appointment.id, dateKey: dateKey(businessDay), dateIso: date.toISOString(), startMinutes: zonedMinutes(date, timeZone), time: zonedTimeLabel(date, timeZone), name: nameOf(appointment.customer), service: appointment.service?.name || 'Service', serviceId: appointment.service?.id, duration: `${minutes} min`, price: money(priceValue), amountCents: Math.round(priceValue * 100), status: appointment.status === 'completed' ? 'paid' : appointment.status || 'pending', note: appointment.notes ?? undefined,
+  return { id: String(appointment.id), appointmentId: appointment.id, dateKey: dateKey(businessDay), dateIso: date.toISOString(), startMinutes: zonedMinutes(date, timeZone), time: zonedTimeLabel(date, timeZone), name: nameOf(appointment.customer), service: appointment.service?.name || 'Service', serviceId: appointment.service?.id, duration: `${minutes} min`, price: money(priceValue), amountCents: Math.round(priceValue * 100), status: appointment.status === 'completed' ? 'paid' : appointment.status || 'pending', note: appointment.notes ?? undefined, customerId: appointment.customer?.id ?? undefined,
     phone: appointment.customer?.phone ?? undefined, email: appointment.customer?.email ?? undefined,
     depositDue: appointment.paymentStatus === 'awaiting_payment',
     depositPaidCents: appointment.paymentStatus === 'awaiting_payment' ? 0 : Math.round((Number(appointment.depositCollected ?? 0) || 0) * 100),

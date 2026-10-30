@@ -46,6 +46,7 @@ export default function AppointmentDetailScreen() {
     duration?: string;
     status?: string;
     note?: string;
+    customerId?: string;
     preview?: string;
     phone?: string;
     email?: string;
@@ -124,7 +125,13 @@ export default function AppointmentDetailScreen() {
     setError('');
     try {
       if (!isPreview) {
-        await api.patch(`/api/appointments/${appointmentId}`, { status: 'paid' });
+        // Mark as paid = paid in cash (or another way outside the app) for the visit's total (owner, 2026-10-28). It is
+        // recorded as a cash sale, so it reaches reports, commission and loyalty. ("paid" is not a server status: it
+        // used to put the appointment back to pending and record nothing.)
+        await api.patch(`/api/appointments/${appointmentId}`, {
+          status: 'completed', paymentMethod: 'cash', totalPaid: (Math.max(0, amountCents) / 100).toFixed(2),
+          serviceRevenue: (Math.max(0, amountCents - travelFeeCents) / 100).toFixed(2), productRevenue: '0.00',
+        });
         await refresh();
       }
       setStatus('paid');
@@ -225,7 +232,7 @@ export default function AppointmentDetailScreen() {
           </View>
           <View style={styles.pager}><View style={[styles.pagerDot, { backgroundColor: colors.primary }]} /><View style={[styles.pagerDot, { backgroundColor: colors.border }]} /></View>
 
-          <TouchableOpacity testID="appointment-notes" onPress={() => setEditing(true)} style={[styles.notesRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <TouchableOpacity testID="appointment-notes" onPress={() => router.push({ pathname: '/notes', params: { customerId: params.customerId ?? '', clientName, appointmentId: String(appointmentId) } })} style={[styles.notesRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.notesCopy}>
               <Text style={[styles.sectionLabel, { color: colors.foreground }]}>Notes</Text>
               {params.note ? <Text numberOfLines={1} style={[styles.notesPreview, { color: colors.mutedForeground }]}>{params.note}</Text> : null}

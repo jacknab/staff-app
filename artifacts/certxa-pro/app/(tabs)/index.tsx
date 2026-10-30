@@ -106,6 +106,7 @@ function appointmentParams(item: AppointmentRecord) {
       duration: item.duration,
       status: item.status,
       note: item.note ?? '',
+      customerId: item.customerId ? String(item.customerId) : '',
       phone: item.phone ?? '',
       email: item.email ?? '',
       depositDue: item.depositDue ? '1' : '0',
@@ -362,7 +363,7 @@ export default function CalendarScreen() {
     setDropError('');
     const nextDate = zonedMoment(selectedDate, pendingDrop.minutes, timeZone);
     try {
-      await rescheduleBooking(pendingDrop.item.appointmentId, nextDate.toISOString(), durationMinutes(pendingDrop.item.duration));
+      await rescheduleBooking(pendingDrop.item.appointmentId, nextDate.toISOString(), durationMinutes(pendingDrop.item.duration), notifyClient);
       setPendingDrop(null);
     } catch (cause) {
       setDropError(cause instanceof Error ? cause.message : 'Could not reschedule appointment.');
