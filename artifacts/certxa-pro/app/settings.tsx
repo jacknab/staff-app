@@ -36,7 +36,7 @@ const BUSINESS_TYPES = ['Nail Salon', 'Hair Salon', 'Barbershop', 'Lash and Brow
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const TITLES: Record<Screen, string> = {
   menu: 'Settings', business: 'Business details', location: 'Location', places: 'Where you see clients', hours: 'Business hours', rules: 'Booking rules', policy: 'Cancellation policy',
-  approval: 'Booking approval', blocked: 'Blocked clients', website: 'Website', stripe: 'Stripe account', readers: 'Card readers', deposits: 'Deposits', tax: 'Sales tax', account: 'Account',
+  approval: 'Booking approval', blocked: 'Blocked clients', website: 'Website', stripe: 'Stripe account', readers: 'Connect card reader', deposits: 'Deposits', tax: 'Sales tax', account: 'Account',
 };
 
 function errorText(cause: unknown, fallback: string) { return cause instanceof Error && cause.message ? cause.message : fallback; }
@@ -309,7 +309,12 @@ export default function SettingsScreen() {
         </Group>
         <Group title="PAYMENTS">
           <Row icon="credit-card" title="Stripe account" hint="Where your card payments are paid out" to="stripe" />
-          <Row icon="smartphone" title="Card readers" hint="Register and view Stripe M2 readers" to="readers" />
+          <TouchableOpacity testID="settings-tap-to-pay" onPress={() => router.push('/tap-to-pay')} style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={[styles.rowIcon, { backgroundColor: colors.secondary }]}><Feather name="smartphone" size={16} color={colors.primary} /></View>
+            <View style={{ flex: 1 }}><Text style={[styles.rowTitle, { color: colors.foreground }]}>Enable Tap to Pay on iPhone</Text><Text numberOfLines={1} style={[styles.rowHint, { color: colors.mutedForeground }]}>Take cards with just this iPhone</Text></View>
+            <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+          </TouchableOpacity>
+          <Row icon="radio" title="Connect card reader" hint="Register and view Stripe M2 readers" to="readers" />
           <Row icon="dollar-sign" title="Deposits" hint="Ask clients for a deposit when they book" to="deposits" />
           <Row icon="percent" title="Sales tax" hint="Tax added at checkout" to="tax" />
         </Group>
