@@ -50,7 +50,14 @@ function ClassicTabLayout() {
           ? <SymbolView name="person.2" tintColor={color} size={23} />
           : <Feather name="users" size={21} color={color} />,
       }} />
-      {/* Checkout has no tab: a payment always belongs to a booking, so it is opened from an appointment's Check Out. */}
+      {/* POS (owner, 2026-10-30): a quick card payment linked to a client. It opens the checkout below. */}
+      <Tabs.Screen name="pos" options={{
+        title: 'POS',
+        tabBarIcon: ({ color }) => isIOS
+          ? <SymbolView name="creditcard" tintColor={color} size={23} />
+          : <Feather name="credit-card" size={21} color={color} />,
+      }} />
+      {/* Checkout has no tab of its own: it is opened from an appointment's Check Out or from the POS. */}
       <Tabs.Screen name="checkout" options={{ title: 'Checkout', href: null }} />
       <Tabs.Screen name="more" options={{
         title: 'More',

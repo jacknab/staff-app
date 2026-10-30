@@ -85,13 +85,16 @@ type BookingContextValue = {
   setCalendarDate: (date: Date) => void;
   refresh: () => Promise<void>;
   addClient: (client: NewClient) => Promise<ClientProfile>;
+  /** A client from just a name, a phone number or an e-mail (the POS). */
+  addQuickClient: (client: { name?: string; phone?: string; email?: string }) => Promise<ClientProfile>;
   addBooking: (appointment: NewAppointment) => Promise<void>;
-  rescheduleBooking: (appointmentId: number, dateIso: string, durationMinutes: number) => Promise<void>;
+  /** `notifyClient`: text the client the new day and time (the "Notify client" switch). */
+  rescheduleBooking: (appointmentId: number, dateIso: string, durationMinutes: number, notifyClient?: boolean) => Promise<void>;
 };
 
 type ApiCustomer = { id: number; name?: string | null; fullName?: string | null; firstName?: string | null; lastName?: string | null; phone?: string | null; email?: string | null; notes?: string | null };
 type ApiService = { id: number; offeredAt?: string | null; name?: string | null; duration?: number | string | null; price?: number | string | null };
-type ApiAppointment = { paymentStatus?: string | null; depositCollected?: number | null; visitAt?: string | null; clientAddress?: HouseCallAddress | null; travelFee?: number | null; appointmentAddons?: { addon?: { price?: number | string | null } | null }[] | null; customLines?: { label?: string; price?: number | string | null }[] | null; id: number; date: string; duration?: number | null; status?: string | null; notes?: string | null; customer?: ApiCustomer | null; service?: ApiService | null };
+type ApiAppointment = { calendarHidden?: boolean | null; paymentStatus?: string | null; depositCollected?: number | null; visitAt?: string | null; clientAddress?: HouseCallAddress | null; travelFee?: number | null; appointmentAddons?: { addon?: { price?: number | string | null } | null }[] | null; customLines?: { label?: string; price?: number | string | null }[] | null; id: number; date: string; duration?: number | null; status?: string | null; notes?: string | null; customer?: ApiCustomer | null; service?: ApiService | null };
 
 const BookingContext = createContext<BookingContextValue | null>(null);
 
@@ -178,7 +181,8 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       const ownServiceIds = Array.isArray(ownServices?.serviceIds) ? ownServices.serviceIds.map(Number) : [];
       setClients((Array.isArray(customerRows) ? customerRows : []).map(mapCustomer));
       setServices((Array.isArray(serviceRows) ? serviceRows : []).filter((service) => ownServiceIds.length === 0 || ownServiceIds.includes(Number(service.id))).map(mapService));
-      setBookings((Array.isArray(appointmentRows) ? appointmentRows : []).map((row) => mapAppointment(row, tz)));
+      // Tickets kept off the calendar (POS quick sales, bookings held for a deposit) are not drawn.
+      setBookings((Array.isArray(appointmentRows) ? appointmentRows : []).filter((row) => row.calendarHidden !== true).map((row) => mapAppointment(row, tz)));
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not load Certxa data.'); }
     finally { setLoading(false); }
   }, [calendarDate, ownStaffId]);
@@ -192,6 +196,14 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       const created = await api.post<ApiCustomer>('/api/customers', { name: client.name, phone: client.phone || undefined });
       const record = mapCustomer(created, 0); setClients((current) => [record, ...current]); return record;
     },
+    addQuickClient: async (client) => {
+      const created = await api.post<ApiCustomer>('/api/customers', {
+        ...(client.name?.trim() ? { name: client.name.trim() } : {}),
+        ...(client.phone?.trim() ? { phone: client.phone.trim() } : {}),
+        ...(client.email?.trim() ? { email: client.email.trim() } : {}),
+      });
+      const record = mapCustomer(created, 0); setClients((current) => [record, ...current]); return record;
+    },
     addBooking: async (appointment) => {
       await api.post('/api/appointments', {
         customerId: appointment.customerId, serviceId: appointment.serviceId, ...(ownStaffId ? { staffId: ownStaffId } : {}),
@@ -200,9 +212,9 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       });
       await refresh();
     },
-    rescheduleBooking: async (appointmentId, dateIso, durationMinutes) => {
+    rescheduleBooking: async (appointmentId, dateIso, durationMinutes, notifyClient = false) => {
       // Certxa refuses the move when it would land on another appointment of the same technician.
-      await api.patch(`/api/appointments/${appointmentId}`, { date: dateIso, duration: durationMinutes, checkConflicts: true });
+      await api.patch(`/api/appointments/${appointmentId}`, { date: dateIso, duration: durationMinutes, checkConflicts: true, ...(notifyClient ? { notifyClient: true } : {}) });
       await refresh();
     },
   }), [bookings, calendarDate, clients, error, loading, ownStaffId, refresh, services, timeZone]);

@@ -37,7 +37,7 @@ import {
 // Stripe M2 does not require that Apple entitlement.
 const TAP_TO_PAY_ENABLED = true;
 // Shown on the payment screen so a tester can tell which build is installed.
-const BUILD_LABEL = 'Build Oct 24 · D';
+const BUILD_LABEL = 'Build Oct 30 · A';
 const EXPO_GO_PREVIEW = process.env.EXPO_PUBLIC_EXPO_GO_PREVIEW === '1';
 
 type PaymentStep = 'idle' | 'tap_intro' | 'initializing' | 'discovering' | 'connecting' | 'ready' | 'processing' | 'capture_pending' | 'success' | 'error';
@@ -63,7 +63,7 @@ export default function CheckoutScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { refresh: refreshBookings } = useBookingData();
-  const params = useLocalSearchParams<{ appointmentId?: string; clientName?: string; serviceName?: string; amountCents?: string; depositCents?: string; phone?: string; email?: string }>();
+  const params = useLocalSearchParams<{ appointmentId?: string; clientName?: string; serviceName?: string; amountCents?: string; depositCents?: string; phone?: string; email?: string; quickSale?: string }>();
   const [digits, setDigits] = useState('0');
   const [tipCents, setTipCents] = useState(0);
   const [appointmentId, setAppointmentId] = useState('');
@@ -81,8 +81,20 @@ export default function CheckoutScreen() {
   const [readerSetupText, setReaderSetupText] = useState('');
   const [isRegisteringReader, setIsRegisteringReader] = useState(false);
   const [sales, setSales] = useState<Array<{ amount: string; label: string; time: string }>>([]);
+  // The business's name, shown to the client on Apple's Tap to Pay screen ("Pay <business>").
+  const [businessName, setBusinessName] = useState('');
   const topInset = insets.top;
   const selectedMethod = paymentMethods.find((method) => method.key === paymentMethod) || paymentMethods[0];
+
+  // Opened again for another sale while the last one still shows "Payment successful": start fresh.
+  useEffect(() => {
+    if (step === 'success' && params.appointmentId && String(params.appointmentId) !== appointmentId) {
+      setStep('idle'); setTipCents(0); setPaymentIntentId(null); setError(''); setStatusText('');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.appointmentId]);
+  // A POS quick sale (app/(tabs)/pos.tsx) is its own ticket; leaving before paying removes it again.
+  const isQuickSale = params.quickSale === '1';
 
   useEffect(() => {
     if (params.appointmentId) setAppointmentId(String(params.appointmentId));
@@ -144,7 +156,7 @@ export default function CheckoutScreen() {
           discoveryMethod: 'tapToPay',
           reader: discoveredReaders[0],
           locationId,
-          merchantDisplayName: 'Certxa Pro',
+          merchantDisplayName: businessName.trim() || 'Certxa Pro',
           autoReconnectOnUnexpectedDisconnect: true,
           tosAcceptancePermitted: true,
         });
@@ -166,7 +178,7 @@ export default function CheckoutScreen() {
     return () => {
       cancelled = true;
     };
-  }, [connectReader, connectedReader, discoveredReaders, locationId, readerMode, step]);
+  }, [businessName, connectReader, connectedReader, discoveredReaders, locationId, readerMode, step]);
 
   useEffect(() => {
     if (step !== 'discovering') return;
@@ -220,9 +232,10 @@ export default function CheckoutScreen() {
   useEffect(() => {
     if (EXPO_GO_PREVIEW) return;
     api.get<{ presets?: number[] }>('/api/tip-presets').then((row) => { if (Array.isArray(row?.presets)) setTipPresets(row.presets); }).catch(() => undefined);
-    api.get<Array<{ id: number }>>('/api/stores').then(async (rows) => {
+    api.get<Array<{ id: number; name?: string | null }>>('/api/stores').then(async (rows) => {
       const id = Array.isArray(rows) ? Number(rows[0]?.id) : 0;
       if (!id) return;
+      if (rows[0]?.name) setBusinessName(String(rows[0].name));
       setStoreId(id);
       const pos = await api.get<{ salesTaxRate?: string | number; taxServicesTaxable?: boolean }>(`/api/pos-settings/${id}`);
       const rate = Number(pos?.salesTaxRate ?? 0);
@@ -512,6 +525,7 @@ export default function CheckoutScreen() {
     setPaymentMethod('card');
     setGiftCardCode('');
     void clearPendingTerminalCapture();
+    if (isQuickSale) router.replace('/(tabs)/pos');
   };
 
   if (step !== 'idle') {
@@ -556,14 +570,14 @@ export default function CheckoutScreen() {
               </View>
               {receiptNote ? <Text style={[styles.setupText, { color: colors.primary }]}>{receiptNote}</Text> : null}
             </View> : null}
-            <TouchableOpacity testID="new-checkout" onPress={resetCheckout} style={[styles.primaryButton, { backgroundColor: colors.primary }]}><Text style={[styles.primaryButtonText, { color: colors.primaryForeground }]}>New checkout</Text></TouchableOpacity>
+            <TouchableOpacity testID="new-checkout" onPress={resetCheckout} style={[styles.primaryButton, { backgroundColor: colors.primary }]}><Text style={[styles.primaryButtonText, { color: colors.primaryForeground }]}>{isQuickSale ? 'New sale' : 'New checkout'}</Text></TouchableOpacity>
           </View>
         ) : (
           <View style={[styles.tapContent, { paddingBottom: insets.bottom + 84 }]}>
              {isTapIntro ? null : <View style={[styles.nfcCircle, { backgroundColor: isReady || isCapturePending ? colors.secondary : colors.muted }]}><Feather name={isCapturePending ? 'alert-circle' : isReady ? 'radio' : 'loader'} size={32} color={isReady || isCapturePending ? colors.primary : colors.mutedForeground} /></View>}
              <Text style={[styles.tapTitle, { color: colors.foreground }]}>{isCapturePending ? 'Payment needs finalizing' : isTapIntro ? 'Tap to Pay' : isReady ? 'Ready for payment' : `Connecting ${readerMode === 'm2' ? 'Stripe M2' : 'Tap to Pay'}`}</Text>
              <Text style={[styles.tapSub, { color: colors.mutedForeground }]}>{error || (isTapIntro ? 'Hold the customer’s card near this phone.' : statusText)}</Text>
-            <View style={[styles.amountCard, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.eyebrow, { color: colors.mutedForeground }]}>AMOUNT DUE</Text><Text style={[styles.tapAmount, { color: colors.foreground }]}>{dollars(digits)}</Text><Text style={[styles.serviceLabel, { color: colors.mutedForeground }]}>{clientName.trim() || 'Certxa appointment'} · Appointment #{appointmentId || '—'}</Text></View>
+            <View style={[styles.amountCard, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.eyebrow, { color: colors.mutedForeground }]}>AMOUNT DUE</Text><Text style={[styles.tapAmount, { color: colors.foreground }]}>{dollars(digits)}</Text><Text style={[styles.serviceLabel, { color: colors.mutedForeground }]}>{clientName.trim() || 'Certxa appointment'} · {isQuickSale ? String(params.serviceName || 'Quick sale') : `Appointment #${appointmentId || '—'}`}</Text></View>
             {error ? <View style={[styles.errorNotice, { backgroundColor: colors.accent }]}><Feather name="alert-circle" size={15} color={colors.accentForeground} /><Text style={[styles.previewText, { color: colors.accentForeground }]}>{error}</Text></View> : null}
              {isTapIntro && baseCentsParam > 0 ? <View testID="discount-block" style={[styles.formField, { width: '100%', marginTop: 16 }]}>
                <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Discount{discountCents > 0 ? <Text style={{ color: colors.primary }}>{` · −${dollars(String(discountCents))}`}</Text> : null}</Text>
@@ -598,7 +612,16 @@ export default function CheckoutScreen() {
     baseCents={Number(params.amountCents) || 0}
     presets={tipPresets}
     serviceName={String(params.serviceName || '')}
-    onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))}
+    onBack={() => {
+      if (isQuickSale) {
+        // Not paid: remove the quick sale's ticket (refused by the server once anything was paid).
+        const saleId = Number(params.appointmentId);
+        if (Number.isInteger(saleId) && saleId > 0) void api.del(`/api/quick-sales/${saleId}`).catch(() => undefined);
+        router.replace('/(tabs)/pos');
+        return;
+      }
+      if (router.canGoBack()) router.back(); else router.replace('/(tabs)');
+    }}
     onConfirmTip={(nextTipCents) => {
       const baseCents = Number(params.amountCents) || 0;
       setTipCents(nextTipCents);
