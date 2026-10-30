@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Constants from 'expo-constants';
 import { Feather } from '@expo/vector-icons';
-import { Platform, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { Image, Platform, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
@@ -212,6 +212,9 @@ export default function MoreScreen() {
           <Text style={[styles.eyebrow, { color: colors.primary }]}>YOUR BUSINESS</Text>
           <Text style={[styles.title, { color: colors.foreground }]}>More</Text>
           <View style={[styles.profileCard, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.profileAvatar, { backgroundColor: colors.secondary }]}><Text style={[styles.avatarText, { color: colors.primary }]}>{profileInitials}</Text></View><View style={{ flex: 1 }}><Text style={[styles.profileName, { color: colors.foreground }]}>{displayName}</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>Independent beauty professional</Text></View></View>
+          {/* Plus plan card (owner, 2026-10-30): the artwork only, from /apps/CM/3plan.png. */}
+          <Image testID="more-plus-plan" source={require('@/assets/images/plus-plan.jpg')} resizeMode="contain"
+            accessibilityLabel="Plus Plan: unlock the app with unlimited SMS notifications" style={styles.planCard} />
           <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 28, marginBottom: 12 }]}>Manage</Text>
           <View style={styles.menuList}>
              <View testID="menu-availability" style={[styles.menuRow, { backgroundColor: colors.card, borderColor: colors.border, opacity: 0.65 }]}><View style={[styles.menuIcon, { backgroundColor: colors.secondary }]}><Feather name="clock" size={17} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>Availability</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>Manage in Certxa web settings</Text></View><Feather name="lock" size={15} color={colors.mutedForeground} /></View>
@@ -236,6 +239,7 @@ const styles = StyleSheet.create({
   eyebrow: { fontSize: 10, letterSpacing: 1.4, fontFamily: 'Inter_700Bold' },
   title: { fontSize: 27, letterSpacing: -0.5, fontFamily: 'Inter_600SemiBold', marginTop: 4 },
   caption: { fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 7, marginBottom: 22 },
+  planCard: { width: '100%', height: undefined, aspectRatio: 1200 / 675, borderRadius: 17, marginTop: 16, overflow: 'hidden' },
   profileCard: { borderWidth: 1, borderRadius: 17, padding: 13, flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 23 },
   profileAvatar: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 14, fontFamily: 'Inter_700Bold' },
