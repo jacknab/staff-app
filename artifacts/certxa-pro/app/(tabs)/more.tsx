@@ -229,8 +229,12 @@ export default function MoreScreen() {
               Apple allows a US app to send people to a website for this, not a card form inside the app. */}
           <TouchableOpacity testID="more-plus-plan" disabled={openingPlus} onPress={() => void openPlus()} activeOpacity={0.85}
             accessibilityRole="button" accessibilityLabel="Plus Plan: unlock the app with unlimited SMS notifications">
-            <Image source={require('@/assets/images/plus-plan.jpg')} resizeMode="contain" style={styles.planCard} />
-            {openingPlus ? <View style={styles.planBusy}><ActivityIndicator color="#FFFFFF" /></View> : null}
+            {/* The box has the picture's own shape and the picture fills it, so there is no empty space above or below
+                it (an Image sized only by aspectRatio got a much taller box on the web). */}
+            <View style={styles.planCard}>
+              <Image source={require('@/assets/images/plus-plan.jpg')} resizeMode="cover" style={styles.planImage} />
+              {openingPlus ? <View style={styles.planBusy}><ActivityIndicator color="#FFFFFF" /></View> : null}
+            </View>
           </TouchableOpacity>
           <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 28, marginBottom: 12 }]}>Manage</Text>
           <View style={styles.menuList}>
@@ -256,8 +260,9 @@ const styles = StyleSheet.create({
   eyebrow: { fontSize: 10, letterSpacing: 1.4, fontFamily: 'Inter_700Bold' },
   title: { fontSize: 27, letterSpacing: -0.5, fontFamily: 'Inter_600SemiBold', marginTop: 4 },
   caption: { fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 7, marginBottom: 22 },
-  planBusy: { position: 'absolute', left: 0, right: 0, bottom: 0, top: 16, borderRadius: 17, backgroundColor: 'rgba(0,0,0,0.25)', alignItems: 'center', justifyContent: 'center' },
-  planCard: { width: '100%', height: undefined, aspectRatio: 1200 / 594, borderRadius: 17, marginTop: 16, overflow: 'hidden' },
+  planBusy: { position: 'absolute', left: 0, right: 0, bottom: 0, top: 0, borderRadius: 17, backgroundColor: 'rgba(0,0,0,0.25)', alignItems: 'center', justifyContent: 'center' },
+  planCard: { width: '100%', aspectRatio: 1200 / 594, borderRadius: 17, marginTop: 16, overflow: 'hidden' },
+  planImage: { width: '100%', height: '100%' },
   profileCard: { borderWidth: 1, borderRadius: 17, padding: 13, flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 23 },
   profileAvatar: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 14, fontFamily: 'Inter_700Bold' },
