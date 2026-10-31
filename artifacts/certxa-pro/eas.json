@@ -23,6 +23,10 @@
       "ios": {
         "credentialsSource": "local"
       }
+    },
+    "development": {
+      "extends": "preview-dev",
+      "developmentClient": true
     }
   }
 }
