@@ -257,7 +257,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 27, letterSpacing: -0.5, fontFamily: 'Inter_600SemiBold', marginTop: 4 },
   caption: { fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 7, marginBottom: 22 },
   planBusy: { position: 'absolute', left: 0, right: 0, bottom: 0, top: 16, borderRadius: 17, backgroundColor: 'rgba(0,0,0,0.25)', alignItems: 'center', justifyContent: 'center' },
-  planCard: { width: '100%', height: undefined, aspectRatio: 1200 / 675, borderRadius: 17, marginTop: 16, overflow: 'hidden' },
+  planCard: { width: '100%', height: undefined, aspectRatio: 1200 / 594, borderRadius: 17, marginTop: 16, overflow: 'hidden' },
   profileCard: { borderWidth: 1, borderRadius: 17, padding: 13, flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 23 },
   profileAvatar: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 14, fontFamily: 'Inter_700Bold' },
