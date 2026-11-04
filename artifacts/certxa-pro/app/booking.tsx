@@ -1,13 +1,16 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Feather } from '@expo/vector-icons';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Platform, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Platform, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
+import { SelectField } from '@/components/SelectField';
 import { useBookingData, type ClientProfile, type ServiceProfile } from '@/contexts/BookingContext';
 import { api } from '@/lib/live-api';
 import { businessToday, zonedTimeLabel } from '@/lib/businessTime';
+import { HelpTitle } from '@/components/HelpTitle';
+import { ClientAvatar } from '@/components/ClientAvatar';
 
 type AddonOption = { id: number; name: string; priceValue: number; minutes: number; serviceIds: number[] };
 type Slot = { time: string; staffId: number; staffName: string };
@@ -55,19 +58,32 @@ export default function BookingScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const params = useLocalSearchParams<{ day?: string; phone?: string }>();
+  // Rebook (a paid booking's REBOOK): the same client's number and the same services, already chosen.
+  const params = useLocalSearchParams<{ day?: string; phone?: string; serviceIds?: string; clientId?: string }>();
   const { clients, services, addClient, refresh, calendarDate, setCalendarDate, ownStaffId, timeZone } = useBookingData();
   const initialPhone = (params.phone ?? '').replace(/\D/g, '').slice(0, 10);
+  // Booked from a client's profile, or Rebook: we already know who it's for, so it starts at the services.
+  const presetId = Number(params.clientId) || 0;
+  const presetClient = presetId ? clients.find((client) => client.customerId === presetId) ?? null : null;
   const [phone, setPhone] = useState(initialPhone);
   const [name, setName] = useState('');
-  const [stage, setStage] = useState<Stage>('client');
+  const [stage, setStage] = useState<Stage>(presetClient ? 'services' : 'client');
   // Step 1 finds the client either by phone number (and can add a new one) or by name / e-mail.
   const [lookupTab, setLookupTab] = useState<'phone' | 'name'>('phone');
   const [query, setQuery] = useState('');
-  const [selectedClient, setSelectedClient] = useState<ClientProfile | null>(null);
-  const [ticketClient, setTicketClient] = useState<ClientProfile | null>(null);
+  const [selectedClient, setSelectedClient] = useState<ClientProfile | null>(presetClient);
+  const [ticketClient, setTicketClient] = useState<ClientProfile | null>(presetClient);
+  // The clients may still be loading when the screen opens.
+  const presetUsed = useRef(!!presetClient);
+  useEffect(() => {
+    if (!presetClient || presetUsed.current) return;
+    presetUsed.current = true;
+    setSelectedClient(presetClient);
+    setTicketClient(presetClient);
+    setStage('services');
+  }, [presetClient]);
   // Step 2: one or more services. Step 3: optional add-ons for those services. Step 4: date + time.
-  const [serviceIds, setServiceIds] = useState<number[]>([]);
+  const [serviceIds, setServiceIds] = useState<number[]>(() => (params.serviceIds ?? '').split(',').map(Number).filter((n) => Number.isInteger(n) && n > 0));
   const [serviceQuery, setServiceQuery] = useState('');
   const [addonOptions, setAddonOptions] = useState<AddonOption[]>([]);
   const [addonIds, setAddonIds] = useState<number[]>([]);
@@ -78,6 +94,9 @@ export default function BookingScreen() {
   const [slot, setSlot] = useState<Slot | null>(null);
   const [selectedDate, setSelectedDate] = useState(() => params.day ? dateFromKey(params.day) : calendarDate);
   const [saving, setSaving] = useState(false);
+  // Repeat (owner, 2026-11-03): the same visit every 1–4 weeks, 2–12 times in all; 0 = doesn't repeat.
+  const [repeatWeeks, setRepeatWeeks] = useState(0);
+  const [repeatTimes, setRepeatTimes] = useState(4);
   const [saveError, setSaveError] = useState('');
   // Solo plan: where the visit happens. A house call needs the client's address; the travel fee is added.
   const [places, setPlaces] = useState<{ ownPlace: 'salon' | 'home' | 'none'; houseCalls: boolean; houseCallFee: number } | null>(null);
@@ -89,6 +108,15 @@ export default function BookingScreen() {
       .catch(() => undefined);
   }, []);
   const offersBoth = Boolean(places?.houseCalls && places.ownPlace !== 'none');
+  // A full ZIP code fills in the city and state; they can still be changed.
+  useEffect(() => {
+    if (!/^\d{5}$/.test(houseAddress.postcode)) return;
+    let stale = false;
+    api.get<{ city: string; state: string }>(`/api/public/zip/${houseAddress.postcode}`)
+      .then((place) => { if (!stale) setHouseAddress((a) => ({ ...a, city: place.city, state: place.state })); })
+      .catch(() => undefined);
+    return () => { stale = true; };
+  }, [houseAddress.postcode]);
   const addressReady = Boolean(houseAddress.line1.trim() && houseAddress.city.trim() && /^[A-Za-z]{2}$/.test(houseAddress.state.trim()) && /^\d{5}$/.test(houseAddress.postcode.trim()));
   const weekDays = useMemo(() => {
     const monday = new Date(selectedDate);
@@ -183,6 +211,7 @@ export default function BookingScreen() {
     setSaveError('');
     if (stage === 'schedule') setStage(applicableAddons.length > 0 ? 'addons' : 'services');
     else if (stage === 'addons') setStage('services');
+    else if (presetClient) router.back();
     else setStage('client');
   };
   const goNext = () => {
@@ -287,9 +316,15 @@ export default function BookingScreen() {
         // Keep the full length (all services + add-ons) on the calendar.
         await api.patch(`/api/appointments/${newId}`, { duration: totalMinutes });
       }
+      let repeatNote = '';
+      if (repeatWeeks > 0 && Number.isInteger(newId) && newId > 0) {
+        const r = await api.post<{ created: string[]; skipped: string[] }>(`/api/appointments/${newId}/repeat`, { everyWeeks: repeatWeeks, times: repeatTimes }).catch(() => null);
+        if (r && r.skipped.length) repeatNote = `${r.created.length + 1} booked. ${r.skipped.length} date${r.skipped.length === 1 ? ' was' : 's were'} skipped because the time was taken: ${r.skipped.map((d) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })).join(', ')}.`;
+      }
       setCalendarDate(selectedDate);
       await refresh();
-      router.replace('/(tabs)');
+      if (repeatNote) Alert.alert('Repeat booking', repeatNote);
+      router.replace('/calendar');
     } catch (cause) { setSaveError(cause instanceof Error ? cause.message : 'Could not create appointment.'); }
     finally { setSaving(false); }
   };
@@ -320,7 +355,7 @@ export default function BookingScreen() {
           <ScrollView contentContainerStyle={styles.clientContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
             <View style={styles.intro}>
               <Text style={[styles.eyebrow, { color: colors.primary }]}>STEP 1 · CLIENT</Text>
-              <Text style={[styles.heading, { color: colors.foreground }]}>Who are we booking?</Text>
+              <HelpTitle help="booking" style={[styles.heading, { color: colors.foreground }]}>Who are we booking?</HelpTitle>
               <Text style={[styles.subheading, { color: colors.mutedForeground }]}>Look up a familiar face or add someone new.</Text>
             </View>
             <View style={{ flexDirection: 'row', borderWidth: 1, borderRadius: 13, padding: 3, marginBottom: 13, backgroundColor: colors.card, borderColor: colors.border }}>
@@ -354,7 +389,7 @@ export default function BookingScreen() {
                 {matches.slice(0, 3).map((client) => {
                   const isSelected = selectedClient?.id === client.id;
                   return <TouchableOpacity key={client.id} testID={`booking-match-${client.id}`} onPress={() => chooseClient(client)} style={[styles.matchCard, { backgroundColor: colors.card, borderColor: isSelected ? colors.primary : colors.border }]}>
-                    <View style={[styles.avatar, { backgroundColor: client.color === 'sand' ? colors.accent : colors.secondary }]}><Text style={[styles.avatarText, { color: client.color === 'sand' ? colors.accentForeground : colors.primary }]}>{client.initials}</Text></View>
+                    <ClientAvatar clientId={client.customerId} avatarUrl={client.avatarUrl} initials={client.initials} style={[styles.avatar, { backgroundColor: client.color === 'sand' ? colors.accent : colors.secondary }]} textStyle={[styles.avatarText, { color: client.color === 'sand' ? colors.accentForeground : colors.primary }]} />
                     <View style={{ flex: 1 }}><Text style={[styles.matchName, { color: colors.foreground }]}>{client.name}</Text><Text style={[styles.matchPhone, { color: colors.mutedForeground }]}>{formatPhone(client.phone)}</Text></View>
                     <Feather name={isSelected ? 'check-circle' : 'chevron-right'} size={19} color={isSelected ? colors.primary : colors.mutedForeground} />
                   </TouchableOpacity>;
@@ -376,7 +411,7 @@ export default function BookingScreen() {
                   {nameMatches.slice(0, 8).map((client) => {
                     const isSelected = selectedClient?.id === client.id;
                     return <TouchableOpacity key={client.id} testID={`booking-name-match-${client.id}`} onPress={() => chooseClient(client)} style={[styles.matchCard, { backgroundColor: colors.card, borderColor: isSelected ? colors.primary : colors.border }]}>
-                      <View style={[styles.avatar, { backgroundColor: client.color === 'sand' ? colors.accent : colors.secondary }]}><Text style={[styles.avatarText, { color: client.color === 'sand' ? colors.accentForeground : colors.primary }]}>{client.initials}</Text></View>
+                      <ClientAvatar clientId={client.customerId} avatarUrl={client.avatarUrl} initials={client.initials} style={[styles.avatar, { backgroundColor: client.color === 'sand' ? colors.accent : colors.secondary }]} textStyle={[styles.avatarText, { color: client.color === 'sand' ? colors.accentForeground : colors.primary }]} />
                       <View style={{ flex: 1 }}><Text style={[styles.matchName, { color: colors.foreground }]}>{client.name}</Text><Text numberOfLines={1} style={[styles.matchPhone, { color: colors.mutedForeground }]}>{[client.phone ? formatPhone(client.phone.replace(/\D/g, '').slice(-10)) : '', client.email ?? ''].filter(Boolean).join(' · ') || 'No phone or e-mail on file'}</Text></View>
                       <Feather name={isSelected ? 'check-circle' : 'chevron-right'} size={19} color={isSelected ? colors.primary : colors.mutedForeground} />
                     </TouchableOpacity>;
@@ -398,31 +433,26 @@ export default function BookingScreen() {
             {stage === 'schedule' ? (
               <>
                 <View style={styles.intro}>
-                  <Text style={[styles.eyebrow, { color: colors.primary }]}>STEP 4 · DATE AND TIME</Text>
-                  <Text style={[styles.heading, { color: colors.foreground }]}>{visitAt === 'client' ? 'When are you visiting?' : 'When are they coming in?'}</Text>
+                  <Text style={[styles.eyebrow, { color: colors.primary }]}>{visitAt === 'client' ? 'STEP 4 · ADDRESS AND TIME' : 'STEP 4 · DATE AND TIME'}</Text>
+                  <HelpTitle help="booking" style={[styles.heading, { color: colors.foreground }]}>{visitAt === 'client' ? 'Where and when is the appointment?' : 'When are they coming in?'}</HelpTitle>
                   <Text style={[styles.subheading, { color: colors.mutedForeground }]}>{`Times shown have room for ${minutesLabel(totalMinutes)} plus ${BUFFER_MINUTES} minutes in case it runs over.`}</Text>
                 </View>
                 {offersBoth && !fixedVisit ? (
                   <View style={styles.placeRow}>
-                    {([['place', 'At my place'], ['client', 'House call']] as const).map(([value, label]) => {
-                      const picked = visitAt === value;
-                      return (
-                        <TouchableOpacity key={value} testID={`booking-visit-${value}`} onPress={() => setVisitAt(value)} style={[styles.placeChip, { backgroundColor: picked ? colors.primary : colors.card, borderColor: picked ? colors.primary : colors.border }]}>
-                          <Text style={[styles.placeChipText, { color: picked ? colors.primaryForeground : colors.foreground }]}>{label}</Text>
-                        </TouchableOpacity>
-                      );
-                    })}
+                    <View style={{ flex: 1 }}>
+                      <SelectField testID="booking-visit" title="Where" value={visitAt} options={[{ value: 'place', label: 'At my place' }, { value: 'client', label: 'House call' }]} onChange={setVisitAt} />
+                    </View>
                   </View>
                 ) : null}
                 {visitAt === 'client' ? (
                   <View style={styles.addressBlock}>
                     <Text style={[styles.addressLabel, { color: colors.foreground }]}>Client’s address</Text>
                     <TextInput testID="booking-house-line1" autoCapitalize="words" value={houseAddress.line1} onChangeText={(v) => setHouseAddress((a) => ({ ...a, line1: v }))} placeholder="Street address" placeholderTextColor={colors.mutedForeground} style={[styles.addressInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
-                    <TextInput testID="booking-house-city" autoCapitalize="words" value={houseAddress.city} onChangeText={(v) => setHouseAddress((a) => ({ ...a, city: v }))} placeholder="City" placeholderTextColor={colors.mutedForeground} style={[styles.addressInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
                     <View style={styles.placeRow}>
-                      <TextInput testID="booking-house-state" autoCapitalize="characters" maxLength={2} value={houseAddress.state} onChangeText={(v) => setHouseAddress((a) => ({ ...a, state: v }))} placeholder="State" placeholderTextColor={colors.mutedForeground} style={[styles.addressInput, { flex: 1, backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
                       <TextInput testID="booking-house-zip" keyboardType="number-pad" maxLength={5} value={houseAddress.postcode} onChangeText={(v) => setHouseAddress((a) => ({ ...a, postcode: v }))} placeholder="ZIP" placeholderTextColor={colors.mutedForeground} style={[styles.addressInput, { flex: 1, backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
+                      <TextInput testID="booking-house-state" autoCapitalize="characters" maxLength={2} value={houseAddress.state} onChangeText={(v) => setHouseAddress((a) => ({ ...a, state: v }))} placeholder="State" placeholderTextColor={colors.mutedForeground} style={[styles.addressInput, { flex: 1, backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
                     </View>
+                    <TextInput testID="booking-house-city" autoCapitalize="words" value={houseAddress.city} onChangeText={(v) => setHouseAddress((a) => ({ ...a, city: v }))} placeholder="City" placeholderTextColor={colors.mutedForeground} style={[styles.addressInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
                     {places?.houseCallFee ? <Text style={[styles.addressNote, { color: colors.mutedForeground }]}>{`$${Number(places.houseCallFee).toFixed(2)} travel fee is added. Times shown leave your travel time free.`}</Text>
                       : <Text style={[styles.addressNote, { color: colors.mutedForeground }]}>Times shown leave your travel time free.</Text>}
                   </View>
@@ -470,7 +500,7 @@ export default function BookingScreen() {
               <>
                 <View style={styles.intro}>
                   <Text style={[styles.eyebrow, { color: colors.primary }]}>{stage === 'services' ? 'STEP 2 · SERVICES' : 'STEP 3 · ADD-ONS'}</Text>
-                  <Text style={[styles.heading, { color: colors.foreground }]}>{stage === 'services' ? 'What are we doing?' : 'Any add-ons?'}</Text>
+                  <HelpTitle help="booking" style={[styles.heading, { color: colors.foreground }]}>{stage === 'services' ? 'What are we doing?' : 'Any add-ons?'}</HelpTitle>
                   <Text style={[styles.subheading, { color: colors.mutedForeground }]}>{stage === 'services' ? `Choose one or more services for ${ticketClient?.name.split(' ')[0] ?? 'this client'}.` : 'Optional extras for the services you picked.'}</Text>
                 </View>
                 <TextInput testID={stage === 'services' ? 'booking-service-search' : 'booking-addon-search'} autoCapitalize="none" autoCorrect={false} value={stage === 'services' ? serviceQuery : addonQuery} onChangeText={stage === 'services' ? setServiceQuery : setAddonQuery} placeholder={stage === 'services' ? 'Search services' : 'Search add-ons'} placeholderTextColor={colors.mutedForeground} style={[styles.nameInput, { height: 48, fontSize: 14, marginBottom: 12, backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
@@ -491,6 +521,20 @@ export default function BookingScreen() {
                 ) : null}
               </>
             )}
+            {stage === 'schedule' ? (
+              <View style={styles.placeRow}>
+                <View style={{ flex: 1 }}>
+                  <SelectField testID="booking-repeat" title="Repeat" value={repeatWeeks} onChange={setRepeatWeeks}
+                    options={[{ value: 0, label: "Doesn't repeat" }, { value: 1, label: 'Every week' }, { value: 2, label: 'Every 2 weeks' }, { value: 3, label: 'Every 3 weeks' }, { value: 4, label: 'Every 4 weeks' }]} />
+                </View>
+                {repeatWeeks > 0 ? (
+                  <View style={{ flex: 1 }}>
+                    <SelectField testID="booking-repeat-times" title="How many times" value={repeatTimes} onChange={setRepeatTimes}
+                      options={[2, 3, 4, 5, 6, 8, 10, 12].map((n) => ({ value: n, label: `${n} times in all` }))} />
+                  </View>
+                ) : null}
+              </View>
+            ) : null}
             <View style={[styles.summary, { backgroundColor: colors.accent }]}><Text style={[styles.summaryLabel, { color: colors.accentForeground }]}>{`${chosenServices.length + chosenAddons.length} ${chosenServices.length + chosenAddons.length === 1 ? 'ITEM' : 'ITEMS'} · ${minutesLabel(totalMinutes)}`}</Text><Text style={[styles.summaryValue, { color: colors.accentForeground }]}>{money(totalPrice)}</Text></View>
           </ScrollView>
           <View style={[styles.footer, { borderTopColor: colors.border, backgroundColor: colors.background, paddingBottom: Math.max(insets.bottom, Platform.OS === 'web' ? 34 : 16) }]}>

@@ -12,26 +12,28 @@
  * The useColors() hook will automatically pick it up.
  */
 
+// Certxa Payments look (owner, 2026-11-03): deep navy text, violet primary, lavender-white background, Stripe-indigo
+// accent. Replaced the earlier teal/green palette.
 const colors = {
   light: {
-    text: '#20241F',
-    tint: '#285747',
-    background: '#F6F6F1',
-    foreground: '#20241F',
+    text: '#11152E',
+    tint: '#7C3AED',
+    background: '#F7F5FD',
+    foreground: '#11152E',
     card: '#FFFFFF',
-    cardForeground: '#20241F',
-    primary: '#285747',
+    cardForeground: '#11152E',
+    primary: '#7C3AED',
     primaryForeground: '#FFFFFF',
-    secondary: '#EAF0EB',
-    secondaryForeground: '#285747',
-    muted: '#EEEFEA',
-    mutedForeground: '#777F79',
-    accent: '#F0E9DD',
-    accentForeground: '#725B37',
-    destructive: '#B84B42',
+    secondary: '#F0EAFE',
+    secondaryForeground: '#6D28D9',
+    muted: '#F1EFF7',
+    mutedForeground: '#6B6F86',
+    accent: '#EEEDFF',
+    accentForeground: '#4F46E5',
+    destructive: '#D92D20',
     destructiveForeground: '#FFFFFF',
-    border: '#E5E7E1',
-    input: '#E5E7E1',
+    border: '#E6E2F1',
+    input: '#E6E2F1',
   },
   radius: 16,
 };

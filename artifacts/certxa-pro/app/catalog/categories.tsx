@@ -84,6 +84,7 @@ export default function CategoriesScreen() {
 
   return (
     <CatalogScreen
+      help="catalog.categories"
       title={draft ? (draft.id > 0 ? 'Edit category' : 'New category') : 'Categories'}
       onBack={() => (draft ? (setDraft(null), setError('')) : router.back())}
       onAdd={draft ? undefined : () => { setError(''); setDraft({ id: 0, name: '', color: null, imageUrl: null, hiddenFromPublic: false }); }}

@@ -16,6 +16,15 @@ export type ClientProfile = {
   color: 'green' | 'sand' | 'rose';
   email?: string;
   notes?: string;
+  /** Live numbers from Certxa (paid visits; spend without tips). */
+  spentCents?: number;
+  lastVisitAt?: string | null;
+  lastService?: string | null;
+  nextAppointmentAt?: string | null;
+  allergies?: string | null;
+  isVip?: boolean;
+  tags?: string[];
+  avatarUrl?: string | null;
 };
 
 export type AppointmentRecord = {
@@ -47,6 +56,18 @@ export type AppointmentRecord = {
   visitAt?: 'place' | 'client';
   clientAddress?: HouseCallAddress | null;
   travelFee?: number;
+  /** The visit's further services (priced lines on the ticket) and its add-ons, for Edit. */
+  extraLines?: { label: string; price: number }[];
+  addonIds?: number[];
+  addonLines?: { label: string; price: number }[];
+  avatarUrl?: string | null;
+  /** Paid: what was paid (cents) and how much of it has been refunded since. */
+  totalPaidCents?: number | null;
+  refundedCents?: number;
+  /** No-show / late-cancel fee: the client's card on file, the shop's fee %, and a fee already charged. */
+  cardOnFile?: boolean;
+  feePercent?: number | null;
+  feeChargedCents?: number | null;
 };
 
 export type HouseCallAddress = { line1: string; line2?: string; city: string; state: string; postcode: string };
@@ -94,9 +115,13 @@ type BookingContextValue = {
   rescheduleBooking: (appointmentId: number, dateIso: string, durationMinutes: number, notifyClient?: boolean) => Promise<void>;
 };
 
-type ApiCustomer = { id: number; name?: string | null; fullName?: string | null; firstName?: string | null; lastName?: string | null; phone?: string | null; email?: string | null; notes?: string | null };
+type ApiCustomer = {
+  id: number; name?: string | null; fullName?: string | null; firstName?: string | null; lastName?: string | null; phone?: string | null; email?: string | null; notes?: string | null;
+  visits?: number | null; spentCents?: number | null; lastVisitAt?: string | null; lastService?: string | null; nextAppointmentAt?: string | null;
+  allergies?: string | null; isVip?: boolean | null; tags?: string[] | null; avatarUrl?: string | null;
+};
 type ApiService = { id: number; offeredAt?: string | null; name?: string | null; duration?: number | string | null; price?: number | string | null };
-type ApiAppointment = { calendarHidden?: boolean | null; paymentStatus?: string | null; depositCollected?: number | null; visitAt?: string | null; clientAddress?: HouseCallAddress | null; travelFee?: number | null; appointmentAddons?: { addon?: { price?: number | string | null } | null }[] | null; customLines?: { label?: string; price?: number | string | null }[] | null; id: number; date: string; duration?: number | null; status?: string | null; notes?: string | null; customer?: ApiCustomer | null; service?: ApiService | null };
+export type ApiAppointment = { cardOnFile?: boolean | null; feePercent?: number | null; feeChargedCents?: number | null; totalPaid?: number | null; refundedCents?: number | null; calendarHidden?: boolean | null; paymentStatus?: string | null; depositCollected?: number | null; visitAt?: string | null; clientAddress?: HouseCallAddress | null; travelFee?: number | null; appointmentAddons?: { addon?: { id?: number; name?: string | null; price?: number | string | null } | null }[] | null; customLines?: { label?: string; price?: number | string | null }[] | null; id: number; date: string; duration?: number | null; status?: string | null; notes?: string | null; customer?: ApiCustomer | null; service?: ApiService | null };
 
 const BookingContext = createContext<BookingContextValue | null>(null);
 
@@ -108,7 +133,17 @@ function durationMinutes(value: ApiService['duration']) { const number = Number(
 
 function mapCustomer(customer: ApiCustomer, index: number): ClientProfile {
   const name = nameOf(customer);
-  return { id: String(customer.id), customerId: customer.id, name, initials: initialsOf(name), phone: customer.phone ?? '', email: customer.email ?? undefined, notes: customer.notes ?? undefined, lastVisit: 'Certxa client', service: customer.phone || customer.email || 'Client record', visits: 0, spend: '—', color: (['green', 'sand', 'rose'] as const)[index % 3] };
+  const visits = Number(customer.visits ?? 0);
+  const spentCents = Number(customer.spentCents ?? 0);
+  return {
+    id: String(customer.id), customerId: customer.id, name, initials: initialsOf(name), phone: customer.phone ?? '', email: customer.email ?? undefined, notes: customer.notes ?? undefined,
+    // lastVisit/service are only fallbacks: the Clients screens label dates in business time from lastVisitAt.
+    lastVisit: visits > 0 ? 'Visited' : 'No visits yet', service: customer.lastService || customer.phone || customer.email || 'Client record',
+    visits, spend: money(spentCents / 100), spentCents,
+    lastVisitAt: customer.lastVisitAt ?? null, lastService: customer.lastService ?? null, nextAppointmentAt: customer.nextAppointmentAt ?? null,
+    allergies: customer.allergies ?? null, isVip: !!customer.isVip, tags: Array.isArray(customer.tags) ? customer.tags : [], avatarUrl: customer.avatarUrl ?? null,
+    color: (['green', 'sand', 'rose'] as const)[index % 3],
+  };
 }
 
 function mapService(service: ApiService, index: number): ServiceProfile {
@@ -117,7 +152,7 @@ function mapService(service: ApiService, index: number): ServiceProfile {
   return { id: service.id, name: service.name || 'Service', durationMinutes: minutes, duration: minutes >= 60 ? `${Math.floor(minutes / 60)} hr${minutes % 60 ? ` ${minutes % 60} min` : ''}` : `${minutes} min`, priceValue, price: money(priceValue), icon: (['eye', 'droplet', 'briefcase', 'star'] as const)[index % 4], offeredAt: service.offeredAt === 'place' || service.offeredAt === 'client' ? service.offeredAt : 'any' };
 }
 
-function mapAppointment(appointment: ApiAppointment, timeZone: string): AppointmentRecord {
+export function mapAppointment(appointment: ApiAppointment, timeZone: string): AppointmentRecord {
   const date = new Date(appointment.date);
   // The business date and time, whatever zone the phone is in.
   const businessDay = zonedDay(date, timeZone);
@@ -130,9 +165,17 @@ function mapAppointment(appointment: ApiAppointment, timeZone: string): Appointm
   const minutes = Number(appointment.duration ?? appointment.service?.duration ?? 60) || 60;
   return { id: String(appointment.id), appointmentId: appointment.id, dateKey: dateKey(businessDay), dateIso: date.toISOString(), startMinutes: zonedMinutes(date, timeZone), time: zonedTimeLabel(date, timeZone), name: nameOf(appointment.customer), service: appointment.service?.name || 'Service', serviceId: appointment.service?.id, duration: `${minutes} min`, price: money(priceValue), amountCents: Math.round(priceValue * 100), status: appointment.status === 'completed' ? 'paid' : appointment.status || 'pending', note: appointment.notes ?? undefined, customerId: appointment.customer?.id ?? undefined,
     phone: appointment.customer?.phone ?? undefined, email: appointment.customer?.email ?? undefined,
+    avatarUrl: appointment.customer?.avatarUrl ?? null,
     depositDue: appointment.paymentStatus === 'awaiting_payment',
     depositPaidCents: appointment.paymentStatus === 'awaiting_payment' ? 0 : Math.round((Number(appointment.depositCollected ?? 0) || 0) * 100),
-    visitAt: appointment.visitAt === 'client' ? 'client' : 'place', clientAddress: appointment.clientAddress ?? null, travelFee: Number(appointment.travelFee ?? 0) || 0 };
+    visitAt: appointment.visitAt === 'client' ? 'client' : 'place', clientAddress: appointment.clientAddress ?? null, travelFee: Number(appointment.travelFee ?? 0) || 0,
+    extraLines: (Array.isArray(appointment.customLines) ? appointment.customLines : []).map((line) => ({ label: String(line?.label ?? ''), price: Number(line?.price ?? 0) || 0 })).filter((line) => line.label),
+    addonIds: (appointment.appointmentAddons ?? []).map((row) => Number(row?.addon?.id)).filter((n) => Number.isInteger(n) && n > 0),
+    addonLines: (appointment.appointmentAddons ?? []).map((row) => ({ label: String(row?.addon?.name ?? 'Add-on'), price: Number(row?.addon?.price ?? 0) || 0 })),
+    totalPaidCents: appointment.totalPaid != null ? Math.round(Number(appointment.totalPaid) * 100) : null,
+    refundedCents: Number(appointment.refundedCents ?? 0) || 0,
+    cardOnFile: !!appointment.cardOnFile, feePercent: appointment.feePercent != null ? Number(appointment.feePercent) : null,
+    feeChargedCents: appointment.feeChargedCents != null ? Number(appointment.feeChargedCents) : null };
 }
 
 export function BookingProvider({ children }: { children: ReactNode }) {
@@ -228,4 +271,39 @@ export function useBookingData() {
   const value = useContext(BookingContext);
   if (!value) throw new Error('useBookingData must be used within BookingProvider.');
   return value;
+}
+
+/** The booking details screen for a booking (the calendar, and a review's "View booking"). */
+export function appointmentParams(item: AppointmentRecord) {
+  return {
+    pathname: '/appointment/[id]' as const,
+    params: {
+      id: String(item.appointmentId),
+      clientName: item.name,
+      serviceName: item.service,
+      serviceId: String(item.serviceId ?? ''),
+      amountCents: String(item.amountCents),
+      dateIso: item.dateIso,
+      duration: item.duration,
+      status: item.status,
+      note: item.note ?? '',
+      customerId: item.customerId ? String(item.customerId) : '',
+      avatarUrl: item.avatarUrl ?? '',
+      phone: item.phone ?? '',
+      email: item.email ?? '',
+      depositDue: item.depositDue ? '1' : '0',
+      depositPaidCents: String(item.depositPaidCents ?? 0),
+      visitAt: item.visitAt ?? 'place',
+      clientAddress: item.clientAddress ? JSON.stringify(item.clientAddress) : '',
+      travelFeeCents: String(Math.round((item.travelFee ?? 0) * 100)),
+      extraLines: JSON.stringify(item.extraLines ?? []),
+      addonIds: (item.addonIds ?? []).join(','),
+      addonLines: JSON.stringify(item.addonLines ?? []),
+      totalPaidCents: item.totalPaidCents != null ? String(item.totalPaidCents) : '',
+      refundedCents: String(item.refundedCents ?? 0),
+      cardOnFile: item.cardOnFile ? '1' : '0',
+      feePercent: item.feePercent != null ? String(item.feePercent) : '',
+      feeChargedCents: item.feeChargedCents != null ? String(item.feeChargedCents) : '',
+    },
+  };
 }

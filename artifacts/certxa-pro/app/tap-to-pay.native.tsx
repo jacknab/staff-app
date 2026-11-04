@@ -15,6 +15,7 @@ import { useStripeTerminal } from '@stripe/stripe-terminal-react-native';
 import { useColors } from '@/hooks/useColors';
 import { api } from '@/lib/live-api';
 import { getStoredToken, getTerminalLocation } from '@/lib/certxa-api';
+import { HelpTitle } from '@/components/HelpTitle';
 
 const ENABLED_KEY = 'certxa.tapToPay.enabled';
 type State = 'idle' | 'connecting' | 'ready' | 'error';
@@ -105,7 +106,7 @@ export default function TapToPayScreen() {
         </Text>
         <View testID="tap-to-pay-card" style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.cardTop}>
-            <Text style={[styles.cardTitle, { color: colors.foreground }]}>Tap to Pay on iPhone</Text>
+            <HelpTitle help="tap-to-pay" style={[styles.cardTitle, { color: colors.foreground }]}>Tap to Pay on iPhone</HelpTitle>
             {busy ? <ActivityIndicator size="small" color={colors.primary} /> : ready || (enabledBefore && state === 'idle') ? <Feather name="check-circle" size={18} color={colors.primary} /> : null}
           </View>
           <Text testID="tap-to-pay-status" style={[styles.status, { color: state === 'error' ? colors.destructive : colors.mutedForeground }]}>{status}</Text>

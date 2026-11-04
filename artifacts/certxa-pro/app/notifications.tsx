@@ -5,7 +5,9 @@ import { useRouter } from 'expo-router';
 import { ActivityIndicator, Alert, ScrollView, StatusBar, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
+import { SelectField } from '@/components/SelectField';
 import { api } from '@/lib/live-api';
+import { HelpTitle } from '@/components/HelpTitle';
 
 /**
  * Settings → Client notifications (owner, 2026-10-30): the website's Settings › Client Notifications in native code —
@@ -69,6 +71,14 @@ export default function NotificationsScreen() {
   const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  // Win-back texts (owner, 2026-11-03): saved on their own, straight away (GET · PUT /api/win-back/settings).
+  const [winBack, setWinBack] = useState<{ enabled: boolean; afterDays: number; dueNow?: number } | null>(null);
+  useEffect(() => { api.get<{ enabled: boolean; afterDays: number; dueNow: number }>('/api/win-back/settings').then(setWinBack).catch(() => setWinBack(null)); }, []);
+  const saveWinBack = (next: { enabled?: boolean; afterDays?: number }) => {
+    setWinBack((w) => (w ? { ...w, ...next } : w));
+    void api.put('/api/win-back/settings', next).then(() => api.get<{ enabled: boolean; afterDays: number; dueNow: number }>('/api/win-back/settings').then(setWinBack))
+      .catch(() => setError('Win-back texts could not be saved.'));
+  };
 
   const loadPhones = useCallback(async (id: number) => {
     setPhones(await api.get<PhoneTypes>(`/api/clients/phone-types/summary?storeId=${id}`).catch(() => null));
@@ -156,7 +166,7 @@ export default function NotificationsScreen() {
       <StatusBar barStyle="dark-content" />
       <View style={styles.header}>
         <TouchableOpacity testID="notifications-back" accessibilityLabel="Back" onPress={back} style={styles.headerButton}><Feather name="arrow-left" size={21} color={colors.foreground} /></TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.foreground }]}>Client notifications</Text>
+        <HelpTitle help="notifications" style={[styles.headerTitle, { color: colors.foreground }]}>Client notifications</HelpTitle>
         <View style={styles.headerButton} />
       </View>
       {loading ? (
@@ -197,6 +207,21 @@ export default function NotificationsScreen() {
               )}
               {customize("review", sms.reviewRequestEnabled, mail.reviewRequestEnabled, "reviewTemplate", REVIEW_VARS)}
             </Section>
+
+            {winBack ? (
+              <Section colors={colors} icon="heart" title="Win-back text" hint="One text inviting a client back when they haven't visited for a while, with your booking link. Only to clients who agreed to marketing texts; once per absence.">
+                <ToggleRow colors={colors} id="winback" icon="message-square" label="Text" value={winBack.enabled} onChange={(v) => saveWinBack({ enabled: v })} />
+                {winBack.enabled ? (
+                  <View style={{ marginTop: 8 }}>
+                    <SelectField testID="notifications-winback-days" value={winBack.afterDays} onChange={(v) => saveWinBack({ afterDays: Number(v) })}
+                      options={[30, 45, 60, 90, 120].map((d) => ({ value: d, label: `After ${d} days without a visit` }))} />
+                    <Text style={[styles.small, { color: colors.mutedForeground, marginTop: 6 }]}>
+                      Sent around 10 AM. Each text uses one text message credit.{winBack.dueNow ? ` ${winBack.dueNow} client${winBack.dueNow === 1 ? '' : 's'} would get one today.` : ''}
+                    </Text>
+                  </View>
+                ) : null}
+              </Section>
+            ) : null}
 
             <Section colors={colors} icon="x-circle" title="Cancellation replies" hint="Recognize clear cancellation requests in clients' text replies.">
               {toggle("cancellation", "message-square", "Text", sms.smsCancellationEnabled, (v) => setSms((s) => ({ ...s, smsCancellationEnabled: v })))}
@@ -266,20 +291,9 @@ function ToggleRow({ colors, id, icon, label, value, onChange }: { colors: Color
   );
 }
 
-function Chips<T extends string | number>({ colors, onTouch, id, options, value, onPick }: { colors: Colors; onTouch: () => void; id: string; options: { value: T; label: string }[]; value: T; onPick: (v: T) => void }) {
-  return (
-    <View style={styles.wrap}>
-      {options.map((o) => {
-        const on = o.value === value;
-        return (
-          <TouchableOpacity key={String(o.value)} testID={`notifications-${id}-${o.value}`} onPress={() => { onTouch(); onPick(o.value); }}
-            style={[styles.chip, { borderColor: on ? colors.primary : colors.border, backgroundColor: on ? colors.primary : colors.card }]}>
-            <Text style={[styles.chipText, { color: on ? colors.primaryForeground : colors.foreground }]}>{o.label}</Text>
-          </TouchableOpacity>
-        );
-      })}
-    </View>
-  );
+/** One of a few choices, as a dropdown (owner, 2026-11-03: no rows of pill buttons). */
+function Chips<T extends string | number>({ colors: _colors, onTouch, id, options, value, onPick }: { colors: Colors; onTouch: () => void; id: string; options: { value: T; label: string }[]; value: T; onPick: (v: T) => void }) {
+  return <SelectField testID={`notifications-${id}`} value={value} options={options} onChange={(v) => { onTouch(); onPick(v); }} />;
 }
 
 /** "Customize messages": the wording of the text (160 characters) and the e-mail, for whichever channels are on. */

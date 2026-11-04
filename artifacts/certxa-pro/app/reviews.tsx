@@ -9,17 +9,19 @@
  *   POST /api/reviews/:id/response    { response }  save the owner's reply (empty removes it)
  */
 import { useCallback, useEffect, useState } from 'react';
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { api } from '@/lib/live-api';
+import { appointmentParams, mapAppointment, useBookingData, type ApiAppointment } from '@/contexts/BookingContext';
+import { HelpTitle } from '@/components/HelpTitle';
 
 type Review = {
   id: number; rating: number; comment?: string | null; customerName?: string | null; serviceName?: string | null;
-  createdAt?: string | null; ownerResponse?: string | null; ownerResponseAt?: string | null;
+  createdAt?: string | null; ownerResponse?: string | null; ownerResponseAt?: string | null; photoUrl?: string | null; appointmentId?: number | null;
 };
 type Stats = { total: number; avg: number; distribution: Record<string, number> };
 const MAX_REPLY = 1000;
@@ -34,6 +36,21 @@ export default function ReviewsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { timeZone } = useBookingData();
+  // "View booking": the booking the review was left for, loaded on its own (it may be outside the calendar's month).
+  const [openingBooking, setOpeningBooking] = useState<number | null>(null);
+  const openBooking = async (appointmentId: number) => {
+    const reviewId = reviews.find((r) => r.appointmentId === appointmentId)?.id ?? null;
+    setOpeningBooking(reviewId);
+    try {
+      const row = await api.get<ApiAppointment>(`/api/appointments/${appointmentId}`);
+      router.push(appointmentParams(mapAppointment(row, timeZone)));
+    } catch {
+      Alert.alert('Booking', 'That booking could not be opened.');
+    } finally {
+      setOpeningBooking(null);
+    }
+  };
   const [reviews, setReviews] = useState<Review[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -69,7 +86,8 @@ export default function ReviewsScreen() {
 
   const stars = (rating: number, size = 14) => (
     <View style={styles.stars} accessibilityLabel={`${rating} out of 5 stars`}>
-      {[1, 2, 3, 4, 5].map((n) => <Feather key={n} name="star" size={size} color={n <= rating ? '#D9A441' : colors.border} />)}
+      {/* Filled stars for the rating (the outline-only star looked the same filled or not, 2026-11-03). */}
+      {[1, 2, 3, 4, 5].map((n) => <Ionicons key={n} name={n <= rating ? 'star' : 'star-outline'} size={size} color={n <= rating ? '#D9A441' : colors.border} />)}
     </View>
   );
 
@@ -78,7 +96,7 @@ export default function ReviewsScreen() {
       <StatusBar barStyle="dark-content" />
       <View style={styles.header}>
         <TouchableOpacity testID="reviews-back" accessibilityLabel="Back" onPress={() => router.back()} style={styles.headerButton}><Feather name="arrow-left" size={21} color={colors.foreground} /></TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.foreground }]}>Reviews</Text>
+        <HelpTitle help="reviews" style={[styles.headerTitle, { color: colors.foreground }]}>Reviews</HelpTitle>
         <View style={styles.headerButton} />
       </View>
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}
@@ -114,6 +132,15 @@ export default function ReviewsScreen() {
                     {stars(review.rating)}
                   </View>
                   {review.comment ? <Text style={[styles.comment, { color: colors.foreground }]}>{review.comment}</Text> : <Text style={[styles.comment, { color: colors.mutedForeground }]}>No written comment.</Text>}
+                  {/* The photo the client added to the review. */}
+                  {/* The visit the review is about: its booking, paid or not (owner, 2026-11-03). */}
+                  {review.appointmentId ? (
+                    <TouchableOpacity testID={`review-booking-${review.id}`} disabled={openingBooking === review.id} onPress={() => void openBooking(review.appointmentId!)} style={styles.bookingLink}>
+                      <Feather name="file-text" size={14} color={colors.primary} />
+                      <Text style={[styles.bookingLinkText, { color: colors.primary }]}>{openingBooking === review.id ? 'Opening…' : 'View booking'}</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                  {review.photoUrl ? <Image testID={`review-photo-${review.id}`} source={{ uri: review.photoUrl }} resizeMode="cover" style={[styles.photo, { borderColor: colors.border }]} accessibilityLabel="Photo from the client" /> : null}
 
                   {review.ownerResponse && !open ? (
                     <View style={[styles.response, { backgroundColor: colors.secondary }]}>
@@ -156,6 +183,9 @@ const styles = StyleSheet.create({
   summaryLeft: { alignItems: 'center', minWidth: 86 },
   average: { fontSize: 34, letterSpacing: -1, fontFamily: 'Inter_600SemiBold', marginBottom: 4 },
   stars: { flexDirection: 'row', gap: 2 },
+  photo: { width: 120, height: 120, borderRadius: 12, borderWidth: 1, marginTop: 10 },
+  bookingLink: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, alignSelf: 'flex-start' },
+  bookingLinkText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   barRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   barTrack: { flex: 1, height: 6, borderRadius: 3, overflow: 'hidden' },
   barFill: { height: 6, borderRadius: 3 },

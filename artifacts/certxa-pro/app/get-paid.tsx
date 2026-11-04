@@ -13,6 +13,7 @@ import { canTakeCards, getPaymentStatus, runPaymentsSetup, type PaymentStatus } 
 import { api } from '@/lib/live-api';
 import { useBookingData } from '@/contexts/BookingContext';
 import { validTimeZone } from '@/lib/businessTime';
+import { HelpTitle } from '@/components/HelpTitle';
 
 type Address = { address: string; city: string; state: string; postcode: string };
 type Store = Partial<Address> & { id: number };
@@ -127,7 +128,7 @@ export default function GetPaidScreen() {
         </View>
       ) : stage === 'address' ? (
         <>
-          <Text style={[styles.title, text]}>{ownPlace === 'salon' ? 'Where do you work?' : 'Your base address'}</Text>
+          <HelpTitle help="get-paid" style={[styles.title, text]}>{ownPlace === 'salon' ? 'Where do you work?' : 'Your base address'}</HelpTitle>
           <Text style={[styles.body, muted]}>{ownPlace === 'home'
             ? 'Stripe needs your address to set up card payments and Tap to Pay. It stays private: clients see your city only, and get the full address once they have booked.'
             : ownPlace === 'none'
@@ -159,16 +160,16 @@ export default function GetPaidScreen() {
         </>
       ) : stage === 'ready' ? (
         <>
-          <Text style={[styles.title, text]}>You’re ready to take cards</Text>
+          <HelpTitle help="get-paid" style={[styles.title, text]}>You’re ready to take cards</HelpTitle>
           <Text style={[styles.body, muted]}>When a client is done, open their appointment and tap Check Out to take payment with Tap to Pay on your iPhone or the Stripe M2 reader. Your money is paid out to your bank account.</Text>
           <View style={styles.actions}>
             {/* Checkout is reached only from an appointment's Check Out (owner's rule, 2026-10-13), never a shortcut. */}
-            {primary('Go to my calendar', () => router.replace('/(tabs)'), 'get-paid-done')}
+            {primary('Go to my calendar', () => router.replace('/calendar'), 'get-paid-done')}
           </View>
         </>
       ) : stage === 'more' ? (
         <>
-          <Text style={[styles.title, text]}>Stripe needs a few more details</Text>
+          <HelpTitle help="get-paid" style={[styles.title, text]}>Stripe needs a few more details</HelpTitle>
           <Text style={[styles.body, muted]}>Finish setting up with Stripe to start taking cards. It picks up where you left off.</Text>
           <View style={styles.actions}>
             {primary('Continue setup', () => void start(), 'get-paid-continue')}
@@ -177,7 +178,7 @@ export default function GetPaidScreen() {
         </>
       ) : (
         <>
-          <Text style={[styles.title, text]}>Take card payments</Text>
+          <HelpTitle help="get-paid" style={[styles.title, text]}>Take card payments</HelpTitle>
           <Text style={[styles.body, muted]}>Set up payments once and take cards from your clients right in the app.</Text>
           <View style={styles.points}>
             {[

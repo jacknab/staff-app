@@ -8,6 +8,8 @@
  *   Cancellation policy          GET · PUT /api/booking-policies
  *   Blocked clients              GET · POST · DELETE /api/booking-ban-list
  *   Client notifications         its own screen, app/notifications.tsx
+ *   Business Phone               GET · PUT /api/pro/phone, GET · POST · DELETE /api/pro/phone/blocked,
+ *                                POST /api/pro/phone/cancel · /resume · /pay ($10/month)
  *   Stripe account               GET /api/payments/stripe/status
  *   Card readers                 GET /api/payments/terminal/reader/list · POST …/reader/register
  *   Sales tax                    GET · PATCH /api/pos-settings/:storeId
@@ -22,12 +24,15 @@ import { ActivityIndicator, Alert, Linking, ScrollView, Share, StatusBar, StyleS
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/contexts/AuthContext';
+import { BusinessHoursEditor } from '@/components/BusinessHoursEditor';
+import { SelectField } from '@/components/SelectField';
 import { useBookingData } from '@/contexts/BookingContext';
 import { timeZoneName, US_TIME_ZONES, validTimeZone } from '@/lib/businessTime';
 import { api } from '@/lib/live-api';
 import { CERTXA_API_BASE_URL, certxaRequest, getStoredToken, login as checkPassword, registerTerminalReader } from '@/lib/certxa-api';
+import { HelpTitle } from '@/components/HelpTitle';
 
-type Screen = 'menu' | 'business' | 'location' | 'places' | 'hours' | 'rules' | 'approval' | 'policy' | 'blocked' | 'website' | 'stripe' | 'readers' | 'deposits' | 'tax' | 'account';
+type Screen = 'menu' | 'business' | 'location' | 'places' | 'hours' | 'rules' | 'approval' | 'policy' | 'blocked' | 'phone' | 'website' | 'stripe' | 'readers' | 'deposits' | 'tax' | 'account';
 type Store = { id: number; name?: string | null; phone?: string | null; email?: string | null; category?: string | null; address?: string | null; city?: string | null; state?: string | null; postcode?: string | null; bookingSlug?: string | null; timezone?: string | null };
 type Hours = { dayOfWeek: number; openTime: string; closeTime: string; isClosed: boolean };
 type FeatherName = ComponentProps<typeof Feather>['name'];
@@ -36,13 +41,11 @@ const BUSINESS_TYPES = ['Nail Salon', 'Hair Salon', 'Barbershop', 'Lash and Brow
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const TITLES: Record<Screen, string> = {
   menu: 'Settings', business: 'Business details', location: 'Location', places: 'Where you see clients', hours: 'Business hours', rules: 'Booking rules', policy: 'Cancellation policy',
-  approval: 'Booking approval', blocked: 'Blocked clients', website: 'Website', stripe: 'Stripe account', readers: 'Connect card reader', deposits: 'Deposits', tax: 'Sales tax', account: 'Account',
+  approval: 'Booking approval', blocked: 'Blocked clients', phone: 'Business Phone', website: 'Website', stripe: 'Stripe account', readers: 'Connect card reader', deposits: 'Deposits', tax: 'Sales tax', account: 'Account',
 };
 
 function errorText(cause: unknown, fallback: string) { return cause instanceof Error && cause.message ? cause.message : fallback; }
 function minutesOf(time: string) { const [h, m] = time.split(':').map(Number); return (h || 0) * 60 + (m || 0); }
-function timeOf(minutes: number) { const m = Math.max(0, Math.min(23 * 60 + 30, minutes)); return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`; }
-function clock(time: string) { const m = minutesOf(time); const h = Math.floor(m / 60); return `${h % 12 === 0 ? 12 : h % 12}:${String(m % 60).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`; }
 function formatPhone(raw: string) { const d = (raw ?? '').replace(/\D/g, '').replace(/^1(?=\d{10}$)/, ''); return d.length === 10 ? `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}` : raw; }
 
 export default function SettingsScreen() {
@@ -50,7 +53,7 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, logout } = useAuth();
-  const { setTimeZone, refresh: refreshCalendar } = useBookingData();
+  const { setTimeZone, refresh: refreshCalendar, clients } = useBookingData();
   const [screen, setScreen] = useState<Screen>('menu');
   const [store, setStore] = useState<Store | null>(null);
   const [loading, setLoading] = useState(true);
@@ -96,9 +99,10 @@ export default function SettingsScreen() {
           api.get<Record<string, any>>('/api/work-places').catch(() => null),
         ]);
         setDraft({
-          policy: policies.bookingPaymentPolicy ?? 'none', depositType: policies.depositType === 'percentage' ? 'percentage' : 'fixed',
+          policy: policies.bookingPaymentPolicy ?? 'none', depositType: policies.depositType === 'percentage' || policies.depositType === 'full' ? policies.depositType : 'fixed',
           depositValue: policies.depositValue != null ? String(Number(policies.depositValue)) : '',
           cardsReady: Boolean(status?.chargesEnabled), approval: places?.bookingApproval ?? 'auto',
+          includeTravelFee: policies.depositIncludeTravelFee === true, houseCalls: places?.houseCalls === true,
         });
       } else if (next === 'approval') {
         const places = await api.get<Record<string, any>>('/api/work-places');
@@ -109,11 +113,26 @@ export default function SettingsScreen() {
           onlineBookingMode: policies.onlineBookingMode ?? 'all', advanceBookingEnabled: !!policies.advanceBookingEnabled, advanceBookingMonths: Number(policies.advanceBookingMonths ?? 3),
           allowOnlineCancellation: policies.allowOnlineCancellation !== false, cancellationHoursCutoff: Number(policies.cancellationHoursCutoff ?? 24),
           cancellationPolicyText: policies.cancellationPolicyText ?? '', cancellationPolicyRequired: !!policies.cancellationPolicyRequired,
+          feePercent: policies.cancellationFeeValue != null ? String(Number(policies.cancellationFeeValue)) : '',
           bookingWindowHours: Number(calendar?.bookingWindowHours ?? 0), timeSlotInterval: Number(calendar?.timeSlotInterval ?? 15), bufferMinutes: Number(calendar?.bufferMinutes ?? 0),
         });
       } else if (next === 'blocked') setDraft({ list: await api.get<any[]>('/api/booking-ban-list'), phone: '', reason: '' });
+      else if (next === 'phone') {
+        const [line, calling] = await Promise.all([
+          api.get<{ phoneNumber: string; ring: string } | null>('/api/pro/phone'),
+          api.get<{ mode: string | null; ring: string | null; plusNumber: string | null }>('/api/pro/phone/calling').catch(() => null),
+        ]);
+        // Plus calling without a number of its own (Certxa's shared Plus number) has the same calling rule and blocks.
+        const plus = !line && calling?.mode === 'plus';
+        setDraft({ line, plus, plusNumber: calling?.plusNumber ?? null, ring: line?.ring ?? calling?.ring ?? 'hours',
+          list: line || plus ? await api.get<any[]>('/api/pro/phone/blocked') : [], clientId: null, phone: '', reason: '' });
+      }
       else if (next === 'stripe') setDraft({ status: await api.get<Record<string, any>>('/api/payments/stripe/status') });
       else if (next === 'readers') { const result = await api.get<{ readers?: any[] }>('/api/payments/terminal/reader/list'); setDraft({ readers: Array.isArray(result?.readers) ? result.readers : [], code: '' }); }
+      else if (next === 'account') {
+        const overview = await api.get<{ user?: { phone?: string | null } }>('/api/manage/overview');
+        setDraft({ mobile: overview?.user?.phone ?? '', mobileNow: overview?.user?.phone ?? '', code: '', codeSent: false });
+      }
       else if (next === 'tax') { const tax = await api.get<Record<string, any>>(`/api/pos-settings/${current.id}`); setDraft({ percent: String(Number((Number(tax.salesTaxRate ?? 0) * 100).toFixed(3))), services: !!tax.taxServicesTaxable, products: tax.taxProductsTaxable !== false }); }
     } catch (cause) { setError(errorText(cause, 'Could not load this from Certxa.')); }
     finally { setLoading(false); }
@@ -142,7 +161,7 @@ export default function SettingsScreen() {
       if (!Number.isFinite(fee) || fee > 500) throw new Error('Enter a travel fee from $0 to $500.');
       const saved = await api.put<Record<string, any>>('/api/work-places', {
         ownPlace: draft.ownPlace, addressPrivate: !!draft.addressPrivate, houseCalls: !!draft.houseCalls, houseCallRadiusMiles: Number(draft.houseCallRadiusMiles),
-        houseCallFee: fee, houseCallTravelMinutes: Number(draft.houseCallTravelMinutes),
+        houseCallFee: fee, houseCallTravelMinutes: Number(draft.houseCallTravelMinutes), houseCallAlarmMinutes: Number(draft.houseCallAlarmMinutes ?? 0),
       });
       setDraft({ ...saved, houseCallFee: String(saved.houseCallFee ?? 0) });
     });
@@ -168,16 +187,18 @@ export default function SettingsScreen() {
       }
     });
     if (screen === 'deposits') return run(async () => {
+      if (draft.policy === 'card_on_file' && !draft.cardsReady) throw new Error('Set up card payments first (Settings → Stripe account).');
       if (draft.policy !== 'deposit') {
         await api.put('/api/booking-policies', { bookingPaymentPolicy: draft.policy === 'card_on_file' ? 'card_on_file' : 'none' });
         return;
       }
       if (!draft.cardsReady) throw new Error('Set up card payments first (Settings → Stripe account).');
+      const full = draft.depositType === 'full';
       const value = Number(String(draft.depositValue ?? '').replace(/[^0-9.]/g, ''));
-      if (draft.depositType === 'percentage' ? !(value >= 1 && value <= 100) : !(value >= 1 && value <= 999)) {
+      if (!full && (draft.depositType === 'percentage' ? !(value >= 1 && value <= 100) : !(value >= 1 && value <= 999))) {
         throw new Error(draft.depositType === 'percentage' ? 'Enter a percentage from 1 to 100.' : 'Enter an amount from $1 to $999.');
       }
-      await api.put('/api/booking-policies', { bookingPaymentPolicy: 'deposit', depositType: draft.depositType, depositValue: value });
+      await api.put('/api/booking-policies', { bookingPaymentPolicy: 'deposit', depositType: draft.depositType, depositValue: full ? null : value, depositIncludeTravelFee: !!draft.includeTravelFee });
     });
     if (screen === 'approval') return run(async () => {
       const saved = await api.put<Record<string, any>>('/api/work-places', {
@@ -194,7 +215,11 @@ export default function SettingsScreen() {
     });
     if (screen === 'policy') return run(async () => {
       if (draft.cancellationPolicyRequired && !String(draft.cancellationPolicyText).trim()) throw new Error('Write the policy before requiring clients to accept it.');
-      await api.put('/api/booking-policies', { cancellationPolicyText: draft.cancellationPolicyText, cancellationPolicyRequired: draft.cancellationPolicyRequired });
+      // The no-show / late-cancel fee: a % of the booking, charged to the client's card on file only when the pro taps it.
+      const fee = String(draft.feePercent ?? '').trim() === '' ? 0 : Number(String(draft.feePercent).replace(/[^0-9.]/g, ''));
+      if (!(fee >= 0 && fee <= 100)) throw new Error('Enter a fee from 0 to 100 percent.');
+      await api.put('/api/booking-policies', { cancellationPolicyText: draft.cancellationPolicyText, cancellationPolicyRequired: draft.cancellationPolicyRequired,
+        cancellationFeeType: fee > 0 ? 'percentage' : null, cancellationFeeValue: fee > 0 ? fee : null });
     });
     if (screen === 'tax') return run(async () => {
       const percent = Number(String(draft.percent).replace(/[^0-9.]/g, ''));
@@ -211,6 +236,26 @@ export default function SettingsScreen() {
     await api.del(`/api/booking-ban-list/${id}`);
     setDraft((current) => ({ ...current, list: (current.list as any[]).filter((row) => row.id !== id) }));
   }, 'Removed from the list.');
+  // Business Phone: when it rings, and numbers that can't call it (routes/businessPhone.ts).
+  const setRing = (ring: string) => run(async () => {
+    set('ring', ring);
+    await api.put('/api/pro/phone', { ring });
+  });
+  // The $10/month: cancel (ends with the paid month), keep it, or pay after a failed payment.
+  const phoneBilling = (path: 'cancel' | 'resume' | 'pay', done: string) => run(async () => {
+    const line = await api.post<any>(`/api/pro/phone/${path}`, path === 'pay' ? { idempotencyKey: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}` } : {});
+    setDraft((current) => ({ ...current, line }));
+  }, done);
+  const blockCaller = () => run(async () => {
+    await api.post('/api/pro/phone/blocked', { phone: draft.phone, reason: String(draft.reason).trim() || undefined });
+    setDraft((current) => ({ ...current, clientId: null, phone: '', reason: '' }));
+    const list = await api.get<any[]>('/api/pro/phone/blocked');
+    setDraft((current) => ({ ...current, list }));
+  }, 'Blocked from calling.');
+  const unblockCaller = (id: number) => run(async () => {
+    await api.del(`/api/pro/phone/blocked/${id}`);
+    setDraft((current) => ({ ...current, list: (current.list as any[]).filter((row) => row.id !== id) }));
+  }, 'Removed from the list.');
   const registerReader = () => run(async () => {
     const token = await getStoredToken();
     if (!token) throw new Error('Your Certxa session has expired. Please sign in again.');
@@ -222,6 +267,27 @@ export default function SettingsScreen() {
     if (!user?.email) throw new Error('No e-mail address is on file for this account.');
     await certxaRequest('/api/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email: user.email }) });
   }, `We e-mailed a link to ${user?.email ?? 'you'} to set a new password.`);
+  // Mobile number (owner, 2026-11-03): a new number is proved by a texted code; one this account had before switches
+  // back with no code; a number any other account ever had is refused (server: lib/proPhoneVerification.ts).
+  const mobileDigits = String(draft.mobile ?? '').replace(/\D/g, '').replace(/^1(?=\d{10}$)/, '');
+  const changeMobile = async () => {
+    if (saving) return;
+    setSaving(true); setError(''); setNotice('');
+    try {
+      const result = await api.post<{ changed?: boolean; phone?: string }>('/api/account/phone/send-code', { phone: mobileDigits });
+      if (result?.changed) {
+        setDraft((d) => ({ ...d, mobile: result.phone ?? mobileDigits, mobileNow: result.phone ?? mobileDigits, codeSent: false, code: '' }));
+        setNotice('Mobile number changed.');
+      } else {
+        setDraft((d) => ({ ...d, codeSent: true, code: '' }));
+      }
+    } catch (cause) { setError(errorText(cause, 'Could not send the code. Check the connection and try again.')); }
+    finally { setSaving(false); }
+  };
+  const confirmMobile = () => run(async () => {
+    const result = await api.post<{ phone?: string }>('/api/account/phone/verify', { phone: mobileDigits, code: String(draft.code ?? '') });
+    setDraft((d) => ({ ...d, mobile: result?.phone ?? mobileDigits, mobileNow: result?.phone ?? mobileDigits, codeSent: false, code: '' }));
+  }, 'Mobile number changed.');
   const deleteAccount = () => {
     Alert.alert('Delete your account?', 'Your business, bookings, clients and website are permanently deleted. This cannot be undone.', [
       { text: 'Cancel', style: 'cancel' },
@@ -258,13 +324,10 @@ export default function SettingsScreen() {
       <Switch testID={`settings-toggle-${key}`} value={!!draft[key]} onValueChange={(value) => set(key, value)} trackColor={{ true: colors.primary, false: colors.border }} />
     </View>
   );
+  // A dropdown, never a row of pill buttons (owner, 2026-11-03).
   const choices = (key: string, options: { value: string | number | boolean; label: string }[], onPick?: (value: string | number | boolean) => void) => (
-    <View style={styles.chips}>
-      {options.map((option) => {
-        const selected = draft[key] === option.value;
-        return <TouchableOpacity key={String(option.value)} testID={`settings-choice-${key}-${option.value}`} onPress={() => (onPick ? onPick(option.value) : set(key, option.value))} style={[styles.chip, { backgroundColor: selected ? colors.primary : colors.card, borderColor: selected ? colors.primary : colors.border }]}><Text style={[styles.chipText, { color: selected ? colors.primaryForeground : colors.foreground }]}>{option.label}</Text></TouchableOpacity>;
-      })}
-    </View>
+    <SelectField testID={`settings-choice-${key}`} value={draft[key] as string | number | boolean | undefined} options={options}
+      onChange={(value) => (onPick ? onPick(value) : set(key, value))} />
   );
   /** Offer the usual choices, plus whatever Certxa currently holds if it is not one of them. */
   const withCurrent = (key: string, values: number[], label: (value: number) => string) => {
@@ -286,9 +349,10 @@ export default function SettingsScreen() {
           <Row icon="map-pin" title="Location" hint={address || 'Your business address'} to="location" />
           <Row icon="navigation" title="Where you see clients" hint="Your place, house calls, or both" to="places" />
           <Row icon="clock" title="Business hours" hint="Your time zone, and the days and times you are open" to="hours" />
-          <TouchableOpacity testID="settings-services" onPress={() => router.push('/services')} style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={[styles.rowIcon, { backgroundColor: colors.secondary }]}><Feather name="list" size={16} color={colors.primary} /></View>
-            <View style={{ flex: 1 }}><Text style={[styles.rowTitle, { color: colors.foreground }]}>Services</Text><Text numberOfLines={1} style={[styles.rowHint, { color: colors.mutedForeground }]}>What you offer, how long it takes and the price</Text></View>
+          {/* Catalog moved here from More (owner, 2026-11-03). */}
+          <TouchableOpacity testID="settings-catalog" onPress={() => router.push('/catalog')} style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={[styles.rowIcon, { backgroundColor: colors.secondary }]}><Feather name="scissors" size={16} color={colors.primary} /></View>
+            <View style={{ flex: 1 }}><Text style={[styles.rowTitle, { color: colors.foreground }]}>Catalog</Text><Text numberOfLines={1} style={[styles.rowHint, { color: colors.mutedForeground }]}>Categories, services, add-ons, packages, deals, products</Text></View>
             <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
           </TouchableOpacity>
         </Group>
@@ -307,6 +371,7 @@ export default function SettingsScreen() {
             <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
           </TouchableOpacity>
         </Group>
+        <Group title="BUSINESS PHONE"><Row icon="phone" title="Business Phone" hint="When your phone rings, and numbers you've blocked" to="phone" /></Group>
         <Group title="PAYMENTS">
           <Row icon="credit-card" title="Stripe account" hint="Where your card payments are paid out" to="stripe" />
           <TouchableOpacity testID="settings-tap-to-pay" onPress={() => router.push('/tap-to-pay')} style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -345,12 +410,15 @@ export default function SettingsScreen() {
       {draft.houseCalls ? <>
         <Label>How far you travel</Label>
         {withCurrent('houseCallRadiusMiles', [5, 10, 15, 25, 40], (miles) => `${miles} miles`)}
-        <Help>Measured from your business address. Clients further away can't book a house call online.</Help>
+        <Help>Driving miles from your business address. Clients further away can't book a house call online.</Help>
         <Label>Travel fee</Label>{field('houseCallFee', '0', { keyboardType: 'decimal-pad' })}
         <Help>Added to every house call. Leave it at 0 for no fee.</Help>
         <Label>Travel time</Label>
         {withCurrent('houseCallTravelMinutes', [0, 10, 15, 30, 45], (minutes) => minutes ? `${minutes} min` : 'None')}
         <Help>Kept free on your calendar before and after each house call.</Help>
+        <Label>House-call alarm</Label>
+        {withCurrent('houseCallAlarmMinutes', [0, 30, 45, 60, 90, 120, 180], (minutes) => (!minutes ? 'Off' : minutes < 60 ? `${minutes} min before` : `${minutes / 60} ${minutes === 60 ? 'hour' : 'hours'} before`))}
+        <Help>Your phone sounds this long before each house call. Allow time to load your car, drive there and set up, so you can start on time.</Help>
       </> : null}
       {saveButton()}
     </>);
@@ -365,35 +433,23 @@ export default function SettingsScreen() {
       {choices('timezone', [...US_TIME_ZONES, ...(US_TIME_ZONES.some((zone) => zone.value === draft.timezone) || !draft.timezone ? [] : [{ value: String(draft.timezone), label: timeZoneName(String(draft.timezone)) }])])}
       <Help>Your calendar, your booking page and the messages clients get all use this time zone.</Help>
       <Label>Hours</Label>
-      {(draft.hours as Hours[] | undefined ?? []).map((day, index) => {
-        const change = (patch: Partial<Hours>) => set('hours', (draft.hours as Hours[]).map((row, n) => (n === index ? { ...row, ...patch } : row)));
-        const stepper = (key: 'openTime' | 'closeTime') => (
-          <View style={styles.stepper}>
-            <TouchableOpacity testID={`hours-${day.dayOfWeek}-${key}-minus`} onPress={() => change({ [key]: timeOf(minutesOf(day[key]) - 30) })} style={[styles.stepButton, { borderColor: colors.border }]}><Feather name="minus" size={14} color={colors.foreground} /></TouchableOpacity>
-            <Text style={[styles.stepValue, { color: colors.foreground }]}>{clock(day[key])}</Text>
-            <TouchableOpacity testID={`hours-${day.dayOfWeek}-${key}-plus`} onPress={() => change({ [key]: timeOf(minutesOf(day[key]) + 30) })} style={[styles.stepButton, { borderColor: colors.border }]}><Feather name="plus" size={14} color={colors.foreground} /></TouchableOpacity>
-          </View>
-        );
-        return (
-          <View key={day.dayOfWeek} style={[styles.dayCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={styles.dayHead}><Text style={[styles.rowTitle, { flex: 1, color: colors.foreground }]}>{DAYS[day.dayOfWeek]}</Text><Text style={[styles.rowHint, { color: colors.mutedForeground, marginRight: 8, marginTop: 0 }]}>{day.isClosed ? 'Closed' : 'Open'}</Text><Switch testID={`hours-${day.dayOfWeek}-open`} value={!day.isClosed} onValueChange={(value) => change({ isClosed: !value })} trackColor={{ true: colors.primary, false: colors.border }} /></View>
-            {day.isClosed ? null : <View style={styles.dayTimes}><View><Text style={[styles.rowHint, { color: colors.mutedForeground }]}>Opens</Text>{stepper('openTime')}</View><View><Text style={[styles.rowHint, { color: colors.mutedForeground }]}>Closes</Text>{stepper('closeTime')}</View></View>}
-          </View>
-        );
-      })}
+      {/* The sign-up design (owner, 2026-11-03): a check box per day, tap a day for the time wheel. */}
+      <BusinessHoursEditor hours={(draft.hours as Hours[] | undefined) ?? []} onChange={(next) => set('hours', next)} testPrefix="hours" />
       <Help>Clients can only book online inside these hours.</Help>{saveButton()}
     </>);
     if (screen === 'deposits') return (<>
       <Label>Deposit when clients book online</Label>
-      {choices('policy', [{ value: 'none', label: 'No deposit' }, { value: 'deposit', label: 'Ask for a deposit' }, ...(draft.policy === 'card_on_file' ? [{ value: 'card_on_file', label: 'Card on file' }] : [])])}
+      {choices('policy', [{ value: 'none', label: 'No deposit' }, { value: 'deposit', label: 'Ask for a deposit' }, { value: 'card_on_file', label: 'Save their card (no charge)' }])}
+      {draft.policy === 'card_on_file' ? <Help>Clients add a card when they book or send a request online. A $1 hold checks the card and is released right away, so nothing is charged. You can charge a no-show or late-cancel fee to it (Settings › Cancellation policy).</Help> : null}
       {draft.policy === 'deposit' ? <>
         <Label>How much</Label>
-        {choices('depositType', [{ value: 'fixed', label: 'A set amount' }, { value: 'percentage', label: 'A percent of the price' }])}
-        {field('depositValue', draft.depositType === 'percentage' ? 'Percent, e.g. 20' : 'Dollars, e.g. 25', { keyboardType: 'decimal-pad' })}
+        {choices('depositType', [{ value: 'full', label: 'The full price' }, { value: 'fixed', label: 'A set amount' }, { value: 'percentage', label: 'A percent of the price' }])}
+        {draft.depositType !== 'full' ? field('depositValue', draft.depositType === 'percentage' ? 'Percent, e.g. 20' : 'Dollars, e.g. 25', { keyboardType: 'decimal-pad' }) : null}
+        {draft.houseCalls ? toggle('includeTravelFee', 'Include the house-call travel fee', 'On: the fee is part of what the client pays when they book. Off: they pay it at the visit.') : null}
         <Help>{draft.approval === 'manual'
           ? 'You review each booking first, so the deposit is asked for after you approve: the client gets a text with a payment link and has 24 hours to pay. The time is only confirmed once it is paid; if not, it is released and the client is told.'
-          : 'Clients pay the deposit by card right after they book. If it isn\'t paid within an hour, the time is released.'}</Help>
-        <Help>The deposit comes off the price at checkout. Payments go to your Stripe account.</Help>
+          : 'Clients pay by card on your booking page as they book. If they leave without paying, the time is held for an hour and they get a text with a link to pay.'}</Help>
+        <Help>{draft.depositType === 'full' ? 'Nothing is left to pay at the visit: tap Mark as done when you finish.' : 'The deposit comes off the price at checkout.'} Payments go to your Stripe account.</Help>
         {!draft.cardsReady ? <>
           <Help>Card payments aren't set up yet, so clients can't pay a deposit.</Help>
           <TouchableOpacity testID="settings-deposits-get-paid" onPress={() => router.push('/get-paid')} style={[styles.save, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}><Text style={[styles.saveText, { color: colors.foreground }]}>Set up card payments</Text></TouchableOpacity>
@@ -435,6 +491,9 @@ export default function SettingsScreen() {
       <Label>Your cancellation policy</Label>
       {field('cancellationPolicyText', 'For example: Please give 24 hours notice to cancel or reschedule.', { multiline: true, style: [styles.input, styles.textArea, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }] })}
       {toggle('cancellationPolicyRequired', 'Clients must accept it to book', 'They tick a box agreeing to the policy before booking online.')}
+      <Label>No-show and late-cancel fee</Label>
+      {field('feePercent', 'Percent of the booking, e.g. 50 (empty = no fee)', { keyboardType: 'decimal-pad' })}
+      <Help>Charged to the client's card on file, only when you tap Charge fee on a no-show or cancelled booking. Ask for a card on file in Settings › Deposits.</Help>
       {saveButton()}
     </>);
     if (screen === 'blocked') return (<>
@@ -446,6 +505,72 @@ export default function SettingsScreen() {
         <View key={row.id} style={[styles.toggleRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={{ flex: 1 }}><Text style={[styles.rowTitle, { color: colors.foreground }]}>{formatPhone(String(row.phoneE164 ?? ''))}</Text>{row.reason ? <Text style={[styles.rowHint, { color: colors.mutedForeground }]}>{row.reason}</Text> : null}</View><TouchableOpacity testID={`settings-unblock-${row.id}`} onPress={() => void unblock(row.id)}><Text style={[styles.link, { color: colors.destructive }]}>Remove</Text></TouchableOpacity></View>
       ))}
     </>);
+    if (screen === 'phone') {
+      const line = draft.line as { phoneNumber: string } | null;
+      if (!line && !draft.plus) return (<>
+        <Help>You don't have a business number yet. Choose one, and clients can call and text it.</Help>
+        <TouchableOpacity testID="settings-phone-setup" onPress={() => router.push('/phone')} style={[styles.save, { backgroundColor: colors.primary }]}><Text style={[styles.saveText, { color: colors.primaryForeground }]}>Choose a number</Text></TouchableOpacity>
+      </>);
+      const digits = String(draft.phone ?? '').replace(/\D/g, '');
+      const withPhone = clients.filter((c) => (c.phone ?? '').replace(/\D/g, '').length >= 10);
+      return (<>
+        {!line ? (<>
+          <Label>Plus calling</Label>
+          <Help>{`Your clients call and text you at ${formatPhone(String(draft.plusNumber ?? ''))}, Certxa's Plus number. You call them from their profile.`}</Help>
+        </>) : null}
+        {line ? (<>
+        <Label>Your business number</Label>
+        <View style={[styles.toggleRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.rowTitle, { flex: 1, color: colors.foreground }]} selectable>{formatPhone(line.phoneNumber)}</Text>
+          <TouchableOpacity testID="settings-phone-change" onPress={() => Alert.alert('Change your business number?',
+            `This can't be undone. By continuing, ${formatPhone(line.phoneNumber)} will be released back into the number pool and you won't be able to get it back. Changing your number costs $5.`,
+            [{ text: 'Cancel', style: 'cancel' }, { text: 'Continue', style: 'destructive', onPress: () => router.push({ pathname: '/phone', params: { change: '1' } }) }])}>
+            <Text style={[styles.link, { color: colors.primary }]}>Change number</Text>
+          </TouchableOpacity>
+        </View>
+        {(() => {
+          const b = (draft.line as any)?.billing as { status: string; paidUntil: string | null; cancelAtPeriodEnd: boolean; retryAt: string | null; heldUntil: string | null } | undefined;
+          if (!b) return null;
+          const on = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '');
+          const text = b.status === 'free' ? 'No charge for this number.'
+            : b.status === 'held' ? `Paused: the payment didn't go through, so calls and texts are stopped. Pay by ${on(b.heldUntil)} to keep this number; after that it is released.`
+            : b.status === 'past_due' ? `The last payment didn't go through. We'll try again ${on(b.retryAt)}.`
+            : b.cancelAtPeriodEnd ? `Cancelled. Your number works until ${on(b.paidUntil)}, then it is released.`
+            : `$10/month · Renews ${on(b.paidUntil)}`;
+          const button = (label: string, onPress: () => void, testID: string, danger = false) => (
+            <TouchableOpacity testID={testID} disabled={saving} onPress={onPress} style={[styles.save, danger ? { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border } : { backgroundColor: colors.primary }]}>
+              <Text style={[styles.saveText, { color: danger ? colors.destructive : colors.primaryForeground }]}>{label}</Text>
+            </TouchableOpacity>
+          );
+          return (<>
+            <Label>Plan</Label>
+            <Help>{text}</Help>
+            {b.status === 'held' || b.status === 'past_due' ? button('Pay $10 now', () => void phoneBilling('pay', 'Paid. Your Business Phone is on.'), 'settings-phone-pay') : null}
+            {b.status !== 'free' && b.status !== 'held' && b.cancelAtPeriodEnd ? button('Keep my number', () => void phoneBilling('resume', 'Your Business Phone will keep going.'), 'settings-phone-resume') : null}
+            {b.status !== 'free' && b.status !== 'held' && !b.cancelAtPeriodEnd ? button('Cancel Business Phone', () => Alert.alert('Cancel Business Phone?',
+              `Your number keeps working until ${on(b.paidUntil)}. Then ${formatPhone(line.phoneNumber)} is released back into the number pool and you won't be able to get it back.`,
+              [{ text: 'Keep it', style: 'cancel' }, { text: 'Cancel Business Phone', style: 'destructive', onPress: () => void phoneBilling('cancel', 'Cancelled. It ends with your paid month.') }]), 'settings-phone-cancel', true) : null}
+          </>);
+        })()}
+        </>) : null}
+        <Label>Calling rules</Label>
+        <SelectField testID="settings-phone-ring" title="Ring my phone" value={String(draft.ring)} onChange={(value) => void setRing(value)}
+          options={[{ value: 'hours', label: 'During business hours' }, { value: 'always', label: 'Any time' }]} />
+        <Help>When your phone doesn't ring, or a call isn't answered in 25 seconds, the caller is told you can't take the call and it shows as a missed call.</Help>
+        <Label>Block a client or number</Label>
+        <Help>A blocked number hears a busy signal when it calls your business number. You aren't told about these calls.</Help>
+        {withPhone.length ? <SelectField testID="settings-phone-block-client" title="Choose a client" placeholder="Choose a client" value={draft.clientId as number | null}
+          onChange={(id) => { const c = withPhone.find((x) => x.customerId === id); setDraft((current) => ({ ...current, clientId: id, phone: c?.phone ?? '' })); }}
+          options={withPhone.map((c) => ({ value: c.customerId, label: c.name, hint: formatPhone(c.phone ?? '') }))} /> : null}
+        {field('phone', '10-digit phone number', { keyboardType: 'phone-pad', onChangeText: (value) => setDraft((current) => ({ ...current, phone: value, clientId: null })) })}
+        {field('reason', 'Reason (optional)')}
+        <TouchableOpacity testID="settings-phone-block" disabled={saving || digits.length < 10} onPress={() => void blockCaller()} style={[styles.save, { backgroundColor: digits.length < 10 ? colors.muted : colors.primary }]}><Text style={[styles.saveText, { color: digits.length < 10 ? colors.mutedForeground : colors.primaryForeground }]}>Block this number</Text></TouchableOpacity>
+        <Label>Blocked from calling</Label>
+        {(draft.list as any[] | undefined ?? []).length === 0 ? <Help>Nobody is blocked.</Help> : (draft.list as any[]).map((row) => (
+          <View key={row.id} style={[styles.toggleRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={{ flex: 1 }}><Text style={[styles.rowTitle, { color: colors.foreground }]}>{row.clientName ?? formatPhone(String(row.phoneE164 ?? ''))}</Text><Text style={[styles.rowHint, { color: colors.mutedForeground }]}>{[row.clientName ? formatPhone(String(row.phoneE164 ?? '')) : null, row.reason].filter(Boolean).join(' · ') || ' '}</Text></View><TouchableOpacity testID={`settings-phone-unblock-${row.id}`} onPress={() => void unblockCaller(row.id)}><Text style={[styles.link, { color: colors.destructive }]}>Remove</Text></TouchableOpacity></View>
+        ))}
+      </>);
+    }
     if (screen === 'website') return (<>
       <Label>Your website and booking address</Label>
       <View style={[styles.toggleRow, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.rowTitle, { flex: 1, color: colors.foreground }]}>{website.replace('https://', '') || 'Not set up yet'}</Text></View>
@@ -453,6 +578,7 @@ export default function SettingsScreen() {
         <TouchableOpacity testID="settings-share-site" onPress={() => void Share.share({ message: website })} style={[styles.save, { backgroundColor: colors.primary }]}><Text style={[styles.saveText, { color: colors.primaryForeground }]}>Share my booking link</Text></TouchableOpacity>
         <TouchableOpacity testID="settings-open-site" onPress={() => void Linking.openURL(website)} style={styles.linkButton}><Text style={[styles.link, { color: colors.primary }]}>Open my website</Text></TouchableOpacity>
       </> : null}
+      <TouchableOpacity testID="settings-about" onPress={() => router.push('/about-me')} style={[styles.save, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}><Text style={[styles.saveText, { color: colors.foreground }]}>About you</Text></TouchableOpacity>
       <TouchableOpacity testID="settings-edit-site" onPress={() => router.push('/website-setup')} style={[styles.save, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}><Text style={[styles.saveText, { color: colors.foreground }]}>Edit my link, design and look</Text></TouchableOpacity>
     </>);
     if (screen === 'stripe') {
@@ -488,6 +614,16 @@ export default function SettingsScreen() {
     </>);
     return (<>
       <View style={[styles.toggleRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={{ flex: 1 }}><Text style={[styles.rowHint, { color: colors.mutedForeground, marginTop: 0 }]}>Signed in as</Text><Text style={[styles.rowTitle, { color: colors.foreground }]}>{user?.email ?? 'Your Certxa account'}</Text></View></View>
+      <Label>Mobile number</Label>
+      {field('mobile', 'Mobile number', { keyboardType: 'phone-pad', autoComplete: 'tel', editable: !draft.codeSent })}
+      {draft.codeSent ? (<>
+        <Help>Enter the 6-digit code we texted to this number.</Help>
+        {field('code', '6-digit code', { keyboardType: 'number-pad', maxLength: 6, autoComplete: 'sms-otp', textContentType: 'oneTimeCode' })}
+        <TouchableOpacity testID="settings-mobile-confirm" disabled={saving || String(draft.code ?? '').length !== 6} onPress={() => void confirmMobile()} style={[styles.save, { backgroundColor: String(draft.code ?? '').length === 6 ? colors.primary : colors.muted }]}><Text style={[styles.saveText, { color: String(draft.code ?? '').length === 6 ? colors.primaryForeground : colors.mutedForeground }]}>Confirm</Text></TouchableOpacity>
+        <TouchableOpacity testID="settings-mobile-cancel" onPress={() => setDraft((d) => ({ ...d, mobile: d.mobileNow, codeSent: false, code: '' }))} style={styles.linkButton}><Text style={[styles.link, { color: colors.foreground }]}>Cancel</Text></TouchableOpacity>
+      </>) : mobileDigits.length === 10 && mobileDigits !== String(draft.mobileNow ?? '').replace(/\D/g, '').replace(/^1(?=\d{10}$)/, '') ? (
+        <TouchableOpacity testID="settings-mobile-change" disabled={saving} onPress={() => void changeMobile()} style={[styles.save, { backgroundColor: colors.primary }]}><Text style={[styles.saveText, { color: colors.primaryForeground }]}>Change number</Text></TouchableOpacity>
+      ) : null}
       <Label>Password</Label>
       <TouchableOpacity testID="settings-change-password" disabled={saving} onPress={() => void sendPasswordEmail()} style={[styles.save, { backgroundColor: colors.primary }]}><Text style={[styles.saveText, { color: colors.primaryForeground }]}>E-mail me a link to change it</Text></TouchableOpacity>
       <Label>This phone</Label>
@@ -504,7 +640,7 @@ export default function SettingsScreen() {
       <StatusBar barStyle="dark-content" />
       <View style={styles.header}>
         <TouchableOpacity testID="settings-back" accessibilityLabel="Back" onPress={() => (screen === 'menu' ? router.back() : void open('menu'))} style={styles.headerButton}><Feather name="arrow-left" size={21} color={colors.foreground} /></TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.foreground }]}>{TITLES[screen]}</Text>
+        <HelpTitle help={screen === 'menu' ? 'settings' : `settings.${screen}`} style={[styles.headerTitle, { color: colors.foreground }]}>{TITLES[screen]}</HelpTitle>
         <View style={styles.headerButton} />
       </View>
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
@@ -537,12 +673,6 @@ const styles = StyleSheet.create({
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { minHeight: 38, borderWidth: 1, borderRadius: 12, paddingHorizontal: 13, alignItems: 'center', justifyContent: 'center' },
   chipText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
-  dayCard: { borderWidth: 1, borderRadius: 15, padding: 12, marginBottom: 8 },
-  dayHead: { flexDirection: 'row', alignItems: 'center' },
-  dayTimes: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 },
-  stepper: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
-  stepButton: { width: 30, height: 30, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  stepValue: { minWidth: 72, textAlign: 'center', fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   save: { minHeight: 49, borderRadius: 15, alignItems: 'center', justifyContent: 'center', marginTop: 18 },
   saveText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   link: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },

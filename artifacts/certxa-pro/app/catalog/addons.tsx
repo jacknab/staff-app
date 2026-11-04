@@ -81,6 +81,7 @@ export default function AddonsScreen() {
 
   return (
     <CatalogScreen
+      help="catalog.addons"
       title={draft ? (draft.id > 0 ? 'Edit add-on' : 'New add-on') : 'Add-Ons'}
       onBack={() => (draft ? (setDraft(null), setError('')) : router.back())}
       onAdd={draft ? undefined : () => { setError(''); setDraft({ id: 0, name: '', description: '', minutes: '', price: '', hiddenFromPublic: false, serviceIds: [] }); }}

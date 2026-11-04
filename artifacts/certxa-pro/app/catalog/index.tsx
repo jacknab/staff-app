@@ -16,7 +16,7 @@ const SECTIONS = [
 export default function CatalogScreenMenu() {
   const router = useRouter();
   return (
-    <CatalogScreen title="Catalog" onBack={() => router.back()} testID="catalog">
+    <CatalogScreen title="Catalog" help="catalog" onBack={() => router.back()} testID="catalog">
       <List>
         {SECTIONS.map((section) => (
           <Row key={section.to} testID={`catalog-${section.title.toLowerCase().replace(/[^a-z]/g, '')}`} title={section.title} hint={section.hint} onPress={() => router.push(section.to)} />

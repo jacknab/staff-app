@@ -30,6 +30,7 @@ import {
   storePendingTerminalCapture,
   CertxaApiError,
 } from '@/lib/certxa-api';
+import { HelpTitle } from '@/components/HelpTitle';
 
 // Tap to Pay on iPhone needs Apple's managed entitlement in the provisioning
 // profile. Today only the development profile carries it (the "preview-dev"
@@ -37,7 +38,7 @@ import {
 // Stripe M2 does not require that Apple entitlement.
 const TAP_TO_PAY_ENABLED = true;
 // Shown on the payment screen so a tester can tell which build is installed.
-const BUILD_LABEL = 'Build Nov 1 · A';
+const BUILD_LABEL = 'Build Nov 4 · Z14';
 const EXPO_GO_PREVIEW = process.env.EXPO_PUBLIC_EXPO_GO_PREVIEW === '1';
 
 type PaymentStep = 'idle' | 'tap_intro' | 'initializing' | 'discovering' | 'connecting' | 'ready' | 'processing' | 'capture_pending' | 'success' | 'error';
@@ -634,7 +635,7 @@ export default function CheckoutScreen() {
     <View style={[styles.root, { backgroundColor: colors.background, paddingTop: topInset }]}>
       <StatusBar barStyle="dark-content" />
       <ScrollView contentContainerStyle={styles.pageContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        <View style={styles.topLine}><View><Text style={[styles.eyebrow, { color: colors.primary }]}>CERTXA PRO</Text><Text style={[styles.title, { color: colors.foreground }]}>Checkout</Text></View><View style={[styles.secureBadge, { backgroundColor: colors.secondary }]}><Feather name="lock" size={13} color={colors.primary} /><Text style={[styles.secureText, { color: colors.primary }]}>Certxa secure</Text></View></View>
+        <View style={styles.topLine}><View><Text style={[styles.eyebrow, { color: colors.primary }]}>CERTXA PRO</Text><HelpTitle help="checkout" style={[styles.title, { color: colors.foreground }]}>Checkout</HelpTitle></View><View style={[styles.secureBadge, { backgroundColor: colors.secondary }]}><Feather name="lock" size={13} color={colors.primary} /><Text style={[styles.secureText, { color: colors.primary }]}>Certxa secure</Text></View></View>
         <View style={{ marginBottom: 14 }}><PaymentsSetupBanner message="Set up card payments to take this payment with Tap to Pay or the M2 reader." /></View>
         <View style={[styles.amountPanel, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[styles.amountCaption, { color: colors.mutedForeground }]}>PAYMENT AMOUNT</Text>

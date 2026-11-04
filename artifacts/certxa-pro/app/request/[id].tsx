@@ -13,6 +13,7 @@ import { useBookingData } from '@/contexts/BookingContext';
 import { api, ApiError } from '@/lib/live-api';
 import { approveBookingRequest, declineBookingRequest, getBookingRequest, offerBookingTimes, type BookingRequest } from '@/lib/bookingRequests';
 import { businessToday, zonedDateLabel, zonedTimeLabel } from '@/lib/businessTime';
+import { HelpTitle } from '@/components/HelpTitle';
 
 const MAX_TIMES = 8;
 function isoDay(day: Date) { return `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`; }
@@ -122,7 +123,7 @@ export default function RequestScreen() {
     <View style={[styles.root, { backgroundColor: colors.background, paddingTop: Platform.OS === 'web' ? 67 : insets.top }]}>
       <View style={styles.nav}>
         <TouchableOpacity accessibilityLabel="Back" onPress={() => (offering ? setOffering(false) : router.back())} style={styles.back} testID="request-back"><Feather name="arrow-left" size={20} color={colors.foreground} /></TouchableOpacity>
-        <Text style={[styles.navTitle, { color: colors.foreground }]}>{offering ? 'Offer other times' : 'Booking request'}</Text>
+        <HelpTitle help="request" style={[styles.navTitle, { color: colors.foreground }]}>{offering ? 'Offer other times' : 'Booking request'}</HelpTitle>
         <View style={styles.back} />
       </View>
       {!request ? (

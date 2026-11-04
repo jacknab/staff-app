@@ -2,7 +2,7 @@
   "expo": {
     "name": "Certxa Pro",
     "slug": "certxa-pro",
-    "version": "1.0.6",
+    "version": "1.0.8",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "certxa-pro",
@@ -14,7 +14,8 @@
         "ITSAppUsesNonExemptEncryption": false
       },
       "entitlements": {
-        "com.apple.developer.proximity-reader.payment.acceptance": true
+        "com.apple.developer.proximity-reader.payment.acceptance": true,
+        "aps-environment": "production"
       }
     },
     "android": {
@@ -28,8 +29,9 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#F6F6F1",
-          "image": "./assets/images/icon.png",
+          "backgroundColor": "#000000",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 240,
           "resizeMode": "contain"
         }
       ],
@@ -50,16 +52,30 @@
         "expo-notifications",
         {
           "sounds": [
-            "./assets/sounds/soft_chime.wav"
+            "./assets/sounds/soft_chime.wav",
+            "./assets/sounds/alarm.wav"
           ]
+        }
+      ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Certxa Pro reads your contacts only when you choose to import clients from them."
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "Certxa Pro uses your photos for the cover photo and profile photo on your booking website.",
-          "cameraPermission": false,
-          "microphonePermission": false
+          "photosPermission": "Certxa Pro uses your photos for your booking website and for before and after photos on your clients' profiles.",
+          "cameraPermission": "Certxa Pro uses the camera to take before and after photos for your clients' profiles.",
+          "microphonePermission": "Certxa Pro uses the microphone for calls on your business number."
+        }
+      ],
+      [
+        "@twilio/voice-react-native-sdk",
+        {
+          "apsEnvironment": "production",
+          "microphoneUsageDescription": "Certxa Pro uses the microphone for calls on your business number."
         }
       ]
     ],
@@ -72,6 +88,15 @@
         "projectId": "7dfdabdc-943a-437b-84d8-e1984923594c"
       }
     },
-    "owner": "tobyben"
+    "owner": "tobyben",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/7dfdabdc-943a-437b-84d8-e1984923594c",
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    }
   }
 }

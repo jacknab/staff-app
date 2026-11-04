@@ -114,12 +114,25 @@ export type RegisterRequest = {
   businessType: string;
   email: string;
   password: string;
-  phone?: string;
+  /** 10 digits, proved by the texted code. */
+  phone: string;
+  /** From verifySignupPhoneCode. */
+  phoneToken: string;
   timezone?: string;
   /** Where they see clients: their own place (salon/suite or a private home studio, or none) and house calls. */
   ownPlace?: 'salon' | 'home' | 'none';
   houseCalls?: boolean;
 };
+
+/** Texts a sign-up code to a mobile number no Certxa account has had (landline and VoIP numbers are refused). */
+export function sendSignupPhoneCode(phone: string): Promise<{ sent: true }> {
+  return certxaRequest('/api/solo/phone/send-code', { method: 'POST', body: JSON.stringify({ phone }) });
+}
+
+/** Checks the texted code; the token goes with the sign-up. */
+export function verifySignupPhoneCode(phone: string, code: string): Promise<{ phoneToken: string }> {
+  return certxaRequest('/api/solo/phone/verify', { method: 'POST', body: JSON.stringify({ phone, code }) });
+}
 
 /** Creates a Certxa Pro account (one calendar, free Solo plan) and signs it in. */
 export function register(body: RegisterRequest): Promise<LoginResponse> {

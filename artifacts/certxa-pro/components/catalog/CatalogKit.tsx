@@ -3,6 +3,7 @@
  * list and editor looks and behaves the same as the Services screen: a header with back and +, a list of rows, and
  * an editor that replaces the list while one item is open.
  */
+import { HelpTitle } from '@/components/HelpTitle';
 import type { ReactNode } from 'react';
 import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -10,6 +11,7 @@ import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { ActivityIndicator, Image, ScrollView, StatusBar, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View, type TextInputProps } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
+import { SelectField } from '@/components/SelectField';
 
 export function money(value: number | string | null | undefined) {
   return `$${(Number(value) || 0).toFixed(2)}`;
@@ -50,8 +52,8 @@ export function PhotoField({ label, uri, onPick, onRemove, testID }: { label: st
   );
 }
 
-export function CatalogScreen({ title, onBack, onAdd, addLabel, testID, children }: {
-  title: string; onBack: () => void; onAdd?: () => void; addLabel?: string; testID: string; children: ReactNode;
+export function CatalogScreen({ title, help, onBack, onAdd, addLabel, testID, children }: {
+  title: string; help: string; onBack: () => void; onAdd?: () => void; addLabel?: string; testID: string; children: ReactNode;
 }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -60,7 +62,7 @@ export function CatalogScreen({ title, onBack, onAdd, addLabel, testID, children
       <StatusBar barStyle="dark-content" />
       <View style={styles.header}>
         <TouchableOpacity testID={`${testID}-back`} accessibilityLabel="Back" onPress={onBack} style={styles.headerButton}><Feather name="arrow-left" size={21} color={colors.foreground} /></TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.foreground }]}>{title}</Text>
+        <HelpTitle help={help} style={[styles.headerTitle, { color: colors.foreground }]}>{title}</HelpTitle>
         {onAdd ? (
           <TouchableOpacity testID={`${testID}-add`} accessibilityLabel={addLabel ?? 'Add'} onPress={onAdd} style={styles.headerButton}><Feather name="plus" size={22} color={colors.primary} /></TouchableOpacity>
         ) : <View style={styles.headerButton} />}
@@ -134,21 +136,9 @@ export function Label({ children }: { children: string }) {
   return <Text style={[styles.label, { color: colors.foreground }]}>{children}</Text>;
 }
 
-/** One choice out of a few (e.g. 30 / 60 / 90 days). */
+/** One choice out of a few (e.g. 30 / 60 / 90 days), as a dropdown (owner, 2026-11-03: no rows of pill buttons). */
 export function Choice<T extends string | number>({ options, value, onChange, testID }: { options: Array<[T, string]>; value: T; onChange: (value: T) => void; testID: string }) {
-  const colors = useColors();
-  return (
-    <View style={styles.pair}>
-      {options.map(([option, text]) => {
-        const picked = option === value;
-        return (
-          <TouchableOpacity key={String(option)} testID={`${testID}-${option}`} onPress={() => onChange(option)} style={[styles.chip, { backgroundColor: picked ? colors.primary : colors.card, borderColor: picked ? colors.primary : colors.border }]}>
-            <Text style={[styles.chipText, { color: picked ? colors.primaryForeground : colors.foreground }]}>{text}</Text>
-          </TouchableOpacity>
-        );
-      })}
-    </View>
-  );
+  return <SelectField testID={testID} value={value} options={options.map(([option, text]) => ({ value: option, label: text }))} onChange={onChange} />;
 }
 
 /** Tick any number of items (services an add-on belongs to, what a package holds). */

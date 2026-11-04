@@ -13,6 +13,7 @@ import { useColors } from '@/hooks/useColors';
 import { useBookingData } from '@/contexts/BookingContext';
 import { api } from '@/lib/live-api';
 import { zonedTimeLabel } from '@/lib/businessTime';
+import { HelpTitle } from '@/components/HelpTitle';
 
 type Note = { id: number; noteContent: string; createdAt: string; appointmentId?: number | null; pinned?: boolean };
 const MAX = 5000;
@@ -79,7 +80,7 @@ export default function NotesScreen() {
           <Feather name="chevron-left" size={24} color={colors.foreground} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.title, { color: colors.foreground }]}>Notes</Text>
+          <HelpTitle help="notes" style={[styles.title, { color: colors.foreground }]}>Notes</HelpTitle>
           {params.clientName ? <Text numberOfLines={1} style={[styles.subtitle, { color: colors.mutedForeground }]}>{params.clientName}</Text> : null}
         </View>
       </View>

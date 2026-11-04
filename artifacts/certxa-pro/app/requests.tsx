@@ -8,6 +8,7 @@ import { useColors } from '@/hooks/useColors';
 import { useBookingData } from '@/contexts/BookingContext';
 import { listBookingRequests, type BookingRequest } from '@/lib/bookingRequests';
 import { zonedDateLabel, zonedTimeLabel } from '@/lib/businessTime';
+import { HelpTitle } from '@/components/HelpTitle';
 
 export default function RequestsScreen() {
   const colors = useColors();
@@ -29,7 +30,7 @@ export default function RequestsScreen() {
     <View style={[styles.root, { backgroundColor: colors.background, paddingTop: Platform.OS === 'web' ? 67 : insets.top }]}>
       <View style={styles.nav}>
         <TouchableOpacity accessibilityLabel="Back" onPress={() => router.back()} style={styles.back} testID="requests-back"><Feather name="arrow-left" size={20} color={colors.foreground} /></TouchableOpacity>
-        <Text style={[styles.navTitle, { color: colors.foreground }]}>Booking requests</Text>
+        <HelpTitle help="requests" style={[styles.navTitle, { color: colors.foreground }]}>Booking requests</HelpTitle>
         <View style={styles.back} />
       </View>
       <ScrollView

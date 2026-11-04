@@ -2,169 +2,307 @@ import { useState } from 'react';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Platform, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollViewCompat';
 import { useColors } from '@/hooks/useColors';
+import { SelectField } from '@/components/SelectField';
 import { useAuth } from '@/contexts/AuthContext';
-import { CertxaApiError } from '@/lib/certxa-api';
+import { CertxaApiError, sendSignupPhoneCode, verifySignupPhoneCode } from '@/lib/certxa-api';
+import { api } from '@/lib/live-api';
+import { BusinessHoursEditor, DAY_NAMES, type DayHours } from '@/components/BusinessHoursEditor';
 
 // The same list as Settings > Business details. Certxa loads a starter list of services for the types it has one for.
 const BUSINESS_TYPES = ['Nail Salon', 'Hair Salon', 'Barbershop', 'Lash and Brows', 'Esthetician', 'Makeup', 'Massage', 'Wax', 'Tattoo and Piercing', 'Pet Grooming', 'Other'];
+const STEPS = 5;
 
 function deviceTimezone() {
   try { return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined; } catch { return undefined; }
 }
 
+/**
+ * Sign-up, one question per step (owner, 2026-11-03): 1 you and your business, 2 where you offer your services,
+ * 3 your business hours (a day opens a sheet with a time wheel), 4 your login, 5 your mobile number, proved by a
+ * texted code (a mobile line no Certxa account has ever had: lib/proPhoneVerification.ts on the server). A progress
+ * bar and "n / 5" at the top, one Next button at the bottom that is grey until the step is answered. Light colours
+ * throughout.
+ */
 export default function SignupScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { register } = useAuth();
+  const [step, setStep] = useState(1);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [businessName, setBusinessName] = useState('');
   const [businessType, setBusinessType] = useState('');
-  // Where they see clients: a salon/suite or a home studio (one or neither), and/or house calls.
-  const [ownPlace, setOwnPlace] = useState<'salon' | 'home' | 'none'>('none');
+  // Where they see clients: their own place (a salon/suite/booth, or a home studio kept private) and/or house calls.
   const [houseCalls, setHouseCalls] = useState(false);
+  const [hasPlace, setHasPlace] = useState(true);
+  const [placeIsHome, setPlaceIsHome] = useState(false);
+  const [street, setStreet] = useState('');
+  const [city, setCity] = useState('');
+  const [state, setState] = useState('');
+  const [zip, setZip] = useState('');
+  // The days and times clients can book (the same default as before: Monday to Saturday, 9 to 6).
+  const [hours, setHours] = useState<DayHours[]>(() => DAY_NAMES.map((_, dayOfWeek) => ({ dayOfWeek, openTime: '09:00', closeTime: '18:00', isClosed: dayOfWeek === 0 })));
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [codeSent, setCodeSent] = useState(false);
+  const [code, setCode] = useState('');
+  // Kept once the code is right, so going back to fix the e-mail doesn't need a new code.
+  const [phoneToken, setPhoneToken] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const topInset = Platform.OS === 'web' ? 67 : insets.top;
   const bottomInset = Platform.OS === 'web' ? 34 : insets.bottom;
 
-  const submit = async () => {
-    if (isSubmitting) return;
-    const phoneDigits = phone.replace(/\D/g, '').replace(/^1(?=\d{10}$)/, '');
-    if (!firstName.trim() || !lastName.trim()) return setError('Enter your first and last name.');
-    if (businessName.trim().length < 2) return setError('Enter the name of your business.');
-    if (!businessType) return setError('Choose your type of business.');
-    if (ownPlace === 'none' && !houseCalls) return setError('Choose where you see clients.');
-    if (!email.trim() || !email.includes('@')) return setError('Enter a valid e-mail address.');
-    if (phoneDigits && phoneDigits.length !== 10) return setError('Enter a 10-digit phone number, or leave it empty.');
-    if (password.length < 8) return setError('Choose a password of at least 8 characters.');
+  const phoneDigits = phone.replace(/\D/g, '').replace(/^1(?=\d{10}$)/, '');
+  const addressReady = Boolean(street.trim() && city.trim() && /^[A-Za-z]{2}$/.test(state.trim()) && /^\d{5}$/.test(zip.trim()));
+  const ready =
+    step === 1 ? Boolean(firstName.trim() && lastName.trim() && businessName.trim().length >= 2 && businessType)
+    : step === 2 ? (houseCalls || hasPlace) && (!hasPlace || addressReady)
+    : step === 3 ? hours.some((day) => !day.isClosed)
+    : step === 4 ? Boolean(email.trim().includes('@') && password.length >= 8)
+    : codeSent ? code.length === 6 : phoneDigits.length === 10;
 
+  const otherNumber = () => { setCodeSent(false); setCode(''); setPhoneToken(null); setError(''); };
+  const back = () => {
+    setError('');
+    if (step === STEPS && codeSent) otherNumber();
+    else if (step > 1) setStep(step - 1);
+    else router.replace('/login');
+  };
+
+  const sendCode = async () => {
     setError('');
     setIsSubmitting(true);
     try {
+      await sendSignupPhoneCode(phoneDigits);
+      setCodeSent(true);
+      setCode('');
+    } catch (cause) {
+      setError(cause instanceof CertxaApiError ? cause.message : 'Could not send the code. Check your connection and try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const next = async () => {
+    if (!ready || isSubmitting) return;
+    setError('');
+    if (step < STEPS) { setStep(step + 1); return; }
+    if (!codeSent) { await sendCode(); return; }
+    setIsSubmitting(true);
+    try {
+      let token = phoneToken;
+      if (!token) {
+        try {
+          token = (await verifySignupPhoneCode(phoneDigits, code)).phoneToken;
+          setPhoneToken(token);
+        } catch (cause) {
+          setError(cause instanceof CertxaApiError ? cause.message : 'Could not check the code. Check your connection and try again.');
+          return;
+        }
+      }
       await register({
         firstName: firstName.trim(), lastName: lastName.trim(), businessName: businessName.trim(), businessType,
-        email: email.trim(), password, phone: phoneDigits || undefined, timezone: deviceTimezone(),
-        ownPlace, houseCalls,
+        email: email.trim(), password, phone: phoneDigits, phoneToken: token, timezone: deviceTimezone(),
+        ownPlace: hasPlace ? (placeIsHome ? 'home' : 'salon') : 'none', houseCalls,
       });
+      // The business address, saved the way Get paid saves it (Certxa also sets the time zone from it). Never blocks
+      // the sign-up: Get paid asks again if it is missing.
+      if (hasPlace) {
+        try {
+          const stores = await api.get<{ id: number }[]>('/api/stores');
+          const store = Array.isArray(stores) ? stores[0] : null;
+          if (store) await api.patch(`/api/stores/${store.id}`, { address: street.trim(), city: city.trim(), state: state.trim().toUpperCase(), postcode: zip.trim() });
+        } catch { /* asked again before card payments */ }
+      }
+      // The business hours chosen here (the account starts with Monday to Saturday, 9 to 6). Never blocks the sign-up.
+      try {
+        const stores = await api.get<{ id: number }[]>('/api/stores');
+        const store = Array.isArray(stores) ? stores[0] : null;
+        if (store) await api.put('/api/business-hours', { storeId: store.id, hours });
+      } catch { /* they can be set in Settings › Business hours */ }
       // A new account sets up its booking website (link, design, look - each step can be skipped), then card payments.
       router.replace('/website-setup?from=signup');
     } catch (cause) {
+      // The number was taken meanwhile, or the check went stale: start the number step again.
+      if (cause instanceof CertxaApiError && (cause.payload as { field?: string } | undefined)?.field === 'phone') otherNumber();
       setError(cause instanceof CertxaApiError ? cause.message : 'Could not create your account. Check your connection and try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const input = { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground };
+  const field = { borderColor: colors.border, backgroundColor: colors.card };
+  const inputText = { color: colors.foreground };
+  const toggle = (on: boolean, set: (v: boolean) => void, testID: string) => (
+    <Switch value={on} onValueChange={set} testID={testID}
+      trackColor={{ false: colors.border, true: colors.primary }} thumbColor="#FFFFFF" ios_backgroundColor={colors.border} />
+  );
 
   return (
-    <KeyboardAwareScrollViewCompat
-      style={[styles.root, { backgroundColor: colors.background }]}
-      contentContainerStyle={[styles.content, { paddingTop: topInset + 18, paddingBottom: bottomInset + 26 }]}
-      keyboardShouldPersistTaps="handled"
-      bottomOffset={20}
-    >
-      <TouchableOpacity accessibilityLabel="Back to sign in" onPress={() => router.replace('/login')} style={styles.back} testID="signup-back">
-        <Feather name="arrow-left" size={21} color={colors.foreground} />
-      </TouchableOpacity>
-      <Text style={[styles.eyebrow, { color: colors.primary }]}>CERTXA PRO</Text>
-      <Text style={[styles.title, { color: colors.foreground }]}>Create your account.</Text>
-      <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Your own calendar, clients and checkout. Free to use.</Text>
-
-      <View style={styles.form}>
-        <View style={styles.pair}>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.label, { color: colors.foreground }]}>First name</Text>
-            <TextInput autoCapitalize="words" autoComplete="given-name" onChangeText={setFirstName} placeholder="First name" placeholderTextColor={colors.mutedForeground} style={[styles.input, input]} testID="signup-first-name" value={firstName} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.label, { color: colors.foreground }]}>Last name</Text>
-            <TextInput autoCapitalize="words" autoComplete="family-name" onChangeText={setLastName} placeholder="Last name" placeholderTextColor={colors.mutedForeground} style={[styles.input, input]} testID="signup-last-name" value={lastName} />
-          </View>
-        </View>
-        <View>
-          <Text style={[styles.label, { color: colors.foreground }]}>Business name</Text>
-          <TextInput autoCapitalize="words" onChangeText={setBusinessName} placeholder="What clients know you as" placeholderTextColor={colors.mutedForeground} style={[styles.input, input]} testID="signup-business-name" value={businessName} />
-        </View>
-        <View>
-          <Text style={[styles.label, { color: colors.foreground }]}>Type of business</Text>
-          <View style={styles.chips}>
-            {BUSINESS_TYPES.map((type) => {
-              const picked = businessType === type;
-              return (
-                <TouchableOpacity key={type} accessibilityRole="radio" accessibilityState={{ selected: picked }} onPress={() => setBusinessType(type)} style={[styles.chip, { backgroundColor: picked ? colors.primary : colors.card, borderColor: picked ? colors.primary : colors.border }]} testID={`signup-type-${type}`}>
-                  <Text style={[styles.chipText, { color: picked ? colors.primaryForeground : colors.foreground }]}>{type}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-        <View>
-          <Text style={[styles.label, { color: colors.foreground }]}>Where do you see clients?</Text>
-          <View style={styles.chips}>
-            {([['salon', 'Salon, suite or booth'], ['home', 'My home studio']] as const).map(([value, label]) => {
-              const picked = ownPlace === value;
-              return (
-                <TouchableOpacity key={value} accessibilityRole="checkbox" accessibilityState={{ checked: picked }} onPress={() => setOwnPlace(picked ? 'none' : value)} style={[styles.chip, { backgroundColor: picked ? colors.primary : colors.card, borderColor: picked ? colors.primary : colors.border }]} testID={`signup-place-${value}`}>
-                  <Text style={[styles.chipText, { color: picked ? colors.primaryForeground : colors.foreground }]}>{label}</Text>
-                </TouchableOpacity>
-              );
-            })}
-            <TouchableOpacity accessibilityRole="checkbox" accessibilityState={{ checked: houseCalls }} onPress={() => setHouseCalls(!houseCalls)} style={[styles.chip, { backgroundColor: houseCalls ? colors.primary : colors.card, borderColor: houseCalls ? colors.primary : colors.border }]} testID="signup-place-house-calls">
-              <Text style={[styles.chipText, { color: houseCalls ? colors.primaryForeground : colors.foreground }]}>Clients' homes (house calls)</Text>
-            </TouchableOpacity>
-          </View>
-          {ownPlace === 'home' ? <Text style={[styles.hint, { color: colors.mutedForeground }]}>Your home address stays private. Clients see your city until they book.</Text> : null}
-        </View>
-        <View>
-          <Text style={[styles.label, { color: colors.foreground }]}>Email</Text>
-          <TextInput autoCapitalize="none" autoComplete="email" autoCorrect={false} keyboardType="email-address" onChangeText={setEmail} placeholder="you@example.com" placeholderTextColor={colors.mutedForeground} style={[styles.input, input]} testID="signup-email" value={email} />
-        </View>
-        <View>
-          <Text style={[styles.label, { color: colors.foreground }]}>Phone (optional)</Text>
-          <TextInput autoComplete="tel" keyboardType="phone-pad" onChangeText={setPhone} placeholder="(555) 555-5555" placeholderTextColor={colors.mutedForeground} style={[styles.input, input]} testID="signup-phone" value={phone} />
-        </View>
-        <View>
-          <Text style={[styles.label, { color: colors.foreground }]}>Password</Text>
-          <TextInput autoCapitalize="none" autoComplete="new-password" onChangeText={setPassword} onSubmitEditing={submit} placeholder="At least 8 characters" placeholderTextColor={colors.mutedForeground} secureTextEntry style={[styles.input, input]} testID="signup-password" value={password} />
-        </View>
-        {error ? <Text style={[styles.error, { color: colors.destructive }]}>{error}</Text> : null}
-        <TouchableOpacity disabled={isSubmitting} onPress={submit} style={[styles.button, { backgroundColor: isSubmitting ? colors.muted : colors.primary }]} testID="signup-submit">
-          <Text style={[styles.buttonText, { color: isSubmitting ? colors.mutedForeground : colors.primaryForeground }]}>{isSubmitting ? 'Creating your account…' : 'Create account'}</Text>
-          {!isSubmitting && <Feather name="arrow-right" size={17} color={colors.primaryForeground} />}
+    <View style={[styles.root, { backgroundColor: colors.background }]}>
+      <KeyboardAwareScrollViewCompat
+        style={{ flex: 1 }}
+        contentContainerStyle={[styles.content, { paddingTop: topInset + 6, paddingBottom: 30 }]}
+        keyboardShouldPersistTaps="handled"
+        bottomOffset={110}
+      >
+        <TouchableOpacity accessibilityLabel={step > 1 ? 'Back' : 'Back to sign in'} onPress={back} style={styles.back} testID="signup-back">
+          <Feather name="arrow-left" size={24} color={colors.foreground} />
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => router.replace('/login')} style={{ alignSelf: 'center', minHeight: 40, justifyContent: 'center' }} testID="signup-sign-in">
-          <Text style={[styles.label, { color: colors.primary, marginBottom: 0 }]}>I already have an account</Text>
+        <View style={[styles.progress, { backgroundColor: colors.border }]} accessibilityLabel={`Step ${step} of ${STEPS}`}>
+          <View style={[styles.progressFill, { backgroundColor: colors.foreground, width: `${(step / STEPS) * 100}%` }]} />
+        </View>
+        <Text style={[styles.stepCount, { color: colors.mutedForeground }]}>{step} / {STEPS}</Text>
+
+        {step === 1 ? (
+          <>
+            <Text style={[styles.title, { color: colors.foreground }]}>Tell us about your business</Text>
+            <View style={styles.form}>
+              <View style={styles.pair}>
+                <TextInput autoCapitalize="words" autoComplete="given-name" onChangeText={setFirstName} placeholder="First name" placeholderTextColor={colors.mutedForeground} style={[styles.input, field, inputText, { flex: 1, minWidth: 0 }]} testID="signup-first-name" value={firstName} />
+                <TextInput autoCapitalize="words" autoComplete="family-name" onChangeText={setLastName} placeholder="Last name" placeholderTextColor={colors.mutedForeground} style={[styles.input, field, inputText, { flex: 1, minWidth: 0 }]} testID="signup-last-name" value={lastName} />
+              </View>
+              <TextInput autoCapitalize="words" onChangeText={setBusinessName} placeholder="Business name" placeholderTextColor={colors.mutedForeground} style={[styles.input, field, inputText]} testID="signup-business-name" value={businessName} />
+              <Text style={[styles.sectionLabel, { color: colors.foreground }]}>Type of business</Text>
+              <SelectField testID="signup-type" title="Type of business" placeholder="Choose your type of business" value={businessType || null}
+                options={BUSINESS_TYPES.map((type) => ({ value: type, label: type }))} onChange={setBusinessType} />
+            </View>
+          </>
+        ) : step === 2 ? (
+          <>
+            <Text style={[styles.title, { color: colors.foreground }]}>Where do you offer your services?</Text>
+            <View style={styles.optionRow}>
+              <Text style={[styles.optionTitle, { color: colors.foreground }]}>House call</Text>
+              {toggle(houseCalls, setHouseCalls, 'signup-place-house-calls')}
+            </View>
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+            <View style={styles.optionRow}>
+              <Text style={[styles.optionTitle, { color: colors.foreground }]}>Business location</Text>
+              {toggle(hasPlace, setHasPlace, 'signup-place-location')}
+            </View>
+            {hasPlace ? (
+              <>
+                <Text style={[styles.optionHint, { color: colors.mutedForeground }]}>
+                  {placeIsHome ? 'Your home address stays private. Clients see your city until they book.' : 'This address will appear on your website.'}
+                </Text>
+                <View style={[styles.addressBox, field]}>
+                  <Feather name="map-pin" size={20} color={colors.foreground} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.addressLabel, { color: colors.mutedForeground }]}>Address</Text>
+                    <TextInput autoComplete="street-address" onChangeText={setStreet} placeholder="Your business address" placeholderTextColor={colors.mutedForeground} style={[styles.addressInput, inputText]} testID="signup-address" value={street} />
+                  </View>
+                </View>
+                <View style={[styles.pair, { marginTop: 10 }]}>
+                  <TextInput autoComplete="postal-address-locality" onChangeText={setCity} placeholder="City" placeholderTextColor={colors.mutedForeground} style={[styles.input, field, inputText, { flex: 2, minWidth: 0 }]} testID="signup-city" value={city} />
+                  <TextInput autoCapitalize="characters" maxLength={2} onChangeText={setState} placeholder="State" placeholderTextColor={colors.mutedForeground} style={[styles.input, field, inputText, { flex: 1, minWidth: 0 }]} testID="signup-state" value={state} />
+                  <TextInput keyboardType="number-pad" maxLength={5} autoComplete="postal-code" onChangeText={setZip} placeholder="ZIP" placeholderTextColor={colors.mutedForeground} style={[styles.input, field, inputText, { flex: 1.3, minWidth: 0 }]} testID="signup-zip" value={zip} />
+                </View>
+                <TouchableOpacity accessibilityRole="checkbox" accessibilityState={{ checked: placeIsHome }} onPress={() => setPlaceIsHome(!placeIsHome)} style={styles.checkRow} testID="signup-place-home">
+                  <Feather name={placeIsHome ? 'check-square' : 'square'} size={20} color={placeIsHome ? colors.foreground : colors.mutedForeground} />
+                  <Text style={[styles.checkText, { color: colors.foreground }]}>This is my home studio (keep the address private)</Text>
+                </TouchableOpacity>
+              </>
+            ) : null}
+            {!houseCalls && !hasPlace ? <Text style={[styles.optionHint, { color: colors.mutedForeground, marginTop: 18 }]}>Turn on at least one.</Text> : null}
+          </>
+        ) : step === 3 ? (
+          <>
+            <Text style={[styles.title, { color: colors.foreground }]}>What are your business hours?</Text>
+            <Text style={[styles.optionHint, { color: colors.mutedForeground, marginTop: 12 }]}>Clients will only be able to book within these hours. You can edit these later in Settings.</Text>
+            <View style={{ marginTop: 18 }}>
+              <BusinessHoursEditor hours={hours} onChange={setHours} />
+            </View>
+          </>
+        ) : step === 4 ? (
+          <>
+            <Text style={[styles.title, { color: colors.foreground }]}>Create your login</Text>
+            <View style={styles.form}>
+              <TextInput autoCapitalize="none" autoComplete="email" autoCorrect={false} keyboardType="email-address" onChangeText={setEmail} placeholder="Email" placeholderTextColor={colors.mutedForeground} style={[styles.input, field, inputText]} testID="signup-email" value={email} />
+              <TextInput autoCapitalize="none" autoComplete="new-password" onChangeText={setPassword} onSubmitEditing={() => void next()} placeholder="Password (at least 8 characters)" placeholderTextColor={colors.mutedForeground} secureTextEntry style={[styles.input, field, inputText]} testID="signup-password" value={password} />
+            </View>
+          </>
+        ) : !codeSent ? (
+          <>
+            <Text style={[styles.title, { color: colors.foreground }]}>What's your mobile number?</Text>
+            <Text style={[styles.optionHint, { color: colors.mutedForeground, marginTop: 12 }]}>We'll text you a code to confirm it.</Text>
+            <View style={styles.form}>
+              <TextInput autoComplete="tel" keyboardType="phone-pad" onChangeText={setPhone} onSubmitEditing={() => void next()} placeholder="Mobile number" placeholderTextColor={colors.mutedForeground} style={[styles.input, field, inputText]} testID="signup-phone" textContentType="telephoneNumber" value={phone} />
+            </View>
+          </>
+        ) : (
+          <>
+            <Text style={[styles.title, { color: colors.foreground }]}>Enter the code</Text>
+            <Text style={[styles.optionHint, { color: colors.mutedForeground, marginTop: 12 }]}>
+              We texted a 6-digit code to ({phoneDigits.slice(0, 3)}) {phoneDigits.slice(3, 6)}-{phoneDigits.slice(6)}.
+            </Text>
+            <View style={styles.form}>
+              <TextInput autoComplete="sms-otp" keyboardType="number-pad" maxLength={6} onChangeText={(v) => setCode(v.replace(/\D/g, ''))} onSubmitEditing={() => void next()} placeholder="6-digit code" placeholderTextColor={colors.mutedForeground} style={[styles.input, field, inputText]} testID="signup-code" textContentType="oneTimeCode" value={code} />
+            </View>
+            <View style={styles.codeLinks}>
+              <TouchableOpacity disabled={isSubmitting} onPress={() => void sendCode()} style={styles.codeLink} testID="signup-code-resend">
+                <Text style={[styles.link, { color: colors.foreground }]}>Send a new code</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={otherNumber} style={styles.codeLink} testID="signup-code-other-number">
+                <Text style={[styles.link, { color: colors.foreground }]}>Use a different number</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+        {error ? <Text style={[styles.error, { color: colors.destructive }]}>{error}</Text> : null}
+        {step === 1 ? (
+          <TouchableOpacity onPress={() => router.replace('/login')} style={{ alignSelf: 'center', minHeight: 44, justifyContent: 'center', marginTop: 18 }} testID="signup-sign-in">
+            <Text style={[styles.link, { color: colors.foreground }]}>I already have an account</Text>
+          </TouchableOpacity>
+        ) : null}
+      </KeyboardAwareScrollViewCompat>
+
+      <View style={[styles.footer, { borderTopColor: colors.border, paddingBottom: bottomInset + 14, backgroundColor: colors.background }]}>
+        <TouchableOpacity disabled={!ready || isSubmitting} onPress={() => void next()} testID="signup-submit"
+          style={[styles.button, { backgroundColor: ready && !isSubmitting ? colors.foreground : colors.muted }]}>
+          <Text style={[styles.buttonText, { color: ready && !isSubmitting ? colors.background : colors.mutedForeground }]}>
+            {step < STEPS ? 'Next' : !codeSent ? (isSubmitting ? 'Sending…' : 'Text me a code') : isSubmitting ? 'Creating your account…' : 'Create account'}
+          </Text>
         </TouchableOpacity>
       </View>
-    </KeyboardAwareScrollViewCompat>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
   content: { flexGrow: 1, paddingHorizontal: 24 },
-  back: { width: 42, height: 42, justifyContent: 'center', marginLeft: -8, marginBottom: 10 },
-  eyebrow: { fontSize: 10, letterSpacing: 1.6, fontFamily: 'Inter_700Bold' },
-  title: { fontSize: 30, letterSpacing: -0.9, fontFamily: 'Inter_600SemiBold', marginTop: 8 },
-  subtitle: { fontSize: 14, lineHeight: 21, fontFamily: 'Inter_400Regular', marginTop: 10, maxWidth: 300 },
-  form: { gap: 17, marginTop: 26 },
+  back: { width: 44, height: 44, justifyContent: 'center', marginLeft: -6, marginBottom: 16 },
+  progress: { height: 3, borderRadius: 2, overflow: 'hidden' },
+  progressFill: { height: 3, borderRadius: 2 },
+  stepCount: { alignSelf: 'flex-end', fontSize: 17, fontFamily: 'Inter_500Medium', marginTop: 12 },
+  title: { fontSize: 34, lineHeight: 40, letterSpacing: -0.8, fontFamily: 'Inter_500Medium', marginTop: 6 },
+  form: { gap: 12, marginTop: 28 },
   pair: { flexDirection: 'row', gap: 10 },
-  label: { fontSize: 12, fontFamily: 'Inter_600SemiBold', marginBottom: 7 },
-  input: { borderWidth: 1, borderRadius: 14, height: 52, paddingHorizontal: 14, fontSize: 14, fontFamily: 'Inter_400Regular' },
+  sectionLabel: { fontSize: 15, fontFamily: 'Inter_600SemiBold', marginTop: 12 },
+  input: { borderWidth: 1, borderRadius: 14, height: 56, paddingHorizontal: 16, fontSize: 16, fontFamily: 'Inter_400Regular' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { borderWidth: 1, borderRadius: 11, paddingHorizontal: 12, minHeight: 38, justifyContent: 'center' },
-  chipText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
-  hint: { fontSize: 12, lineHeight: 17, fontFamily: 'Inter_400Regular', marginTop: 8 },
-  error: { fontSize: 12, lineHeight: 17, fontFamily: 'Inter_500Medium', marginTop: -5 },
-  button: { height: 53, borderRadius: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
-  buttonText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  chip: { borderWidth: 1, borderRadius: 22, paddingHorizontal: 16, minHeight: 42, justifyContent: 'center' },
+  chipText: { fontSize: 14, fontFamily: 'Inter_500Medium' },
+  optionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 64, marginTop: 22 },
+  optionTitle: { fontSize: 19, fontFamily: 'Inter_500Medium' },
+  optionHint: { fontSize: 16, lineHeight: 23, fontFamily: 'Inter_400Regular', marginTop: 4 },
+  divider: { height: StyleSheet.hairlineWidth, marginTop: 22 },
+  addressBox: { borderWidth: 1, borderRadius: 14, minHeight: 66, paddingHorizontal: 16, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 22 },
+  addressLabel: { fontSize: 13, fontFamily: 'Inter_500Medium' },
+  addressInput: { fontSize: 17, fontFamily: 'Inter_400Regular', padding: 0, marginTop: 2 },
+  checkRow: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44, marginTop: 12 },
+  checkText: { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular' },
+  link: { fontSize: 14, fontFamily: 'Inter_500Medium', textDecorationLine: 'underline' },
+  codeLinks: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
+  codeLink: { minHeight: 44, justifyContent: 'center' },
+  error: { fontSize: 13, lineHeight: 18, fontFamily: 'Inter_500Medium', marginTop: 16 },
+  footer: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 24, paddingTop: 14 },
+  button: { height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
+  buttonText: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
 });

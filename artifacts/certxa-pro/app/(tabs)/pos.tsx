@@ -15,6 +15,8 @@ import { useColors } from '@/hooks/useColors';
 import { useBookingData } from '@/contexts/BookingContext';
 import { api } from '@/lib/live-api';
 import { CertxaApiError } from '@/lib/certxa-api';
+import { HelpTitle } from '@/components/HelpTitle';
+import { ClientAvatar } from '@/components/ClientAvatar';
 
 const MAX_CENTS = 10_000_000; // $100,000
 const MIN_CENTS = 50; // Stripe's smallest card payment
@@ -112,6 +114,7 @@ export default function PosScreen() {
     return (
       <View style={[styles.root, { backgroundColor: colors.background, paddingTop: insets.top }]}>
         <StatusBar barStyle="dark-content" />
+        <View style={styles.pageHeader}><HelpTitle help="pos" style={[styles.pageTitle, { color: colors.foreground }]}>POS</HelpTitle></View>
         <View style={styles.amountArea}>
           <Text testID="pos-amount" style={[styles.amount, { color: cents > 0 ? colors.foreground : colors.mutedForeground }]} adjustsFontSizeToFit numberOfLines={1}>{dollars(cents)}</Text>
           {editingDescription ? (
@@ -169,7 +172,7 @@ export default function PosScreen() {
                 setPicked({ customerId: item.customerId, name: item.name, phone: item.phone, email: item.email ?? '' });
                 setChoosing(false); setSearch('');
               }} style={[styles.clientRow, { borderBottomColor: colors.border }]}>
-                <View style={[styles.initials, { backgroundColor: colors.secondary }]}><Text style={[styles.initialsText, { color: colors.primary }]}>{item.initials}</Text></View>
+                <ClientAvatar clientId={item.customerId} avatarUrl={item.avatarUrl} initials={item.initials} style={[styles.initials, { backgroundColor: colors.secondary }]} textStyle={[styles.initialsText, { color: colors.primary }]} />
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.clientName, { color: colors.foreground }]}>{item.name}</Text>
                   {item.phone || item.email ? <Text style={[styles.clientMeta, { color: colors.mutedForeground }]}>{item.phone || item.email}</Text> : null}
@@ -179,7 +182,7 @@ export default function PosScreen() {
         </View>
       ) : (
         <View style={[styles.clientArea, { paddingBottom: insets.bottom + 70 }]}>
-          <Text style={[styles.title, { color: colors.foreground }]}>Who is this sale for?</Text>
+          <HelpTitle help="pos" style={[styles.title, { color: colors.foreground }]}>Who is this sale for?</HelpTitle>
           {picked ? (
             <View testID="pos-picked" style={[styles.card, styles.pickedRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Feather name="user" size={18} color={colors.mutedForeground} />
@@ -228,7 +231,9 @@ function Field({ icon, value, onChange, placeholder, colors, testID, keyboardTyp
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  amountArea: { alignItems: 'center', paddingTop: 70, paddingHorizontal: 24, minHeight: 230 },
+  pageHeader: { height: 50, alignItems: 'center', justifyContent: 'center' },
+  pageTitle: { fontSize: 18, fontFamily: 'Inter_500Medium' },
+  amountArea: { alignItems: 'center', paddingTop: 20, paddingHorizontal: 24, minHeight: 230 },
   amount: { fontSize: 64, letterSpacing: -2, fontFamily: 'Inter_500Medium' },
   descriptionButton: { paddingVertical: 8, paddingHorizontal: 12 },
   descriptionText: { fontSize: 15, fontFamily: 'Inter_500Medium' },

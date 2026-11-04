@@ -13,15 +13,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollViewCompat';
 import { useColors } from '@/hooks/useColors';
 import { api, ApiError } from '@/lib/live-api';
+import { HelpTitle } from '@/components/HelpTitle';
 
-type Theme = 'bloom' | 'simple' | 'classic' | 'mobile';
+// 'solo' is the app's own copy of Bloom (owner, 2026-11-04); 'bloom' stays for the website's salons.
+type Theme = 'bloom' | 'solo' | 'simple' | 'classic' | 'mobile';
 type Look = { accent?: string; coverImage?: string; logoImage?: string; about?: string; instagram?: string; facebook?: string };
 type SiteState = { slug: string | null; url: string | null; theme: Theme; site: Look; businessName: string; oldSlugs: string[] };
 type Check = { slug: string; available: boolean; message: string | null; suggestions: string[] };
 type Step = 'link' | 'design' | 'look' | 'done';
 
 const THEMES: Array<{ value: Theme; name: string; about: string }> = [
-  { value: 'bloom', name: 'Bloom', about: 'A full website: big photo, services with pictures, your gallery, reviews and a map.' },
+  { value: 'solo', name: 'Solo', about: 'A full website: big photo, services with pictures, your portfolio, reviews and a map.' },
   { value: 'simple', name: 'Simple', about: 'Your photo and name on top, then a clean list of services to book.' },
   { value: 'mobile', name: 'Mobile', about: 'Feels like an app: service tiles and a bar at the bottom.' },
   { value: 'classic', name: 'Classic', about: 'A plain step-by-step booking page.' },
@@ -52,7 +54,7 @@ export default function WebsiteSetupScreen() {
   const [check, setCheck] = useState<Check | null>(null);
   const [checking, setChecking] = useState(false);
   // Step 2: the design
-  const [theme, setTheme] = useState<Theme>('bloom');
+  const [theme, setTheme] = useState<Theme>('solo');
   // Step 3: the look
   const [look, setLook] = useState<Look>({});
   const [uploading, setUploading] = useState<'' | 'coverImage' | 'logoImage'>('');
@@ -172,7 +174,7 @@ export default function WebsiteSetupScreen() {
       {step === 'link' ? (
         <>
           <Text style={[styles.eyebrow, { color: colors.primary }]}>YOUR WEBSITE</Text>
-          <Text style={[styles.title, { color: colors.foreground }]}>Choose your link</Text>
+          <HelpTitle help="website-setup" style={[styles.title, { color: colors.foreground }]}>Choose your link</HelpTitle>
           <Text style={[styles.body, { color: colors.mutedForeground }]}>Clients book you here. Put it in your Instagram bio and share it anywhere.</Text>
           <View style={[styles.slugBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <TextInput
@@ -190,10 +192,12 @@ export default function WebsiteSetupScreen() {
               : check?.message ?? ''}
           </Text>
           {typedSlug !== state.slug && check && !check.available && check.suggestions.length > 0 ? (
-            <View style={styles.chips}>
-              {check.suggestions.map((value) => (
-                <TouchableOpacity key={value} onPress={() => setSlug(value)} style={[styles.chip, { backgroundColor: colors.card, borderColor: colors.border }]} testID={`website-suggestion-${value}`}>
-                  <Text style={[styles.chipText, { color: colors.foreground }]}>{value}</Text>
+            <View style={[styles.suggestions, { borderColor: colors.border, backgroundColor: colors.card }]}>
+              {check.suggestions.map((value, index) => (
+                <TouchableOpacity key={value} onPress={() => setSlug(value)} testID={`website-suggestion-${value}`}
+                  style={[styles.suggestionRow, index > 0 ? { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border } : null]}>
+                  <Text style={[styles.suggestionText, { color: colors.foreground }]}>{value}.certxa.com</Text>
+                  <Text style={[styles.suggestionUse, { color: colors.primary }]}>Use</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -207,7 +211,7 @@ export default function WebsiteSetupScreen() {
       ) : step === 'design' ? (
         <>
           <Text style={[styles.eyebrow, { color: colors.primary }]}>YOUR WEBSITE</Text>
-          <Text style={[styles.title, { color: colors.foreground }]}>Pick a design</Text>
+          <HelpTitle help="website-setup" style={[styles.title, { color: colors.foreground }]}>Pick a design</HelpTitle>
           <Text style={[styles.body, { color: colors.mutedForeground }]}>Tap Preview to see your own page in that design.</Text>
           <View style={{ gap: 10, marginTop: 6 }}>
             {THEMES.map((item) => {
@@ -233,7 +237,7 @@ export default function WebsiteSetupScreen() {
       ) : step === 'look' ? (
         <>
           <Text style={[styles.eyebrow, { color: colors.primary }]}>YOUR WEBSITE</Text>
-          <Text style={[styles.title, { color: colors.foreground }]}>Make it yours</Text>
+          <HelpTitle help="website-setup" style={[styles.title, { color: colors.foreground }]}>Make it yours</HelpTitle>
           <Text style={[styles.body, { color: colors.mutedForeground }]}>All optional. You can change these any time in Settings.</Text>
 
           <Text style={[styles.label, { color: colors.foreground }]}>Colour</Text>
@@ -284,7 +288,7 @@ export default function WebsiteSetupScreen() {
       ) : (
         <>
           <Text style={[styles.eyebrow, { color: colors.primary }]}>YOUR WEBSITE</Text>
-          <Text style={[styles.title, { color: colors.foreground }]}>Your website is ready</Text>
+          <HelpTitle help="website-setup" style={[styles.title, { color: colors.foreground }]}>Your website is ready</HelpTitle>
           <Text style={[styles.body, { color: colors.mutedForeground }]}>Share your link so clients can book you.</Text>
           <View style={[styles.slugBox, { backgroundColor: colors.card, borderColor: colors.border, justifyContent: 'center' }]}>
             <Text testID="website-url" style={[styles.slugInput, { color: colors.foreground, textAlign: 'center' }]}>{(state.url ?? '').replace('https://', '')}</Text>
@@ -311,6 +315,10 @@ export default function WebsiteSetupScreen() {
 }
 
 const styles = StyleSheet.create({
+  suggestions: { borderWidth: 1, borderRadius: 14, marginTop: 10, overflow: 'hidden' },
+  suggestionRow: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14 },
+  suggestionText: { fontSize: 15, fontFamily: 'Inter_500Medium' },
+  suggestionUse: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   content: { paddingHorizontal: 22 },
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },

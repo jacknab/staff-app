@@ -5,8 +5,10 @@ import { useRouter } from 'expo-router';
 import { ActivityIndicator, Alert, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
+import { SelectField } from '@/components/SelectField';
 import { useBookingData } from '@/contexts/BookingContext';
 import { api } from '@/lib/live-api';
+import { HelpTitle } from '@/components/HelpTitle';
 
 type OfferedAt = 'place' | 'client' | 'any';
 type Service = { id: number; name: string; duration: number; price: number; offeredAt: OfferedAt; categoryId: number | null };
@@ -108,7 +110,7 @@ export default function ServicesScreen() {
       <StatusBar barStyle="dark-content" />
       <View style={styles.header}>
         <TouchableOpacity testID="services-back" accessibilityLabel="Back" onPress={() => (draft ? (setDraft(null), setError('')) : router.back())} style={styles.headerButton}><Feather name="arrow-left" size={21} color={colors.foreground} /></TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.foreground }]}>{draft ? (draft.id > 0 ? 'Edit service' : 'New service') : 'Services'}</Text>
+        <HelpTitle help="services" style={[styles.headerTitle, { color: colors.foreground }]}>{draft ? (draft.id > 0 ? 'Edit service' : 'New service') : 'Services'}</HelpTitle>
         {draft ? <View style={styles.headerButton} /> : (
           <TouchableOpacity testID="services-add" accessibilityLabel="Add a service" onPress={() => { setError(''); setDraft({ id: 0, name: '', minutes: '', price: '', offeredAt: 'any', categoryId: null }); }} style={styles.headerButton}><Feather name="plus" size={22} color={colors.primary} /></TouchableOpacity>
         )}
@@ -131,31 +133,17 @@ export default function ServicesScreen() {
             {categories.length > 0 ? (
               <>
                 <Text style={[styles.label, { color: colors.foreground }]}>Category</Text>
-                <View style={styles.wrap}>
-                  {[{ id: 0, name: 'None' }, ...categories].map((category) => {
-                    const picked = (draft.categoryId ?? 0) === category.id;
-                    return (
-                      <TouchableOpacity key={category.id} testID={`service-category-${category.id}`} onPress={() => setDraft({ ...draft, categoryId: category.id || null })} style={[styles.wrapChip, { backgroundColor: picked ? colors.primary : colors.card, borderColor: picked ? colors.primary : colors.border }]}>
-                        <Text style={[styles.chipText, { color: picked ? colors.primaryForeground : colors.foreground }]}>{category.name}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+                <SelectField testID="service-category" title="Category" value={draft.categoryId ?? 0}
+                  options={[{ id: 0, name: 'None' }, ...categories].map((category) => ({ value: category.id, label: category.name }))}
+                  onChange={(id) => setDraft({ ...draft, categoryId: id || null })} />
               </>
             ) : null}
             {offersBoth ? (
               <>
                 <Text style={[styles.label, { color: colors.foreground }]}>Where you do it</Text>
-                <View style={styles.pair}>
-                  {([['any', 'Either'], ['place', 'My place'], ['client', 'House call']] as const).map(([value, label]) => {
-                    const picked = draft.offeredAt === value;
-                    return (
-                      <TouchableOpacity key={value} testID={`service-offered-${value}`} onPress={() => setDraft({ ...draft, offeredAt: value })} style={[styles.chip, { backgroundColor: picked ? colors.primary : colors.card, borderColor: picked ? colors.primary : colors.border }]}>
-                        <Text style={[styles.chipText, { color: picked ? colors.primaryForeground : colors.foreground }]}>{label}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+                <SelectField testID="service-offered" value={draft.offeredAt} title="Where you do it"
+                  options={[{ value: 'any', label: 'Either' }, { value: 'place', label: 'My place' }, { value: 'client', label: 'House call' }]}
+                  onChange={(value) => setDraft({ ...draft, offeredAt: value })} />
               </>
             ) : null}
             {error ? <Text style={[styles.error, { color: colors.destructive }]}>{error}</Text> : null}

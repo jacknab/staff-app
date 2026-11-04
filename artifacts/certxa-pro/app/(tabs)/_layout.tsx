@@ -38,7 +38,14 @@ function ClassicTabLayout() {
           ) : null,
       }}
     >
+      {/* Home (owner, 2026-11-03): today at a glance; the screen the app opens on. */}
       <Tabs.Screen name="index" options={{
+        title: 'Home',
+        tabBarIcon: ({ color }) => isIOS
+          ? <SymbolView name="house" tintColor={color} size={23} />
+          : <Feather name="home" size={21} color={color} />,
+      }} />
+      <Tabs.Screen name="calendar" options={{
         title: 'Calendar',
         tabBarIcon: ({ color }) => isIOS
           ? <SymbolView name="calendar" tintColor={color} size={23} />

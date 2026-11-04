@@ -1,13 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Constants from 'expo-constants';
 import { Feather } from '@expo/vector-icons';
 import { ActivityIndicator, Alert, Image, Platform, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
-import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/live-api';
+import { HelpTitle } from '@/components/HelpTitle';
 
 type DaySchedule = { day: string; short: string; enabled: boolean; hours: string };
 const initialHours: DaySchedule[] = [
@@ -56,7 +56,6 @@ export default function MoreScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams<{ screen?: string }>();
-  const { user } = useAuth();
   const [stripeReady, setStripeReady] = useState(false);
   const [availability, setAvailability] = useState<DaySchedule[]>(initialHours);
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -65,11 +64,23 @@ export default function MoreScreen() {
   const [showWeeklyHours, setShowWeeklyHours] = useState(false);
   const [reminders, setReminders] = useState(true);
   const [openingPlus, setOpeningPlus] = useState(false);
+  // Plus and Business Phone cards show only while the account doesn't have them (owner, 2026-11-04); checked each time
+  // More opens, so a card comes back when Plus or the number ends. Hidden until known, so a card never flashes.
+  const [enrolled, setEnrolled] = useState<{ plus: boolean; phone: boolean } | null>(null);
+  const loadEnrolled = useCallback(async () => {
+    const [plus, phone] = await Promise.all([
+      api.get<{ plus?: boolean }>('/api/solo/plus').catch(() => null),
+      api.get<{ phoneNumber: string } | null>('/api/pro/phone').catch(() => null),
+    ]);
+    setEnrolled({ plus: !!plus?.plus, phone: !!phone });
+  }, []);
+  useFocusEffect(useCallback(() => { void loadEnrolled(); }, [loadEnrolled]));
   const openPlus = async () => {
     setOpeningPlus(true);
     try {
       const { url } = await api.post<{ url: string }>('/api/solo/plus/web-link');
       await WebBrowser.openAuthSessionAsync(url, 'certxa-pro://plus');
+      await loadEnrolled();
     } catch (cause) {
       Alert.alert('Plus', cause instanceof Error ? cause.message : 'Could not open the Plus page. Please try again.');
     } finally {
@@ -78,8 +89,6 @@ export default function MoreScreen() {
   };
   const topInset = Platform.OS === 'web' ? 67 : insets.top;
   const showingAvailability = params.screen === 'availability';
-  const displayName = String(user?.name ?? user?.email ?? 'Certxa professional');
-  const profileInitials = displayName.split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase() ?? '').join('') || 'CP';
   useEffect(() => {
     api.get<{ connected?: boolean; chargesEnabled?: boolean }>('/api/payments/stripe/status')
       .then((status) => setStripeReady(Boolean(status?.chargesEnabled && status?.connected !== false)))
@@ -100,9 +109,7 @@ export default function MoreScreen() {
     return day;
   }), [selectedDate]);
 
-  const goToAvailability = () => router.push('/(tabs)/more?screen=availability');
   const leaveAvailability = () => router.replace('/(tabs)/more');
-  const goToSection = (screen: 'payments') => router.push(`/(tabs)/more?screen=${screen}`);
   const shiftAvailabilityWeek = (amount: number) => {
     const next = new Date(selectedDate);
     next.setDate(next.getDate() + amount * 7);
@@ -222,28 +229,57 @@ export default function MoreScreen() {
         </ScrollView>
       ) : (
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <Text style={[styles.eyebrow, { color: colors.primary }]}>YOUR BUSINESS</Text>
-          <Text style={[styles.title, { color: colors.foreground }]}>More</Text>
-          <View style={[styles.profileCard, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.profileAvatar, { backgroundColor: colors.secondary }]}><Text style={[styles.avatarText, { color: colors.primary }]}>{profileInitials}</Text></View><View style={{ flex: 1 }}><Text style={[styles.profileName, { color: colors.foreground }]}>{displayName}</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>Independent beauty professional</Text></View></View>
+          {/* Tap to Pay card (owner, 2026-11-03): the same size as the Plus Plan card below; opens the payments screen,
+              whose button starts Stripe's sign-up for Certxa's card payments. */}
+          <TouchableOpacity testID="more-tap-to-pay" onPress={() => router.push('/payments-intro')} activeOpacity={0.85}
+            accessibilityRole="button" accessibilityLabel="Accept payments with Tap to Pay, powered by Stripe">
+            <View style={styles.planCard}>
+              <Image source={require('@/assets/images/tap-to-pay-banner.jpg')} resizeMode="cover" style={styles.planImage} />
+            </View>
+          </TouchableOpacity>
+          {/* Business Phone card (owner, 2026-11-04): opens the Business Phone screen (app/phone.tsx). Its picture is a
+              little taller than the others, so the box takes the picture's own shape and nothing is cut off. */}
+          {enrolled && !enrolled.phone ? <TouchableOpacity testID="more-business-phone" onPress={() => router.push('/phone')} activeOpacity={0.85}
+            accessibilityRole="button" accessibilityLabel="Business Phone: a dedicated business number for your clients">
+            <View style={[styles.planCard, { aspectRatio: 1200 / 676 }]}>
+              <Image source={require('@/assets/images/business-phone-banner.jpg')} resizeMode="cover" style={styles.planImage} />
+            </View>
+          </TouchableOpacity> : null}
           {/* Plus plan card (owner, 2026-10-30): opens certxa.com/pro-plus, already signed in, to pay by card.
               Apple allows a US app to send people to a website for this, not a card form inside the app. */}
-          <TouchableOpacity testID="more-plus-plan" disabled={openingPlus} onPress={() => void openPlus()} activeOpacity={0.85}
-            accessibilityRole="button" accessibilityLabel="Plus Plan: unlock the app with unlimited SMS notifications">
+          {enrolled && !enrolled.plus ? <TouchableOpacity testID="more-plus-plan" disabled={openingPlus} onPress={() => void openPlus()} activeOpacity={0.85}
+            accessibilityRole="button" accessibilityLabel="Plus Plan, $5 a month: unlock the app with unlimited SMS notifications">
             {/* The box has the picture's own shape and the picture fills it, so there is no empty space above or below
                 it (an Image sized only by aspectRatio got a much taller box on the web). */}
-            <View style={styles.planCard}>
+            <View style={[styles.planCard, { aspectRatio: 1200 / 676 }]}>
               <Image source={require('@/assets/images/plus-plan.jpg')} resizeMode="cover" style={styles.planImage} />
               {openingPlus ? <View style={styles.planBusy}><ActivityIndicator color="#FFFFFF" /></View> : null}
             </View>
-          </TouchableOpacity>
-          <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 28, marginBottom: 12 }]}>Manage</Text>
+          </TouchableOpacity> : null}
+          <HelpTitle help="more" style={[styles.sectionTitle, { color: colors.foreground, marginTop: 28, marginBottom: 12 }]}>Manage</HelpTitle>
           <View style={styles.menuList}>
-             <View testID="menu-availability" style={[styles.menuRow, { backgroundColor: colors.card, borderColor: colors.border, opacity: 0.65 }]}><View style={[styles.menuIcon, { backgroundColor: colors.secondary }]}><Feather name="clock" size={17} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>Availability</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>Manage in Certxa web settings</Text></View><Feather name="lock" size={15} color={colors.mutedForeground} /></View>
-             <View testID="menu-business-ai" style={[styles.menuRow, { backgroundColor: colors.card, borderColor: colors.border, opacity: 0.65 }]}><View style={[styles.menuIcon, { backgroundColor: colors.primary }]}><Feather name="message-circle" size={17} color={colors.primaryForeground} /></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>Business AI</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>Live AI endpoint not enabled yet</Text></View><Feather name="lock" size={15} color={colors.mutedForeground} /></View>
-            <TouchableOpacity testID="menu-catalog" onPress={() => router.push('/catalog')} style={[styles.menuRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.menuIcon, { backgroundColor: colors.accent }]}><Feather name="scissors" size={17} color={colors.accentForeground} /></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>Catalog</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>Categories, services, add-ons, packages, deals, products</Text></View><Feather name="chevron-right" size={17} color={colors.mutedForeground} /></TouchableOpacity>
-            <TouchableOpacity testID="menu-payment" onPress={() => goToSection('payments')} style={[styles.menuRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.menuIcon, { backgroundColor: colors.muted }]}><Feather name="credit-card" size={17} color={colors.foreground} /></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>Payments</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>{stripeReady ? 'Stripe M2 ready' : 'Payment setup required'}</Text></View><Feather name="chevron-right" size={17} color={colors.mutedForeground} /></TouchableOpacity>
+            {/* Owner, 2026-11-03: Booking requests first, then Reviews and Credit balance; Availability removed, Catalog and Payments are in Settings. */}
+            {/* Money (owner, 2026-11-03): sales, the next payout, payouts and this month's payments (app/money.tsx). */}
+            <TouchableOpacity testID="menu-money" onPress={() => router.push('/money')} style={[styles.menuRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.menuIcon, { backgroundColor: colors.secondary }]}><Feather name="dollar-sign" size={17} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>Money</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>Sales, payouts and payments</Text></View><Feather name="chevron-right" size={17} color={colors.mutedForeground} /></TouchableOpacity>
+            {/* Two-way texting with clients (app/messages.tsx, owner 2026-11-03). */}
+            <TouchableOpacity testID="menu-messages" onPress={() => router.push('/messages')} style={[styles.menuRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.menuIcon, { backgroundColor: colors.secondary }]}><Feather name="message-circle" size={17} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>Messages</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>Text with your clients</Text></View><Feather name="chevron-right" size={17} color={colors.mutedForeground} /></TouchableOpacity>
+            {/* Gift cards: sell, use and see balances (app/gift-cards.tsx, owner 2026-11-03). */}
+            <TouchableOpacity testID="menu-gift-cards" onPress={() => router.push('/gift-cards')} style={[styles.menuRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.menuIcon, { backgroundColor: colors.secondary }]}><Feather name="gift" size={17} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>Gift cards</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>Sell, use and check balances</Text></View><Feather name="chevron-right" size={17} color={colors.mutedForeground} /></TouchableOpacity>
+            {/* Business Phone: a business number for calls and texts (app/phone.tsx, owner 2026-11-04). */}
+            <TouchableOpacity testID="menu-phone" onPress={() => router.push('/phone')} style={[styles.menuRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.menuIcon, { backgroundColor: colors.secondary }]}><Feather name="phone" size={17} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>Business Phone</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>Your business number for calls and texts</Text></View><Feather name="chevron-right" size={17} color={colors.mutedForeground} /></TouchableOpacity>
+            {/* Packages: prepaid visits sold on the pro's website (app/packages.tsx, owner 2026-11-04). */}
+            <TouchableOpacity testID="menu-packages" onPress={() => router.push('/packages')} style={[styles.menuRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.menuIcon, { backgroundColor: colors.secondary }]}><Feather name="package" size={17} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>Packages</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>Prepaid visits on your website</Text></View><Feather name="chevron-right" size={17} color={colors.mutedForeground} /></TouchableOpacity>
+            {/* Waitlist: clients who want in on a full day (app/waitlist.tsx, owner 2026-11-03). */}
+            <TouchableOpacity testID="menu-waitlist" onPress={() => router.push('/waitlist')} style={[styles.menuRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.menuIcon, { backgroundColor: colors.secondary }]}><Feather name="list" size={17} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>Waitlist</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>Clients waiting for a time</Text></View><Feather name="chevron-right" size={17} color={colors.mutedForeground} /></TouchableOpacity>
+            {/* Portfolio: photos of your work on your website's gallery (app/portfolio.tsx, owner 2026-11-03). */}
+            <TouchableOpacity testID="menu-portfolio" onPress={() => router.push('/portfolio')} style={[styles.menuRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.menuIcon, { backgroundColor: colors.secondary }]}><Feather name="image" size={17} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>Portfolio</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>Photos of your work on your website</Text></View><Feather name="chevron-right" size={17} color={colors.mutedForeground} /></TouchableOpacity>
+            {/* Campaigns: one text to many clients (app/campaigns.tsx, owner 2026-11-03). */}
+            <TouchableOpacity testID="menu-campaigns" onPress={() => router.push('/campaigns')} style={[styles.menuRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.menuIcon, { backgroundColor: colors.secondary }]}><Feather name="send" size={17} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>Campaigns</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>Text a special to your clients</Text></View><Feather name="chevron-right" size={17} color={colors.mutedForeground} /></TouchableOpacity>
             <TouchableOpacity testID="menu-requests" onPress={() => router.push('/requests')} style={[styles.menuRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.menuIcon, { backgroundColor: colors.secondary }]}><Feather name="inbox" size={17} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>Booking requests</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>Approve, offer other times, or decline</Text></View><Feather name="chevron-right" size={17} color={colors.mutedForeground} /></TouchableOpacity>
             <TouchableOpacity testID="menu-reviews" onPress={() => router.push('/reviews')} style={[styles.menuRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.menuIcon, { backgroundColor: colors.accent }]}><Feather name="star" size={17} color={colors.accentForeground} /></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>Reviews</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>See what clients said and reply</Text></View><Feather name="chevron-right" size={17} color={colors.mutedForeground} /></TouchableOpacity>
+            {/* Text message credits: the balance and packages to buy more (app/credits.tsx, owner 2026-11-03). */}
+            <TouchableOpacity testID="menu-credits" onPress={() => router.push('/credits')} style={[styles.menuRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.menuIcon, { backgroundColor: colors.secondary }]}><Feather name="message-square" size={17} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>Credit balance</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>Text message credits · buy more</Text></View><Feather name="chevron-right" size={17} color={colors.mutedForeground} /></TouchableOpacity>
+            <TouchableOpacity testID="menu-business-ai" onPress={() => router.push('/ai')} style={[styles.menuRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.menuIcon, { backgroundColor: colors.primary }]}><Feather name="zap" size={17} color={colors.primaryForeground} /></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>Business AI</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>Ask about your earnings, schedule and clients</Text></View><Feather name="chevron-right" size={17} color={colors.mutedForeground} /></TouchableOpacity>
             <TouchableOpacity testID="menu-settings" onPress={() => router.push('/settings')} style={[styles.menuRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.menuIcon, { backgroundColor: colors.secondary }]}><Feather name="settings" size={17} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>Settings</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>Business, booking, messages, payments, account</Text></View><Feather name="chevron-right" size={17} color={colors.mutedForeground} /></TouchableOpacity>
           </View>
           <View style={[styles.certxaCard, { backgroundColor: colors.primary }]}><Text style={[styles.certxaBrand, { color: colors.primaryForeground }]}>CERTXA PRO</Text><Text style={[styles.certxaTitle, { color: colors.primaryForeground }]}>Your business, beautifully in sync.</Text><Text style={[styles.certxaSub, { color: colors.primaryForeground }]}>Calendar, clients, services, appointments, and payments are connected to Certxa.</Text></View>
