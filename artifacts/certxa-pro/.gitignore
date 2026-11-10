@@ -10,7 +10,8 @@ web-build/
 expo-env.d.ts
 
 # Native
-ios/
+# Only the generated project at the top; a native module's own ios/ folder (modules/*/ios) must be uploaded.
+/ios/
 android/
 *.orig.*
 *.jks

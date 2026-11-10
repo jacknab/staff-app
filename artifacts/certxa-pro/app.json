@@ -2,7 +2,7 @@
   "expo": {
     "name": "Certxa Pro",
     "slug": "certxa-pro",
-    "version": "1.0.8",
+    "version": "1.0.9",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "certxa-pro",
@@ -11,7 +11,8 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.fastcheckinllc.certxapro",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSAlarmKitUsageDescription": "Certxa Pro rings an alarm when a booking starts and when it's time to leave for a house call."
       },
       "entitlements": {
         "com.apple.developer.proximity-reader.payment.acceptance": true,
@@ -53,7 +54,9 @@
         {
           "sounds": [
             "./assets/sounds/soft_chime.wav",
-            "./assets/sounds/alarm.wav"
+            "./assets/sounds/alarm.wav",
+            "./assets/sounds/ringtone.wav",
+            "./assets/sounds/reminder.wav"
           ]
         }
       ],
@@ -77,7 +80,8 @@
           "apsEnvironment": "production",
           "microphoneUsageDescription": "Certxa Pro uses the microphone for calls on your business number."
         }
-      ]
+      ],
+      "expo-audio"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -88,7 +92,7 @@
         "projectId": "7dfdabdc-943a-437b-84d8-e1984923594c"
       }
     },
-    "owner": "tobyben",
+    "owner": "tobybens-team",
     "runtimeVersion": {
       "policy": "appVersion"
     },

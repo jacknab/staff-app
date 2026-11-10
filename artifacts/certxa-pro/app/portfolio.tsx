@@ -15,6 +15,8 @@ import { SelectField } from '@/components/SelectField';
 import { api, ApiError } from '@/lib/live-api';
 import { HelpTitle } from '@/components/HelpTitle';
 
+import { AppBackground } from '@/components/look/AppBackground';
+import { look } from '@/components/look/tokens';
 type Photo = { id: number; url: string; caption: string | null; serviceId?: number | null };
 
 export default function PortfolioScreen() {
@@ -65,7 +67,8 @@ export default function PortfolioScreen() {
 
   const topInset = Platform.OS === 'web' ? 67 : insets.top;
   return (
-    <View style={[styles.root, { backgroundColor: colors.background, paddingTop: topInset }]} testID="portfolio">
+    <View style={[styles.root, { backgroundColor: look.pageTop, paddingTop: topInset }]} testID="portfolio">
+      <AppBackground />
       <View style={styles.nav}>
         <TouchableOpacity onPress={() => router.back()} style={styles.navSide} accessibilityLabel="Back"><Feather name="arrow-left" size={24} color={colors.foreground} /></TouchableOpacity>
         <HelpTitle help="portfolio" style={[styles.navTitle, { color: colors.foreground }]}>Portfolio</HelpTitle>
@@ -108,11 +111,11 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   nav: { height: 56, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   navSide: { width: 44, height: 44, justifyContent: 'center' },
-  navTitle: { fontSize: 18, fontFamily: 'Inter_500Medium' },
+  navTitle: { fontSize: 20, fontFamily: 'Inter_500Medium' },
   content: { paddingHorizontal: 20, paddingBottom: 60, gap: 14, paddingTop: 6 },
-  muted: { fontSize: 13, lineHeight: 18, fontFamily: 'Inter_400Regular' },
+  muted: { fontSize: 16, lineHeight: 22, fontFamily: 'Inter_400Regular' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   removeRow: { height: 44, alignItems: 'center', justifyContent: 'center' },
-  removeText: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
+  removeText: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
   empty: { height: 140, borderRadius: 14, borderWidth: 1.5, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', gap: 8 },
 });

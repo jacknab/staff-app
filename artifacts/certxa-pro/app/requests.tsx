@@ -10,6 +10,8 @@ import { listBookingRequests, type BookingRequest } from '@/lib/bookingRequests'
 import { zonedDateLabel, zonedTimeLabel } from '@/lib/businessTime';
 import { HelpTitle } from '@/components/HelpTitle';
 
+import { AppBackground } from '@/components/look/AppBackground';
+import { look, cardShadow } from '@/components/look/tokens';
 export default function RequestsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -27,7 +29,8 @@ export default function RequestsScreen() {
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.background, paddingTop: Platform.OS === 'web' ? 67 : insets.top }]}>
+    <View style={[styles.root, { backgroundColor: look.pageTop, paddingTop: Platform.OS === 'web' ? 67 : insets.top }]}>
+      <AppBackground />
       <View style={styles.nav}>
         <TouchableOpacity accessibilityLabel="Back" onPress={() => router.back()} style={styles.back} testID="requests-back"><Feather name="arrow-left" size={20} color={colors.foreground} /></TouchableOpacity>
         <HelpTitle help="requests" style={[styles.navTitle, { color: colors.foreground }]}>Booking requests</HelpTitle>
@@ -68,13 +71,13 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   nav: { height: 50, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12 },
   back: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  navTitle: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
+  navTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
   content: { paddingHorizontal: 18, paddingTop: 8, gap: 10 },
-  row: { borderWidth: 1, borderRadius: 15, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  title: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
-  sub: { fontSize: 12, lineHeight: 17, fontFamily: 'Inter_400Regular', marginTop: 3 },
+  row: { borderWidth: 1, borderRadius: 15, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 10, ...cardShadow },
+  title: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
+  sub: { fontSize: 15, lineHeight: 21, fontFamily: 'Inter_400Regular', marginTop: 3 },
   pill: { borderWidth: 1, borderRadius: 10, paddingVertical: 5, paddingHorizontal: 9 },
-  pillText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
+  pillText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
   empty: { borderWidth: 1, borderRadius: 15, padding: 18, marginTop: 10 },
-  error: { fontSize: 12, fontFamily: 'Inter_500Medium', marginTop: 10 },
+  error: { fontSize: 15, fontFamily: 'Inter_500Medium', marginTop: 10 },
 });

@@ -19,6 +19,9 @@ import { api, ApiError } from '@/lib/live-api';
 import { placeCall, registerBusinessPhone } from '@/lib/voice';
 import { HelpTitle } from '@/components/HelpTitle';
 
+import { AppBackground } from '@/components/look/AppBackground';
+import { SectionTitle } from '@/components/look/SectionHeader';
+import { look, cardShadow } from '@/components/look/tokens';
 type Line = { phoneNumber: string; ring: 'hours' | 'always'; billing?: { status: string; retryAt: string | null; heldUntil: string | null } };
 type Card = { brand: string | null; last4: string | null };
 const cardName = (c: Card) => (c.last4 ? `your ${c.brand ? c.brand[0].toUpperCase() + c.brand.slice(1) : 'card'} ending ${c.last4}` : 'your card on file');
@@ -148,7 +151,8 @@ export default function PhoneScreen() {
   const topInset = Platform.OS === 'web' ? 67 : insets.top;
   const box = { borderColor: colors.border, backgroundColor: colors.card };
   return (
-    <View style={[styles.root, { backgroundColor: colors.background, paddingTop: topInset }]} testID="phone">
+    <View style={[styles.root, { backgroundColor: look.pageTop, paddingTop: topInset }]} testID="phone">
+      <AppBackground />
       <View style={styles.nav}>
         <TouchableOpacity onPress={() => (dialing ? setDialing(false) : changing ? (setChanging(false), setOffers(null)) : router.back())} style={styles.navSide} accessibilityLabel="Back"><Feather name="arrow-left" size={24} color={colors.foreground} /></TouchableOpacity>
         <HelpTitle help="phone" style={[styles.navTitle, { color: colors.foreground }]}>{dialing ? 'Call a number' : changing ? 'Change number' : 'Business Phone'}</HelpTitle>
@@ -164,7 +168,7 @@ export default function PhoneScreen() {
               keyboardType="number-pad" maxLength={3} placeholder="Area code" placeholderTextColor={colors.mutedForeground}
               style={[styles.input, box, { color: colors.foreground }]} testID="phone-area-code" />
             <View style={styles.listHead}>
-              <Text style={[styles.section, { color: colors.mutedForeground }]}>NUMBERS</Text>
+              <SectionTitle style={styles.section}>Numbers</SectionTitle>
               <TouchableOpacity onPress={() => void search(areaCode, true)} disabled={searching} style={styles.recycle} accessibilityLabel="Show 5 other numbers" testID="phone-more-numbers">
                 {searching ? <ActivityIndicator color={colors.primary} /> : <Feather name="refresh-cw" size={20} color={colors.primary} />}
               </TouchableOpacity>
@@ -178,7 +182,7 @@ export default function PhoneScreen() {
                       <Text style={[styles.number, { color: colors.foreground }]}>{o.display}</Text>
                       {o.place ? <Text style={[styles.muted, { color: colors.mutedForeground }]}>{o.place}</Text> : null}
                     </View>
-                    {claiming === o.phoneNumber ? <ActivityIndicator color={colors.primary} /> : <Feather name="chevron-right" size={18} color={colors.mutedForeground} />}
+                    {claiming === o.phoneNumber ? <ActivityIndicator color={colors.primary} /> : <Feather name="chevron-right" size={20} color={colors.mutedForeground} />}
                   </TouchableOpacity>
                 ))}
               </View>
@@ -221,9 +225,9 @@ export default function PhoneScreen() {
             <TouchableOpacity onPress={() => router.push('/phone-texts')} style={[styles.row, styles.list, box]} testID="phone-texts">
               <View style={{ flex: 1 }}><Text style={[styles.rowTitle, { color: colors.foreground }]}>Texts</Text>
                 <Text style={[styles.muted, { color: colors.mutedForeground }]}>{textCount ? `${textCount} received` : 'Texts to your business number show here'}</Text></View>
-              <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+              <Feather name="chevron-right" size={20} color={colors.mutedForeground} />
             </TouchableOpacity>
-            <Text style={[styles.section, { color: colors.mutedForeground }]}>RECENT CALLS</Text>
+            <SectionTitle style={styles.section}>Recent calls</SectionTitle>
             {calls.length === 0 ? <Text style={[styles.muted, { color: colors.mutedForeground }]}>No calls yet.</Text> : (
               <View style={[styles.list, box]}>
                 {calls.map((c, i) => {
@@ -233,7 +237,7 @@ export default function PhoneScreen() {
                   return (
                     <TouchableOpacity key={c.id} onPress={() => call(c.number, c.clientName ?? c.display)} testID={`phone-call-${c.id}`}
                       style={[styles.row, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}>
-                      <Feather name={missed ? 'phone-missed' : c.direction === 'incoming' ? 'phone-incoming' : 'phone-outgoing'} size={18} color={colors.mutedForeground} />
+                      <Feather name={missed ? 'phone-missed' : c.direction === 'incoming' ? 'phone-incoming' : 'phone-outgoing'} size={20} color={colors.mutedForeground} />
                       <View style={{ flex: 1 }}>
                         <Text style={[styles.rowTitle, { color: missed ? colors.destructive : colors.foreground }]}>{c.clientName ?? c.display}</Text>
                         <Text style={[styles.muted, { color: colors.mutedForeground }]}>
@@ -255,22 +259,22 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   nav: { height: 56, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   navSide: { width: 44, height: 44, justifyContent: 'center' },
-  navTitle: { fontSize: 18, fontFamily: 'Inter_500Medium' },
+  navTitle: { fontSize: 20, fontFamily: 'Inter_500Medium' },
   content: { paddingHorizontal: 20, paddingBottom: 60, gap: 12, paddingTop: 6 },
-  title: { fontSize: 22, fontFamily: 'Inter_600SemiBold' },
-  muted: { fontSize: 13, lineHeight: 18, fontFamily: 'Inter_400Regular' },
-  section: { fontSize: 12, letterSpacing: 0.6, fontFamily: 'Inter_600SemiBold', marginTop: 8 },
-  input: { borderWidth: 1, borderRadius: 14, height: 54, paddingHorizontal: 16, fontSize: 16, fontFamily: 'Inter_400Regular' },
+  title: { fontSize: 23, fontFamily: 'Inter_600SemiBold' },
+  muted: { fontSize: 16, lineHeight: 22, fontFamily: 'Inter_400Regular' },
+  section: { marginTop: 14, marginBottom: 2 },
+  input: { borderWidth: 1, borderRadius: 14, height: 54, paddingHorizontal: 16, fontSize: 18, fontFamily: 'Inter_400Regular' },
   listHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   recycle: { width: 44, height: 44, alignItems: 'flex-end', justifyContent: 'center' },
-  list: { borderWidth: 1, borderRadius: 14, overflow: 'hidden' },
+  list: { borderWidth: 1, borderRadius: 14, overflow: 'hidden', ...cardShadow },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 13 },
-  rowTitle: { fontSize: 15, fontFamily: 'Inter_500Medium' },
-  number: { fontSize: 18, fontFamily: 'Inter_600SemiBold' },
-  card: { borderWidth: 1, borderRadius: 14, padding: 16, gap: 4 },
+  rowTitle: { fontSize: 17, fontFamily: 'Inter_500Medium' },
+  number: { fontSize: 20, fontFamily: 'Inter_600SemiBold' },
+  card: { borderWidth: 1, borderRadius: 14, padding: 16, gap: 4, ...cardShadow },
   bigNumber: { fontSize: 26, fontFamily: 'Inter_600SemiBold' },
   button: { height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  buttonText: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
+  buttonText: { fontSize: 18, fontFamily: 'Inter_600SemiBold' },
   dialer: { flex: 1, justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 10 },
   dialDisplay: { minHeight: 90, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20 },
   dialNumber: { fontSize: 40, fontWeight: '400', color: '#000000' },

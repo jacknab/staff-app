@@ -20,6 +20,8 @@ function ClassicTabLayout() {
       screenOptions={{
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.mutedForeground,
+        // Bigger text (owner, 2026-11-09): the tab names were the default 10 pt.
+        tabBarLabelStyle: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
         headerShown: false,
         tabBarStyle: {
           position: 'absolute',

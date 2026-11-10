@@ -5,6 +5,7 @@ import { useNavigation } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 
+import { cardShadow } from '@/components/look/tokens';
 type TipCheckoutProps = {
   baseCents: number;
   serviceName?: string;
@@ -125,9 +126,9 @@ export function TipCheckout({ baseCents, serviceName, presets, onConfirmTip, onB
               <Text style={[styles.customButtonText, { color: selectedPercent === 0 ? colors.primary : colors.foreground }]}>No tip</Text>
             </TouchableOpacity>
             <TouchableOpacity testID="custom-tip" onPress={() => setScreen('custom')} style={[styles.customButton, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Feather name="edit-3" size={16} color={colors.primary} />
+              <Feather name="edit-3" size={18} color={colors.primary} />
               <Text style={[styles.customButtonText, { color: colors.foreground }]}>Custom tip</Text>
-              <Feather name="chevron-right" size={17} color={colors.mutedForeground} />
+              <Feather name="chevron-right" size={19} color={colors.mutedForeground} />
             </TouchableOpacity>
           </>
         ) : (
@@ -155,7 +156,7 @@ export function TipCheckout({ baseCents, serviceName, presets, onConfirmTip, onB
       <View style={[styles.footer, { paddingBottom: insets.bottom + 84 }]}>
         <TouchableOpacity testID="confirm-tip" disabled={(screen === 'select' && selectedPercent === null) || (screen === 'custom' && customTipCents <= 0)} onPress={confirm} style={[styles.confirmButton, { backgroundColor: ((screen === 'select' && selectedPercent !== null) || (screen === 'custom' && customTipCents > 0)) ? colors.primary : colors.muted }]}>
           <Text style={[styles.confirmText, { color: ((screen === 'select' && selectedPercent !== null) || (screen === 'custom' && customTipCents > 0)) ? colors.primaryForeground : colors.mutedForeground }]}>{screen === 'custom' ? 'Confirm tip' : 'Continue to Tap to Pay'}</Text>
-          <Feather name="arrow-right" size={17} color={((screen === 'select' && selectedPercent !== null) || (screen === 'custom' && customTipCents > 0)) ? colors.primaryForeground : colors.mutedForeground} />
+          <Feather name="arrow-right" size={19} color={((screen === 'select' && selectedPercent !== null) || (screen === 'custom' && customTipCents > 0)) ? colors.primaryForeground : colors.mutedForeground} />
         </TouchableOpacity>
         <Text style={[styles.footerNote, { color: colors.mutedForeground }]}>You can review the total before payment.</Text>
       </View>
@@ -168,33 +169,33 @@ const styles = StyleSheet.create({
   header: { height: 55, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerButton: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
   backButton: { minWidth: 84, height: 42, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  backText: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
-  eyebrow: { fontSize: 10, letterSpacing: 1.4, fontFamily: 'Inter_700Bold' },
+  backText: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
+  eyebrow: { fontSize: 13, letterSpacing: 1.4, fontFamily: 'Inter_700Bold' },
   content: { flex: 1, paddingHorizontal: 20, paddingTop: 16 },
   title: { fontSize: 29, letterSpacing: -0.8, fontFamily: 'Inter_600SemiBold', marginTop: 5 },
-  subtitle: { fontSize: 12, lineHeight: 18, fontFamily: 'Inter_400Regular', marginTop: 6, maxWidth: 320 },
-  summaryCard: { borderWidth: 1, borderRadius: 18, padding: 15, marginTop: 25, gap: 10 },
+  subtitle: { fontSize: 15, lineHeight: 22, fontFamily: 'Inter_400Regular', marginTop: 6, maxWidth: 320 },
+  summaryCard: { borderWidth: 1, borderRadius: 18, padding: 15, marginTop: 25, gap: 10, ...cardShadow },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  summaryLabel: { fontSize: 12, fontFamily: 'Inter_400Regular' },
-  summaryValue: { fontSize: 12, fontFamily: 'Inter_500Medium' },
+  summaryLabel: { fontSize: 15, fontFamily: 'Inter_400Regular' },
+  summaryValue: { fontSize: 15, fontFamily: 'Inter_500Medium' },
   totalRow: { borderTopWidth: 1, paddingTop: 11, marginTop: 2, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  totalLabel: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  totalValue: { fontSize: 18, fontFamily: 'Inter_600SemiBold' },
-  sectionTitle: { fontSize: 16, fontFamily: 'Inter_600SemiBold', marginTop: 25, marginBottom: 10 },
+  totalLabel: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
+  totalValue: { fontSize: 20, fontFamily: 'Inter_600SemiBold' },
+  sectionTitle: { fontSize: 18, fontFamily: 'Inter_600SemiBold', marginTop: 25, marginBottom: 10 },
   tipGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
   tipOption: { width: '48%', minHeight: 72, borderWidth: 1, borderRadius: 15, padding: 12, justifyContent: 'center' },
-  tipPercent: { fontSize: 19, fontFamily: 'Inter_600SemiBold' },
-  tipAmount: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 3 },
+  tipPercent: { fontSize: 21, fontFamily: 'Inter_600SemiBold' },
+  tipAmount: { fontSize: 14, fontFamily: 'Inter_400Regular', marginTop: 3 },
   customButton: { minHeight: 52, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 9, marginTop: 10 },
-  customButtonText: { flex: 1, fontSize: 13, fontFamily: 'Inter_500Medium' },
-  customAmountCard: { borderWidth: 1, borderRadius: 18, alignItems: 'center', paddingVertical: 19, marginTop: 26 },
-  amountCaption: { fontSize: 9, letterSpacing: 1.4, fontFamily: 'Inter_600SemiBold' },
+  customButtonText: { flex: 1, fontSize: 16, fontFamily: 'Inter_500Medium' },
+  customAmountCard: { borderWidth: 1, borderRadius: 18, alignItems: 'center', paddingVertical: 19, marginTop: 26, ...cardShadow },
+  amountCaption: { fontSize: 12, letterSpacing: 1.4, fontFamily: 'Inter_600SemiBold' },
   customAmount: { fontSize: 38, letterSpacing: -1, fontFamily: 'Inter_500Medium', marginTop: 7 },
   keypad: { flexDirection: 'row', flexWrap: 'wrap', gap: 9, marginTop: 17 },
   key: { width: '31.5%', height: 51, borderWidth: 1, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-  keyText: { fontSize: 19, fontFamily: 'Inter_500Medium' },
+  keyText: { fontSize: 21, fontFamily: 'Inter_500Medium' },
   footer: { paddingHorizontal: 20, paddingBottom: 22 },
   confirmButton: { height: 53, borderRadius: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
-  confirmText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  footerNote: { textAlign: 'center', fontSize: 10, fontFamily: 'Inter_400Regular', marginTop: 10 },
+  confirmText: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
+  footerNote: { textAlign: 'center', fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 10 },
 });

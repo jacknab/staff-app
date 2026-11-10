@@ -19,9 +19,11 @@ import { api } from '@/lib/live-api';
 import { appointmentParams, mapAppointment, useBookingData, type ApiAppointment } from '@/contexts/BookingContext';
 import { HelpTitle } from '@/components/HelpTitle';
 
+import { AppBackground } from '@/components/look/AppBackground';
+import { look, cardShadow } from '@/components/look/tokens';
 type Review = {
   id: number; rating: number; comment?: string | null; customerName?: string | null; serviceName?: string | null;
-  createdAt?: string | null; ownerResponse?: string | null; ownerResponseAt?: string | null; photoUrl?: string | null; appointmentId?: number | null;
+  createdAt?: string | null; ownerResponse?: string | null; ownerResponseAt?: string | null; photoUrl?: string | null; appointmentId?: number | null; clientAvatarUrl?: string | null;
 };
 type Stats = { total: number; avg: number; distribution: Record<string, number> };
 const MAX_REPLY = 1000;
@@ -92,7 +94,8 @@ export default function ReviewsScreen() {
   );
 
   return (
-    <KeyboardAvoidingView style={[styles.root, { backgroundColor: colors.background, paddingTop: insets.top }]} behavior="padding" keyboardVerticalOffset={0}>
+    <KeyboardAvoidingView style={[styles.root, { backgroundColor: look.pageTop, paddingTop: insets.top }]} behavior="padding" keyboardVerticalOffset={0}>
+      <AppBackground />
       <StatusBar barStyle="dark-content" />
       <View style={styles.header}>
         <TouchableOpacity testID="reviews-back" accessibilityLabel="Back" onPress={() => router.back()} style={styles.headerButton}><Feather name="arrow-left" size={21} color={colors.foreground} /></TouchableOpacity>
@@ -103,7 +106,7 @@ export default function ReviewsScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} tintColor={colors.primary} onRefresh={() => { setRefreshing(true); void load().finally(() => setRefreshing(false)); }} />}>
         {loading ? <ActivityIndicator style={{ marginTop: 40 }} color={colors.primary} /> : (
           <>
-            {error ? <View style={[styles.banner, { backgroundColor: colors.accent }]}><Feather name="alert-circle" size={15} color={colors.accentForeground} /><Text style={[styles.bannerText, { color: colors.accentForeground }]}>{error}</Text></View> : null}
+            {error ? <View style={[styles.banner, { backgroundColor: colors.accent }]}><Feather name="alert-circle" size={17} color={colors.accentForeground} /><Text style={[styles.bannerText, { color: colors.accentForeground }]}>{error}</Text></View> : null}
             <View style={[styles.summary, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={styles.summaryLeft}>
                 <Text style={[styles.average, { color: colors.foreground }]}>{stats && stats.total > 0 ? stats.avg.toFixed(1) : '–'}</Text>
@@ -120,7 +123,7 @@ export default function ReviewsScreen() {
             </View>
 
             {reviews.length === 0 && !error ? (
-              <View style={[styles.empty, { backgroundColor: colors.secondary }]}><Feather name="message-circle" size={18} color={colors.primary} /><Text style={[styles.emptyText, { color: colors.primary }]}>No reviews yet. Clients are asked for one after their appointment when review requests are switched on in Settings.</Text></View>
+              <View style={[styles.empty, { backgroundColor: colors.secondary }]}><Feather name="message-circle" size={20} color={colors.primary} /><Text style={[styles.emptyText, { color: colors.primary }]}>No reviews yet. Clients are asked for one after their appointment when review requests are switched on in Settings.</Text></View>
             ) : null}
 
             {reviews.map((review) => {
@@ -128,19 +131,26 @@ export default function ReviewsScreen() {
               return (
                 <View key={review.id} testID={`review-${review.id}`} style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
                   <View style={styles.cardHead}>
-                    <View style={{ flex: 1 }}><Text style={[styles.name, { color: colors.foreground }]}>{review.customerName || 'Client'}</Text><Text style={[styles.meta, { color: colors.mutedForeground }]}>{[review.serviceName, dateLabel(review.createdAt)].filter(Boolean).join(' · ')}</Text></View>
-                    {stars(review.rating)}
+                    {review.clientAvatarUrl
+                      ? <Image testID={`review-avatar-${review.id}`} source={{ uri: review.clientAvatarUrl }} style={styles.avatar} />
+                      : <View style={[styles.avatar, { backgroundColor: colors.secondary }]}><Text style={[styles.avatarText, { color: colors.foreground }]}>{(review.customerName || 'Client').charAt(0).toUpperCase()}</Text></View>}
+                    <View style={{ flex: 1 }}><Text style={[styles.name, { color: colors.foreground }]}>{review.customerName || 'Client'}</Text><Text style={[styles.reviewMeta, { color: colors.mutedForeground }]}>{[review.serviceName, dateLabel(review.createdAt)].filter(Boolean).join(' · ')}</Text></View>
+                    {stars(review.rating, 17)}
                   </View>
-                  {review.comment ? <Text style={[styles.comment, { color: colors.foreground }]}>{review.comment}</Text> : <Text style={[styles.comment, { color: colors.mutedForeground }]}>No written comment.</Text>}
-                  {/* The photo the client added to the review. */}
+                  {/* The photo the client added to the review, with their words beside it. */}
+                  <View style={styles.reviewBody}>
+                    {review.photoUrl ? <Image testID={`review-photo-${review.id}`} source={{ uri: review.photoUrl }} resizeMode="cover" style={[styles.photo, { borderColor: colors.border }]} accessibilityLabel="Photo from the client" /> : null}
+                    <View style={{ flex: 1 }}>
+                      {review.comment ? <Text style={[styles.comment, { color: colors.foreground }]}>{review.comment}</Text> : <Text style={[styles.comment, { color: colors.mutedForeground }]}>No written comment.</Text>}
+                    </View>
+                  </View>
                   {/* The visit the review is about: its booking, paid or not (owner, 2026-11-03). */}
                   {review.appointmentId ? (
                     <TouchableOpacity testID={`review-booking-${review.id}`} disabled={openingBooking === review.id} onPress={() => void openBooking(review.appointmentId!)} style={styles.bookingLink}>
-                      <Feather name="file-text" size={14} color={colors.primary} />
+                      <Feather name="file-text" size={16} color={colors.primary} />
                       <Text style={[styles.bookingLinkText, { color: colors.primary }]}>{openingBooking === review.id ? 'Opening…' : 'View booking'}</Text>
                     </TouchableOpacity>
                   ) : null}
-                  {review.photoUrl ? <Image testID={`review-photo-${review.id}`} source={{ uri: review.photoUrl }} resizeMode="cover" style={[styles.photo, { borderColor: colors.border }]} accessibilityLabel="Photo from the client" /> : null}
 
                   {review.ownerResponse && !open ? (
                     <View style={[styles.response, { backgroundColor: colors.secondary }]}>
@@ -160,7 +170,7 @@ export default function ReviewsScreen() {
                       </View>
                     </View>
                   ) : (
-                    <TouchableOpacity testID={`review-reply-${review.id}`} onPress={() => startReply(review)} style={styles.replyLink}><Feather name="corner-up-left" size={14} color={colors.primary} /><Text style={[styles.replyText, { color: colors.primary }]}>{review.ownerResponse ? 'Edit your reply' : 'Reply'}</Text></TouchableOpacity>
+                    <TouchableOpacity testID={`review-reply-${review.id}`} onPress={() => startReply(review)} style={styles.replyLink}><Feather name="corner-up-left" size={16} color={colors.primary} /><Text style={[styles.replyText, { color: colors.primary }]}>{review.ownerResponse ? 'Edit your reply' : 'Reply'}</Text></TouchableOpacity>
                   )}
                 </View>
               );
@@ -177,33 +187,37 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   header: { minHeight: 52, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerButton: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
+  headerTitle: { fontSize: 18, fontFamily: 'Inter_600SemiBold' },
   content: { paddingHorizontal: 20, paddingTop: 8 },
-  summary: { borderWidth: 1, borderRadius: 17, padding: 15, flexDirection: 'row', alignItems: 'center', gap: 18, marginBottom: 14 },
+  summary: { borderWidth: 1, borderRadius: 17, padding: 15, flexDirection: 'row', alignItems: 'center', gap: 18, marginBottom: 14, ...cardShadow },
   summaryLeft: { alignItems: 'center', minWidth: 86 },
   average: { fontSize: 34, letterSpacing: -1, fontFamily: 'Inter_600SemiBold', marginBottom: 4 },
   stars: { flexDirection: 'row', gap: 2 },
-  photo: { width: 120, height: 120, borderRadius: 12, borderWidth: 1, marginTop: 10 },
+  photo: { width: 120, height: 120, borderRadius: 12, borderWidth: 1 },
   bookingLink: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, alignSelf: 'flex-start' },
-  bookingLinkText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  bookingLinkText: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
   barRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   barTrack: { flex: 1, height: 6, borderRadius: 3, overflow: 'hidden' },
   barFill: { height: 6, borderRadius: 3 },
-  meta: { fontSize: 11, fontFamily: 'Inter_400Regular' },
+  meta: { fontSize: 14, fontFamily: 'Inter_400Regular' },
   empty: { borderRadius: 14, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  emptyText: { flex: 1, fontSize: 12, lineHeight: 18, fontFamily: 'Inter_500Medium' },
-  card: { borderWidth: 1, borderRadius: 16, padding: 14, marginBottom: 10 },
+  emptyText: { flex: 1, fontSize: 15, lineHeight: 22, fontFamily: 'Inter_500Medium' },
+  card: { borderWidth: 1, borderRadius: 16, padding: 14, marginBottom: 10, ...cardShadow },
   cardHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 9 },
-  name: { fontSize: 14, fontFamily: 'Inter_600SemiBold', marginBottom: 3 },
-  comment: { fontSize: 13, lineHeight: 19, fontFamily: 'Inter_400Regular' },
+  avatar: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontSize: 21, fontFamily: 'Inter_600SemiBold' },
+  name: { fontSize: 19, fontFamily: 'Inter_600SemiBold', marginBottom: 3 },
+  reviewMeta: { fontSize: 17, lineHeight: 24, fontFamily: 'Inter_400Regular' },
+  reviewBody: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  comment: { fontSize: 19, lineHeight: 28, fontFamily: 'Inter_400Regular' },
   response: { borderRadius: 12, padding: 11, marginTop: 12 },
-  responseLabel: { fontSize: 9, letterSpacing: 1.1, fontFamily: 'Inter_700Bold' },
-  input: { minHeight: 92, borderWidth: 1, borderRadius: 13, paddingHorizontal: 12, paddingTop: 11, paddingBottom: 11, fontSize: 13, lineHeight: 19, fontFamily: 'Inter_400Regular', textAlignVertical: 'top', marginBottom: 5 },
+  responseLabel: { fontSize: 15, letterSpacing: 1.1, fontFamily: 'Inter_700Bold' },
+  input: { minHeight: 92, borderWidth: 1, borderRadius: 13, paddingHorizontal: 12, paddingTop: 11, paddingBottom: 11, fontSize: 16, lineHeight: 23, fontFamily: 'Inter_400Regular', textAlignVertical: 'top', marginBottom: 5 },
   actions: { flexDirection: 'row', gap: 9, marginTop: 10 },
   button: { flex: 1, minHeight: 44, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-  buttonText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  buttonText: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
   replyLink: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12, minHeight: 30 },
-  replyText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  replyText: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
   banner: { marginBottom: 14, borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  bannerText: { flex: 1, fontSize: 12, lineHeight: 17, fontFamily: 'Inter_500Medium' },
+  bannerText: { flex: 1, fontSize: 15, lineHeight: 21, fontFamily: 'Inter_500Medium' },
 });

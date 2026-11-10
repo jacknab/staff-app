@@ -19,7 +19,13 @@ const TOKEN_KEY = 'certxa.pushToken';
 
 // A notification that arrives while the app is open still shows its banner and plays the chime.
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: false }),
+  // A booking-starting reminder or house-call alarm in the app opens the full-screen alarm (lib/alarm.ts), which plays
+  // the sound itself: no banner or second sound for it.
+  handleNotification: async (notification) => {
+    const type = (notification.request.content.data as { type?: string } | undefined)?.type;
+    const alarm = type === 'appointment_reminder' || type === 'house_call_alarm';
+    return { shouldShowBanner: !alarm, shouldShowList: true, shouldPlaySound: !alarm, shouldSetBadge: false };
+  },
 });
 
 /**
@@ -60,9 +66,11 @@ export async function unregisterBookingPushes(authToken: string | null): Promise
 }
 
 /** Run `onBooking` when a booking notification arrives or is tapped. Returns the unsubscribe function. */
-export function onBookingPush(onBooking: (data: { type?: string; appointmentId?: number; requestId?: number }, tapped: boolean) => void): () => void {
+export function onBookingPush(onBooking: (data: { type?: string; appointmentId?: number; requestId?: number }, tapped: boolean,
+  content?: { id: string; title: string; body: string }) => void): () => void {
   const read = (notification: Notifications.Notification) => (notification.request.content.data ?? {}) as { type?: string; appointmentId?: number; requestId?: number };
-  const received = Notifications.addNotificationReceivedListener((notification) => onBooking(read(notification), false));
-  const tapped = Notifications.addNotificationResponseReceivedListener((response) => onBooking(read(response.notification), true));
+  const text = (notification: Notifications.Notification) => ({ id: notification.request.identifier, title: notification.request.content.title ?? '', body: notification.request.content.body ?? '' });
+  const received = Notifications.addNotificationReceivedListener((notification) => onBooking(read(notification), false, text(notification)));
+  const tapped = Notifications.addNotificationResponseReceivedListener((response) => onBooking(read(response.notification), true, text(response.notification)));
   return () => { received.remove(); tapped.remove(); };
 }

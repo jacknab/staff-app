@@ -14,6 +14,8 @@ import { useColors } from '@/hooks/useColors';
 import { api, ApiError } from '@/lib/live-api';
 import { HelpTitle } from '@/components/HelpTitle';
 
+import { AppBackground } from '@/components/look/AppBackground';
+import { look, cardShadow } from '@/components/look/tokens';
 type Action = { id: number; summary: string; status: 'pending' | 'running' | 'done' | 'failed' | 'cancelled'; result?: string | null };
 type ClientLink = { id: number; name: string };
 type Draft = { clientId: number; name: string; phone: string; message: string };
@@ -92,7 +94,7 @@ export default function BusinessAiScreen() {
     const mine = item.role === 'user';
     return (
       <View style={[styles.messageRow, mine && styles.userMessageRow]}>
-        {!mine && <View style={[styles.smallAvatar, { backgroundColor: colors.secondary }]}><Feather name="zap" size={12} color={colors.primary} /></View>}
+        {!mine && <View style={[styles.smallAvatar, { backgroundColor: colors.secondary }]}><Feather name="zap" size={14} color={colors.primary} /></View>}
         <View style={{ flexShrink: 1, gap: 8, alignItems: mine ? 'flex-end' : 'flex-start' }}>
           <View style={[styles.messageBubble, mine ? { backgroundColor: colors.primary, borderWidth: 0 } : { backgroundColor: colors.card, borderColor: colors.border }, mine && styles.userBubble]}>
             {item.thinking ? <ActivityIndicator color={colors.primary} testID="business-ai-thinking" />
@@ -102,7 +104,7 @@ export default function BusinessAiScreen() {
             <View style={styles.chips}>
               {item.clients.map((c) => (
                 <TouchableOpacity key={c.id} testID={`business-ai-client-${c.id}`} onPress={() => router.push(`/client/${c.id}`)} style={[styles.chip, { borderColor: colors.primary, backgroundColor: colors.card }]}>
-                  <Feather name="user" size={13} color={colors.primary} /><Text style={[styles.chipText, { color: colors.primary }]}>{c.name}</Text>
+                  <Feather name="user" size={15} color={colors.primary} /><Text style={[styles.chipText, { color: colors.primary }]}>{c.name}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -113,7 +115,7 @@ export default function BusinessAiScreen() {
               <Text style={[styles.cardText, { color: colors.foreground }]}>{d.message}</Text>
               <View style={styles.cardButtons}>
                 <TouchableOpacity testID={`business-ai-draft-send-${d.clientId}`} onPress={() => void Linking.openURL(smsLink(d.phone, d.message))} style={[styles.cardButton, { backgroundColor: colors.primary }]}>
-                  <Feather name="message-circle" size={14} color={colors.primaryForeground} /><Text style={[styles.cardButtonText, { color: colors.primaryForeground }]}>Open in Messages</Text>
+                  <Feather name="message-circle" size={16} color={colors.primaryForeground} /><Text style={[styles.cardButtonText, { color: colors.primaryForeground }]}>Open in Messages</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => router.push(`/client/${d.clientId}`)} style={[styles.cardButton, { borderWidth: 1, borderColor: colors.border }]}>
                   <Text style={[styles.cardButtonText, { color: colors.foreground }]}>Profile</Text>
@@ -144,14 +146,15 @@ export default function BusinessAiScreen() {
   };
 
   return (
-    <KeyboardAvoidingView style={[styles.root, { backgroundColor: colors.background }]} behavior="padding">
+    <KeyboardAvoidingView style={[styles.root, { backgroundColor: look.pageTop }]} behavior="padding">
+      <AppBackground />
       <View style={[styles.header, { paddingTop: topInset + 10 }]}>
         <TouchableOpacity testID="business-ai-back" onPress={() => router.back()} style={styles.backButton}>
           <Feather name="arrow-left" size={19} color={colors.foreground} />
           <Text style={[styles.backText, { color: colors.foreground }]}>More</Text>
         </TouchableOpacity>
         <HelpTitle help="ai" style={[styles.title, { color: colors.foreground }]}>Business AI</HelpTitle>
-        <View style={[styles.aiMark, { backgroundColor: colors.primary }]}><Feather name="zap" size={17} color={colors.primaryForeground} /></View>
+        <View style={[styles.aiMark, { backgroundColor: colors.primary }]}><Feather name="zap" size={19} color={colors.primaryForeground} /></View>
       </View>
 
       {loading ? <ActivityIndicator style={{ marginTop: 40 }} color={colors.primary} /> : (
@@ -167,7 +170,7 @@ export default function BusinessAiScreen() {
           ListHeaderComponent={messages.length === 0 ? (
             <View>
               <View style={styles.chatIntro}>
-                <View style={[styles.assistantAvatar, { backgroundColor: colors.secondary }]}><Feather name="zap" size={15} color={colors.primary} /></View>
+                <View style={[styles.assistantAvatar, { backgroundColor: colors.secondary }]}><Feather name="zap" size={17} color={colors.primary} /></View>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.introTitle, { color: colors.foreground }]}>Ask about your business</Text>
                   <Text style={[styles.introText, { color: colors.mutedForeground }]}>Your earnings, schedule and clients, from your real numbers. I can draft texts to clients and change your hours, tax, tips and booking approval when you confirm.</Text>
@@ -200,7 +203,7 @@ export default function BusinessAiScreen() {
             testID="business-ai-input"
           />
           <TouchableOpacity testID="business-ai-send" accessibilityLabel="Send message" onPress={() => void send(draft)} disabled={!draft.trim() || busy} style={[styles.sendButton, { backgroundColor: draft.trim() && !busy ? colors.primary : colors.muted }]}>
-            <Feather name="arrow-up" size={17} color={draft.trim() && !busy ? colors.primaryForeground : colors.mutedForeground} />
+            <Feather name="arrow-up" size={19} color={draft.trim() && !busy ? colors.primaryForeground : colors.mutedForeground} />
           </TouchableOpacity>
         </View>
       </View>
@@ -212,35 +215,35 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   header: { paddingHorizontal: 20, paddingBottom: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   backButton: { flexDirection: 'row', alignItems: 'center', gap: 7, minWidth: 66 },
-  backText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
-  title: { fontSize: 20, letterSpacing: -0.4, fontFamily: 'Inter_600SemiBold' },
+  backText: { fontSize: 16, fontFamily: 'Inter_500Medium' },
+  title: { fontSize: 22, letterSpacing: -0.4, fontFamily: 'Inter_600SemiBold' },
   aiMark: { width: 34, height: 34, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   messageContent: { paddingHorizontal: 20, paddingBottom: 18 },
   chatIntro: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
   assistantAvatar: { width: 32, height: 32, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  introTitle: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  introText: { fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 17, marginTop: 3 },
+  introTitle: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
+  introText: { fontSize: 15, fontFamily: 'Inter_400Regular', lineHeight: 21, marginTop: 3 },
   suggestionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 18 },
   suggestionChip: { borderWidth: 1, borderRadius: 14, paddingHorizontal: 11, paddingVertical: 8 },
-  suggestionText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  suggestionText: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
   messageRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 7, marginBottom: 12, maxWidth: '94%' },
   userMessageRow: { alignSelf: 'flex-end', justifyContent: 'flex-end' },
   smallAvatar: { width: 23, height: 23, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   messageBubble: { borderWidth: 1, borderRadius: 16, borderBottomLeftRadius: 5, paddingHorizontal: 13, paddingVertical: 11 },
   userBubble: { borderWidth: 0, borderBottomLeftRadius: 16, borderBottomRightRadius: 5 },
-  messageText: { fontSize: 14, lineHeight: 21, fontFamily: 'Inter_400Regular' },
+  messageText: { fontSize: 17, lineHeight: 26, fontFamily: 'Inter_400Regular' },
   composerArea: { paddingHorizontal: 15, paddingTop: 9, borderTopWidth: 1 },
   composer: { minHeight: 48, borderWidth: 1, borderRadius: 17, paddingLeft: 14, paddingRight: 6, flexDirection: 'row', alignItems: 'center' },
-  input: { flex: 1, minHeight: 42, maxHeight: 120, fontSize: 14, fontFamily: 'Inter_400Regular', paddingVertical: 10 },
+  input: { flex: 1, minHeight: 42, maxHeight: 120, fontSize: 17, fontFamily: 'Inter_400Regular', paddingVertical: 10 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderRadius: 14, paddingHorizontal: 10, minHeight: 32 },
-  chipText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
-  card: { borderWidth: 1, borderRadius: 14, padding: 12, alignSelf: 'stretch' },
-  cardLabel: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
-  cardText: { fontSize: 14, lineHeight: 20, fontFamily: 'Inter_400Regular', marginTop: 5 },
-  cardResult: { fontSize: 12, fontFamily: 'Inter_500Medium', marginTop: 6 },
+  chipText: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
+  card: { borderWidth: 1, borderRadius: 14, padding: 12, alignSelf: 'stretch', ...cardShadow },
+  cardLabel: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  cardText: { fontSize: 17, lineHeight: 24, fontFamily: 'Inter_400Regular', marginTop: 5 },
+  cardResult: { fontSize: 15, fontFamily: 'Inter_500Medium', marginTop: 6 },
   cardButtons: { flexDirection: 'row', gap: 8, marginTop: 10 },
   cardButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 38, borderRadius: 11, paddingHorizontal: 14 },
-  cardButtonText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  cardButtonText: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
   sendButton: { width: 35, height: 35, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
 });

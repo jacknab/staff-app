@@ -15,8 +15,10 @@ import { useColors } from '@/hooks/useColors';
 import { api, ApiError } from '@/lib/live-api';
 import { HelpTitle } from '@/components/HelpTitle';
 
+import { AppBackground } from '@/components/look/AppBackground';
+import { look as appLook, cardShadow } from '@/components/look/tokens';
 // 'solo' is the app's own copy of Bloom (owner, 2026-11-04); 'bloom' stays for the website's salons.
-type Theme = 'bloom' | 'solo' | 'simple' | 'classic' | 'mobile';
+type Theme = 'bloom' | 'solo' | 'aspen' | 'simple' | 'classic' | 'mobile';
 type Look = { accent?: string; coverImage?: string; logoImage?: string; about?: string; instagram?: string; facebook?: string };
 type SiteState = { slug: string | null; url: string | null; theme: Theme; site: Look; businessName: string; oldSlugs: string[] };
 type Check = { slug: string; available: boolean; message: string | null; suggestions: string[] };
@@ -24,6 +26,8 @@ type Step = 'link' | 'design' | 'look' | 'done';
 
 const THEMES: Array<{ value: Theme; name: string; about: string }> = [
   { value: 'solo', name: 'Solo', about: 'A full website: big photo, services with pictures, your portfolio, reviews and a map.' },
+  // Aspen (owner, 2026-11-07): Solo with clients choosing a professional first.
+  { value: 'aspen', name: 'Aspen', about: 'The Solo website, with clients choosing a professional first.' },
   { value: 'simple', name: 'Simple', about: 'Your photo and name on top, then a clean list of services to book.' },
   { value: 'mobile', name: 'Mobile', about: 'Feels like an app: service tiles and a bar at the bottom.' },
   { value: 'classic', name: 'Classic', about: 'A plain step-by-step booking page.' },
@@ -143,7 +147,7 @@ export default function WebsiteSetupScreen() {
 
   if (!state) {
     return (
-      <View style={[styles.center, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+      <View style={[styles.center, { backgroundColor: appLook.pageTop, paddingTop: insets.top }]}>
         {loadError ? (
           <>
             <Text style={[styles.body, { color: colors.foreground, textAlign: 'center' }]}>{loadError}</Text>
@@ -156,8 +160,10 @@ export default function WebsiteSetupScreen() {
   }
 
   return (
+    <View style={{ flex: 1, backgroundColor: appLook.pageTop }}>
+      <AppBackground />
     <KeyboardAwareScrollViewCompat
-      style={{ flex: 1, backgroundColor: colors.background }}
+      style={{ flex: 1 }}
       contentContainerStyle={[styles.content, { paddingTop: (Platform.OS === 'web' ? 67 : insets.top) + 12, paddingBottom: insets.bottom + 28 }]}
       keyboardShouldPersistTaps="handled"
       bottomOffset={20}
@@ -191,6 +197,8 @@ export default function WebsiteSetupScreen() {
               : check?.available ? `${typedSlug}.certxa.com is available.`
               : check?.message ?? ''}
           </Text>
+          {/* Advice on the link (owner, 2026-11-09; GlossGenius review). Old links keep working (lib/bookingSlug.ts history). */}
+          <Text style={[styles.status, { color: colors.mutedForeground }]}>Shorter links are easier for clients to remember. If you change it later, your old link keeps working, but update it wherever you've shared it.</Text>
           {typedSlug !== state.slug && check && !check.available && check.suggestions.length > 0 ? (
             <View style={[styles.suggestions, { borderColor: colors.border, backgroundColor: colors.card }]}>
               {check.suggestions.map((value, index) => (
@@ -311,54 +319,55 @@ export default function WebsiteSetupScreen() {
         </TouchableOpacity>
       ) : null}
     </KeyboardAwareScrollViewCompat>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   suggestions: { borderWidth: 1, borderRadius: 14, marginTop: 10, overflow: 'hidden' },
   suggestionRow: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14 },
-  suggestionText: { fontSize: 15, fontFamily: 'Inter_500Medium' },
-  suggestionUse: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  suggestionText: { fontSize: 17, fontFamily: 'Inter_500Medium' },
+  suggestionUse: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   content: { paddingHorizontal: 22 },
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
   iconButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', marginLeft: -8 },
-  stepText: { fontSize: 10, letterSpacing: 1.2, fontFamily: 'Inter_700Bold' },
-  eyebrow: { fontSize: 10, letterSpacing: 1.4, fontFamily: 'Inter_700Bold' },
+  stepText: { fontSize: 13, letterSpacing: 1.2, fontFamily: 'Inter_700Bold' },
+  eyebrow: { fontSize: 13, letterSpacing: 1.4, fontFamily: 'Inter_700Bold' },
   title: { fontSize: 27, letterSpacing: -0.5, fontFamily: 'Inter_600SemiBold', marginTop: 4 },
-  body: { fontSize: 13, lineHeight: 19, fontFamily: 'Inter_400Regular', marginTop: 7, marginBottom: 18 },
-  slugBox: { height: 54, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center' },
-  slugInput: { flex: 1, fontSize: 16, fontFamily: 'Inter_600SemiBold', paddingVertical: 0 },
-  slugSuffix: { fontSize: 15, fontFamily: 'Inter_500Medium' },
-  status: { fontSize: 12, fontFamily: 'Inter_500Medium', marginTop: 9 },
-  hint: { fontSize: 11, lineHeight: 16, fontFamily: 'Inter_400Regular', marginTop: 12 },
+  body: { fontSize: 16, lineHeight: 23, fontFamily: 'Inter_400Regular', marginTop: 7, marginBottom: 18 },
+  slugBox: { height: 54, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', ...cardShadow },
+  slugInput: { flex: 1, minWidth: 0, fontSize: 18, fontFamily: 'Inter_600SemiBold', paddingVertical: 0 },
+  slugSuffix: { flexShrink: 0, fontSize: 17, fontFamily: 'Inter_500Medium' },
+  status: { fontSize: 15, fontFamily: 'Inter_500Medium', marginTop: 9 },
+  hint: { fontSize: 14, lineHeight: 20, fontFamily: 'Inter_400Regular', marginTop: 12 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
   chip: { borderWidth: 1, borderRadius: 12, paddingVertical: 9, paddingHorizontal: 12 },
-  chipText: { fontSize: 12, fontFamily: 'Inter_500Medium' },
+  chipText: { fontSize: 15, fontFamily: 'Inter_500Medium' },
   card: { borderRadius: 15, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  cardTitle: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
-  cardBody: { fontSize: 12, lineHeight: 17, fontFamily: 'Inter_400Regular', marginTop: 4 },
+  cardTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
+  cardBody: { fontSize: 15, lineHeight: 21, fontFamily: 'Inter_400Regular', marginTop: 4 },
   previewButton: { borderWidth: 1, borderRadius: 10, paddingVertical: 8, paddingHorizontal: 11 },
-  previewText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
-  label: { fontSize: 13, fontFamily: 'Inter_600SemiBold', marginTop: 20, marginBottom: 9 },
+  previewText: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
+  label: { fontSize: 16, fontFamily: 'Inter_600SemiBold', marginTop: 20, marginBottom: 9 },
   swatches: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   swatch: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
-  swatchNone: { fontSize: 9, fontFamily: 'Inter_600SemiBold' },
+  swatchNone: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
   cover: { height: 150, borderRadius: 14, borderWidth: 1, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
-  photoText: { fontSize: 12, fontFamily: 'Inter_500Medium' },
+  photoText: { fontSize: 15, fontFamily: 'Inter_500Medium' },
   remove: { marginTop: 8 },
-  photoError: { fontSize: 12, fontFamily: 'Inter_500Medium', marginTop: 8 },
-  removeText: { fontSize: 12, fontFamily: 'Inter_500Medium' },
+  photoError: { fontSize: 15, fontFamily: 'Inter_500Medium', marginTop: 8 },
+  removeText: { fontSize: 15, fontFamily: 'Inter_500Medium' },
   logoRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   logo: { width: 78, height: 78, borderRadius: 39, borderWidth: 1, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   logoImage: { width: 78, height: 78 },
-  linkText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  input: { borderWidth: 1, borderRadius: 13, minHeight: 48, paddingHorizontal: 13, fontSize: 14, fontFamily: 'Inter_400Regular' },
+  linkText: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
+  input: { borderWidth: 1, borderRadius: 13, minHeight: 48, paddingHorizontal: 13, fontSize: 17, fontFamily: 'Inter_400Regular' },
   textArea: { minHeight: 110, paddingTop: 12, textAlignVertical: 'top' },
-  counter: { fontSize: 10, fontFamily: 'Inter_400Regular', textAlign: 'right', marginTop: 5 },
-  error: { fontSize: 12, fontFamily: 'Inter_500Medium', marginTop: 14 },
+  counter: { fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'right', marginTop: 5 },
+  error: { fontSize: 15, fontFamily: 'Inter_500Medium', marginTop: 14 },
   button: { height: 52, borderRadius: 15, alignItems: 'center', justifyContent: 'center', marginTop: 22 },
-  buttonText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  buttonText: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
   skip: { alignSelf: 'center', minHeight: 44, justifyContent: 'center', marginTop: 8 },
-  skipText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
+  skipText: { fontSize: 16, fontFamily: 'Inter_500Medium' },
 });

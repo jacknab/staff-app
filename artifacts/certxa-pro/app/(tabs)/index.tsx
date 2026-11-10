@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Feather } from '@expo/vector-icons';
 import { ActivityIndicator, Platform, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/contexts/AuthContext';
@@ -17,9 +17,14 @@ import { useBookingData, type ApiAppointment } from '@/contexts/BookingContext';
 import { api } from '@/lib/live-api';
 import { listBookingRequests, type BookingRequest } from '@/lib/bookingRequests';
 import { onBookingPush } from '@/lib/push';
+import { unreadInboxCount } from '@/lib/inbox';
+import { onInboxEvent } from '@/lib/inboxLive';
 import { businessToday, zonedDateLabel, zonedMinutes, zonedMoment, zonedTimeLabel } from '@/lib/businessTime';
 import { HelpTitle } from '@/components/HelpTitle';
 
+import { AppBackground } from '@/components/look/AppBackground';
+import { SectionTitle } from '@/components/look/SectionHeader';
+import { look, cardShadow } from '@/components/look/tokens';
 type Ticket = ApiAppointment & { calendarHidden?: boolean | null };
 type Conversation = { clientPhone: string; clientName: string | null; lastMessage: string; lastMessageAt: string; unreadCount: number };
 const pretty = (n: string) => { const d = n.replace(/\D/g, '').slice(-10); return d.length === 10 ? `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}` : n; };
@@ -60,7 +65,10 @@ export default function HomeScreen() {
       setError(cause instanceof Error ? cause.message : 'Could not load today.');
     } finally { setLoading(false); setRefreshing(false); }
   }, [ownStaffId, timeZone]);
+  // Website messages not read yet: the envelope's count (owner, 2026-11-07).
+  const [inboxUnread, setInboxUnread] = useState(0);
   const loadAttention = useCallback(async () => {
+    void unreadInboxCount().then(setInboxUnread);
     const [reqs, convs] = await Promise.all([
       listBookingRequests().catch(() => [] as BookingRequest[]),
       api.get<Conversation[]>('/api/sms-inbox/conversations').catch(() => [] as Conversation[]),
@@ -69,6 +77,8 @@ export default function HomeScreen() {
     setUnread((Array.isArray(convs) ? convs : []).filter((c) => c.unreadCount > 0).sort((a, b) => +new Date(b.lastMessageAt) - +new Date(a.lastMessageAt)));
   }, []);
   useFocusEffect(useCallback(() => { void load(); void loadAttention(); }, [load, loadAttention]));
+  // The envelope's count follows new website messages and ones read on another phone.
+  useEffect(() => onInboxEvent((e) => { if (e.type === 'message' || e.type === 'read') void unreadInboxCount().then(setInboxUnread); }), []);
   // A new request or text while Home is open shows straight away.
   useEffect(() => onBookingPush(() => { void loadAttention(); }), [loadAttention]);
 
@@ -80,7 +90,7 @@ export default function HomeScreen() {
   const paid = tickets.filter((t) => t.status === 'completed' || t.status === 'paid');
   const takenCents = paid.reduce((sum, t) => sum + Math.round(Number(t.totalPaid ?? 0) * 100) - Number(t.refundedCents ?? 0), 0);
   const appointments = useMemo(() => tickets
-    .filter((t) => !t.calendarHidden && t.status !== 'cancelled')
+    .filter((t) => (!t.calendarHidden || t.paymentStatus === 'awaiting_payment') && t.status !== 'cancelled')
     .sort((a, b) => +new Date(a.date) - +new Date(b.date)), [tickets]);
   // Next up: the first visit not paid yet that hasn't ended.
   const nextUp = appointments.find((t) => !['completed', 'paid', 'no_show'].includes(String(t.status))
@@ -90,10 +100,26 @@ export default function HomeScreen() {
   const card = { backgroundColor: colors.card, borderColor: colors.border };
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: colors.background }} contentContainerStyle={[styles.content, { paddingTop: topInset + 12 }]}
+    <View style={{ flex: 1, backgroundColor: look.pageTop }}>
+      <AppBackground />
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.content, { paddingTop: topInset + 12 }]}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load(); void loadAttention(); }} tintColor={colors.primary} />}>
-      <Text style={[styles.date, { color: colors.primary }]}>{zonedDateLabel(now, timeZone).toUpperCase()}</Text>
-      <HelpTitle help="home" style={[styles.title, { color: colors.foreground }]}>{greeting}{firstName ? `, ${firstName}` : ''}</HelpTitle>
+      <View style={styles.headRow}>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.date, { color: colors.primary }]}>{zonedDateLabel(now, timeZone).toUpperCase()}</Text>
+          <HelpTitle help="home" style={[styles.title, { color: colors.foreground }]}>{greeting}{firstName ? `, ${firstName}` : ''}</HelpTitle>
+        </View>
+        {/* Inbox: messages clients send from the website, with the count not read yet (app/inbox). */}
+        <TouchableOpacity onPress={() => router.push('/inbox' as Href)} style={styles.inboxButton} testID="home-inbox"
+          accessibilityLabel={inboxUnread > 0 ? `Inbox, ${inboxUnread} new ${inboxUnread === 1 ? 'message' : 'messages'}` : 'Inbox'}>
+          <Feather name="mail" size={24} color={colors.foreground} />
+          {inboxUnread > 0 ? (
+            <View style={[styles.inboxBadge, { backgroundColor: colors.primary, borderColor: colors.background }]} testID="home-inbox-count">
+              <Text style={styles.inboxBadgeText}>{inboxUnread > 99 ? '99+' : inboxUnread}</Text>
+            </View>
+          ) : null}
+        </TouchableOpacity>
+      </View>
 
       <View style={[styles.takings, { backgroundColor: colors.primary }]} testID="home-takings">
         <Text style={[styles.takingsLabel, { color: colors.primaryForeground }]}>Taken today</Text>
@@ -127,7 +153,7 @@ export default function HomeScreen() {
                 <Text style={[styles.rowTitle, { color: colors.foreground }]} numberOfLines={1}>{item.title}</Text>
                 <Text style={[styles.rowSub, { color: colors.mutedForeground }]} numberOfLines={1}>{item.sub}</Text>
               </View>
-              <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+              <Feather name="chevron-right" size={20} color={colors.mutedForeground} />
             </TouchableOpacity>
           ))}
         </View>
@@ -149,7 +175,7 @@ export default function HomeScreen() {
       ) : null}
 
       <View style={styles.sectionLine}>
-        <Text style={[styles.section, { color: colors.foreground }]}>Today's appointments</Text>
+        <SectionTitle style={[styles.section]}>Today's appointments</SectionTitle>
         <TouchableOpacity testID="home-open-calendar" onPress={() => router.push('/calendar')}><Text style={[styles.link, { color: colors.primary }]}>Calendar</Text></TouchableOpacity>
       </View>
       {loading ? <ActivityIndicator style={{ marginTop: 20 }} color={colors.primary} /> : error ? (
@@ -178,31 +204,36 @@ export default function HomeScreen() {
         </View>
       )}
     </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   content: { paddingHorizontal: 20, paddingBottom: 120 },
-  date: { fontSize: 11, letterSpacing: 1.2, fontFamily: 'Inter_700Bold' },
-  title: { fontSize: 27, fontFamily: 'Inter_600SemiBold', letterSpacing: -0.5, marginTop: 4 },
+  date: { fontSize: 14, letterSpacing: 1.2, fontFamily: 'Inter_700Bold' },
+  headRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  inboxButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
+  inboxBadge: { position: 'absolute', top: 2, right: 0, minWidth: 20, height: 20, borderRadius: 10, borderWidth: 2, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center' },
+  inboxBadgeText: { color: '#FFFFFF', fontSize: 13, fontFamily: 'Inter_700Bold' },
+  title: { fontSize: 34, fontFamily: 'Inter_700Bold', letterSpacing: -0.7, marginTop: 4 },
   takings: { borderRadius: 20, padding: 18, marginTop: 20 },
-  takingsLabel: { fontSize: 12, fontFamily: 'Inter_600SemiBold', opacity: 0.85 },
+  takingsLabel: { fontSize: 15, fontFamily: 'Inter_600SemiBold', opacity: 0.85 },
   takingsValue: { fontSize: 32, fontFamily: 'Inter_700Bold', marginTop: 4, letterSpacing: -0.5 },
-  takingsSub: { fontSize: 12, fontFamily: 'Inter_500Medium', marginTop: 6, opacity: 0.85 },
+  takingsSub: { fontSize: 15, fontFamily: 'Inter_500Medium', marginTop: 6, opacity: 0.85 },
   next: { borderWidth: 1, borderRadius: 18, padding: 16, marginTop: 14 },
-  eyebrow: { fontSize: 10, letterSpacing: 1.4, fontFamily: 'Inter_700Bold' },
-  nextTime: { fontSize: 22, fontFamily: 'Inter_700Bold', marginTop: 6, marginBottom: 4 },
+  eyebrow: { fontSize: 13, letterSpacing: 1.4, fontFamily: 'Inter_700Bold' },
+  nextTime: { fontSize: 23, fontFamily: 'Inter_700Bold', marginTop: 6, marginBottom: 4 },
   sectionLine: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginTop: 26, marginBottom: 10 },
-  section: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
+  section: {},
   dot: { width: 8, height: 8, borderRadius: 4 },
   moreLinks: { flexDirection: 'row', justifyContent: 'flex-end', gap: 18, marginTop: 8 },
-  link: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  list: { borderWidth: 1, borderRadius: 16, overflow: 'hidden' },
+  link: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
+  list: { borderWidth: 1, borderRadius: 16, overflow: 'hidden', ...cardShadow },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 13 },
-  rowTime: { width: 70, fontSize: 13, fontFamily: 'Inter_700Bold' },
-  rowTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  rowSub: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 3 },
+  rowTime: { width: 70, fontSize: 16, fontFamily: 'Inter_700Bold' },
+  rowTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
+  rowSub: { fontSize: 15, fontFamily: 'Inter_400Regular', marginTop: 3 },
   pill: { borderRadius: 11, paddingHorizontal: 9, paddingVertical: 3 },
-  pillText: { fontSize: 10, fontFamily: 'Inter_600SemiBold' },
+  pillText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   empty: { borderWidth: 1, borderRadius: 16, minHeight: 110, alignItems: 'center', justifyContent: 'center', gap: 8 },
 });

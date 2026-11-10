@@ -8,8 +8,9 @@ const SECTIONS = [
   { to: '/catalog/categories', title: 'Categories', hint: 'Group your services' },
   { to: '/services', title: 'Services', hint: 'Your menu, duration and rates' },
   { to: '/catalog/addons', title: 'Add-Ons', hint: 'Extras clients add to a service' },
+  { to: '/catalog/addon-groups', title: 'Add-on Groups', hint: 'Add-ons several services share' },
   { to: '/catalog/packages', title: 'Packages', hint: 'Services and add-ons sold together' },
-  { to: '/catalog/deals', title: 'Deals', hint: 'Vouchers for a package at a lower price' },
+  // { to: '/catalog/deals', title: 'Deals', hint: 'Vouchers for a package at a lower price' }, // marketplace removed 2026-11-07
   { to: '/catalog/products', title: 'Products', hint: 'Retail items you sell' },
 ] as const;
 

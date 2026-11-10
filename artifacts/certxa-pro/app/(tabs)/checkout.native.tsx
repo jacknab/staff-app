@@ -32,13 +32,15 @@ import {
 } from '@/lib/certxa-api';
 import { HelpTitle } from '@/components/HelpTitle';
 
+import { AppBackground } from '@/components/look/AppBackground';
+import { look, cardShadow } from '@/components/look/tokens';
 // Tap to Pay on iPhone needs Apple's managed entitlement in the provisioning
 // profile. Today only the development profile carries it (the "preview-dev"
 // EAS build profile), so ad hoc and App Store builds cannot use it yet.
 // Stripe M2 does not require that Apple entitlement.
 const TAP_TO_PAY_ENABLED = true;
 // Shown on the payment screen so a tester can tell which build is installed.
-const BUILD_LABEL = 'Build Nov 4 · Z14';
+const BUILD_LABEL = 'Build Nov 10 · A';
 const EXPO_GO_PREVIEW = process.env.EXPO_PUBLIC_EXPO_GO_PREVIEW === '1';
 
 type PaymentStep = 'idle' | 'tap_intro' | 'initializing' | 'discovering' | 'connecting' | 'ready' | 'processing' | 'capture_pending' | 'success' | 'error';
@@ -539,7 +541,8 @@ export default function CheckoutScreen() {
     const isBusy = (loading && !isTapIntro) || ['initializing', 'discovering', 'connecting', 'processing'].includes(step);
 
     return (
-      <View style={[styles.root, { backgroundColor: colors.background, paddingTop: topInset }]}>
+      <View style={[styles.root, { backgroundColor: look.pageTop, paddingTop: topInset }]}>
+        <AppBackground />
         <StatusBar barStyle="dark-content" />
         <View style={styles.tapHeader}>
           {/* Back to the tip screen. Not while a card payment is going through, or one is waiting to be finalized. */}
@@ -579,7 +582,7 @@ export default function CheckoutScreen() {
              <Text style={[styles.tapTitle, { color: colors.foreground }]}>{isCapturePending ? 'Payment needs finalizing' : isTapIntro ? 'Tap to Pay' : isReady ? 'Ready for payment' : `Connecting ${readerMode === 'm2' ? 'Stripe M2' : 'Tap to Pay'}`}</Text>
              <Text style={[styles.tapSub, { color: colors.mutedForeground }]}>{error || (isTapIntro ? 'Hold the customer’s card near this phone.' : statusText)}</Text>
             <View style={[styles.amountCard, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.eyebrow, { color: colors.mutedForeground }]}>AMOUNT DUE</Text><Text style={[styles.tapAmount, { color: colors.foreground }]}>{dollars(digits)}</Text><Text style={[styles.serviceLabel, { color: colors.mutedForeground }]}>{clientName.trim() || 'Certxa appointment'} · {isQuickSale ? String(params.serviceName || 'Quick sale') : `Appointment #${appointmentId || '—'}`}</Text></View>
-            {error ? <View style={[styles.errorNotice, { backgroundColor: colors.accent }]}><Feather name="alert-circle" size={15} color={colors.accentForeground} /><Text style={[styles.previewText, { color: colors.accentForeground }]}>{error}</Text></View> : null}
+            {error ? <View style={[styles.errorNotice, { backgroundColor: colors.accent }]}><Feather name="alert-circle" size={17} color={colors.accentForeground} /><Text style={[styles.previewText, { color: colors.accentForeground }]}>{error}</Text></View> : null}
              {isTapIntro && baseCentsParam > 0 ? <View testID="discount-block" style={[styles.formField, { width: '100%', marginTop: 16 }]}>
                <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Discount{discountCents > 0 ? <Text style={{ color: colors.primary }}>{` · −${dollars(String(discountCents))}`}</Text> : null}</Text>
                <View style={{ flexDirection: 'row', gap: 6 }}>
@@ -600,9 +603,9 @@ export default function CheckoutScreen() {
                </View>
                {readerSetupText ? <Text style={[styles.setupText, { color: colors.primary }]}>{readerSetupText}</Text> : null}
              </View> : null}
-             <TouchableOpacity disabled={(!isReady && !isCapturePending && !isTapIntro) || isBusy} testID={isTapIntro ? 'start-tap-to-pay' : isCapturePending ? 'retry-capture' : 'accept-payment'} onPress={isTapIntro ? () => void startReader('tap_to_pay') : isCapturePending ? retryCapture : processPayment} style={[styles.primaryButton, { backgroundColor: (isReady || isCapturePending || isTapIntro) && !isBusy ? colors.primary : colors.muted }]}><Feather name={isTapIntro ? 'radio' : isCapturePending ? 'refresh-cw' : 'radio'} size={17} color={(isReady || isCapturePending || isTapIntro) && !isBusy ? colors.primaryForeground : colors.mutedForeground} /><Text style={[styles.primaryButtonText, { color: (isReady || isCapturePending || isTapIntro) && !isBusy ? colors.primaryForeground : colors.mutedForeground }]}>{isBusy ? (step === 'processing' ? 'Payment in progress…' : 'Preparing…') : isTapIntro ? 'Start Tap to Pay' : isCapturePending ? 'Retry capture' : 'Accept payment'}</Text></TouchableOpacity>
-             {isTapIntro ? <TouchableOpacity testID="start-stripe-m2" disabled={isBusy} onPress={() => void startReader('m2')} style={[styles.primaryButton, { marginTop: -12, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}><Feather name="credit-card" size={17} color={colors.foreground} /><Text style={[styles.primaryButtonText, { color: colors.foreground }]}>Use Stripe M2 reader</Text></TouchableOpacity> : null}
-             <Text testID="build-label" style={[styles.tapSub, { fontSize: 10, marginTop: 10, color: colors.mutedForeground }]}>{BUILD_LABEL}</Text>
+             <TouchableOpacity disabled={(!isReady && !isCapturePending && !isTapIntro) || isBusy} testID={isTapIntro ? 'start-tap-to-pay' : isCapturePending ? 'retry-capture' : 'accept-payment'} onPress={isTapIntro ? () => void startReader('tap_to_pay') : isCapturePending ? retryCapture : processPayment} style={[styles.primaryButton, { backgroundColor: (isReady || isCapturePending || isTapIntro) && !isBusy ? colors.primary : colors.muted }]}><Feather name={isTapIntro ? 'radio' : isCapturePending ? 'refresh-cw' : 'radio'} size={19} color={(isReady || isCapturePending || isTapIntro) && !isBusy ? colors.primaryForeground : colors.mutedForeground} /><Text style={[styles.primaryButtonText, { color: (isReady || isCapturePending || isTapIntro) && !isBusy ? colors.primaryForeground : colors.mutedForeground }]}>{isBusy ? (step === 'processing' ? 'Payment in progress…' : 'Preparing…') : isTapIntro ? 'Start Tap to Pay' : isCapturePending ? 'Retry capture' : 'Accept payment'}</Text></TouchableOpacity>
+             {isTapIntro ? <TouchableOpacity testID="start-stripe-m2" disabled={isBusy} onPress={() => void startReader('m2')} style={[styles.primaryButton, { marginTop: -12, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}><Feather name="credit-card" size={19} color={colors.foreground} /><Text style={[styles.primaryButtonText, { color: colors.foreground }]}>Use Stripe M2 reader</Text></TouchableOpacity> : null}
+             <Text testID="build-label" style={[styles.tapSub, { fontSize: 13, marginTop: 10, color: colors.mutedForeground }]}>{BUILD_LABEL}</Text>
           </View>
         )}
       </View>
@@ -635,7 +638,7 @@ export default function CheckoutScreen() {
     <View style={[styles.root, { backgroundColor: colors.background, paddingTop: topInset }]}>
       <StatusBar barStyle="dark-content" />
       <ScrollView contentContainerStyle={styles.pageContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        <View style={styles.topLine}><View><Text style={[styles.eyebrow, { color: colors.primary }]}>CERTXA PRO</Text><HelpTitle help="checkout" style={[styles.title, { color: colors.foreground }]}>Checkout</HelpTitle></View><View style={[styles.secureBadge, { backgroundColor: colors.secondary }]}><Feather name="lock" size={13} color={colors.primary} /><Text style={[styles.secureText, { color: colors.primary }]}>Certxa secure</Text></View></View>
+        <View style={styles.topLine}><View><Text style={[styles.eyebrow, { color: colors.primary }]}>CERTXA PRO</Text><HelpTitle help="checkout" style={[styles.title, { color: colors.foreground }]}>Checkout</HelpTitle></View><View style={[styles.secureBadge, { backgroundColor: colors.secondary }]}><Feather name="lock" size={15} color={colors.primary} /><Text style={[styles.secureText, { color: colors.primary }]}>Certxa secure</Text></View></View>
         <View style={{ marginBottom: 14 }}><PaymentsSetupBanner message="Set up card payments to take this payment with Tap to Pay or the M2 reader." /></View>
         <View style={[styles.amountPanel, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[styles.amountCaption, { color: colors.mutedForeground }]}>PAYMENT AMOUNT</Text>
@@ -654,27 +657,27 @@ export default function CheckoutScreen() {
             {readerSetupText ? <Text style={[styles.setupText, { color: colors.primary }]}>{readerSetupText}</Text> : null}
            </View> : null}
         </View>
-        {error ? <View style={[styles.errorNotice, { backgroundColor: colors.accent }]}><Feather name="alert-circle" size={15} color={colors.accentForeground} /><Text style={[styles.previewText, { color: colors.accentForeground }]}>{error}</Text></View> : null}
+        {error ? <View style={[styles.errorNotice, { backgroundColor: colors.accent }]}><Feather name="alert-circle" size={17} color={colors.accentForeground} /><Text style={[styles.previewText, { color: colors.accentForeground }]}>{error}</Text></View> : null}
         <Text style={[styles.methodHeading, { color: colors.foreground }]}>Payment method</Text>
         <View style={styles.methodList}>
           {paymentMethods.map((method) => {
             const selected = paymentMethod === method.key;
             return (
               <TouchableOpacity key={method.key} testID={`payment-method-${method.key}`} onPress={() => setPaymentMethod(method.key)} accessibilityRole="button" accessibilityState={{ selected }} style={[styles.methodCard, { backgroundColor: selected ? colors.secondary : colors.card, borderColor: selected ? colors.primary : colors.border }]}>
-                <View style={[styles.methodIcon, { backgroundColor: selected ? colors.primary : colors.muted }]}><Feather name={method.icon} size={16} color={selected ? colors.primaryForeground : colors.foreground} /></View>
+                <View style={[styles.methodIcon, { backgroundColor: selected ? colors.primary : colors.muted }]}><Feather name={method.icon} size={18} color={selected ? colors.primaryForeground : colors.foreground} /></View>
                 <View style={{ flex: 1 }}><Text style={[styles.methodLabel, { color: colors.foreground }]}>{method.label}</Text><Text style={[styles.methodDescription, { color: colors.mutedForeground }]}>{method.description}</Text></View>
-                <Feather name={selected ? 'check-circle' : 'circle'} size={18} color={selected ? colors.primary : colors.border} />
+                <Feather name={selected ? 'check-circle' : 'circle'} size={20} color={selected ? colors.primary : colors.border} />
               </TouchableOpacity>
             );
           })}
         </View>
         {paymentMethod === 'gift_card' ? <View style={styles.giftCardField}><Text style={[styles.fieldLabel, { color: colors.foreground }]}>Gift card number <Text style={{ color: colors.mutedForeground }}>(optional)</Text></Text><TextInput autoCapitalize="characters" onChangeText={setGiftCardCode} placeholder="Add a reference to the receipt" placeholderTextColor={colors.mutedForeground} style={[styles.fieldInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} testID="gift-card-code" value={giftCardCode} /></View> : null}
         {paymentMethod === 'card' ? <View style={styles.readerButtons}>
-          <TouchableOpacity testID="stripe-m2" onPress={() => startReader('m2')} disabled={Number(digits) < 50} style={[styles.tapButton, styles.readerButton, { backgroundColor: Number(digits) < 50 ? colors.muted : colors.primary }]}><Feather name="credit-card" size={18} color={Number(digits) < 50 ? colors.mutedForeground : colors.primaryForeground} /><Text style={[styles.tapButtonText, { color: Number(digits) < 50 ? colors.mutedForeground : colors.primaryForeground }]}>Stripe M2</Text></TouchableOpacity>
-          <TouchableOpacity testID="tap-to-pay" onPress={() => startReader('tap_to_pay')} disabled={!TAP_TO_PAY_ENABLED || Number(digits) < 50} style={[styles.tapButton, styles.readerButton, { backgroundColor: colors.muted }]}><Feather name="radio" size={18} color={colors.mutedForeground} /><Text style={[styles.tapButtonText, { color: colors.mutedForeground }]}>Tap to Pay pending Apple</Text></TouchableOpacity>
-        </View> : <TouchableOpacity testID={`record-${paymentMethod}`} onPress={processManualPayment} disabled={Number(digits) < 50} style={[styles.tapButton, { backgroundColor: Number(digits) < 50 ? colors.muted : colors.primary }]}><Feather name={selectedMethod.icon} size={18} color={Number(digits) < 50 ? colors.mutedForeground : colors.primaryForeground} /><Text style={[styles.tapButtonText, { color: Number(digits) < 50 ? colors.mutedForeground : colors.primaryForeground }]}>Record {selectedMethod.label} payment</Text></TouchableOpacity>}
+          <TouchableOpacity testID="stripe-m2" onPress={() => startReader('m2')} disabled={Number(digits) < 50} style={[styles.tapButton, styles.readerButton, { backgroundColor: Number(digits) < 50 ? colors.muted : colors.primary }]}><Feather name="credit-card" size={20} color={Number(digits) < 50 ? colors.mutedForeground : colors.primaryForeground} /><Text style={[styles.tapButtonText, { color: Number(digits) < 50 ? colors.mutedForeground : colors.primaryForeground }]}>Stripe M2</Text></TouchableOpacity>
+          <TouchableOpacity testID="tap-to-pay" onPress={() => startReader('tap_to_pay')} disabled={!TAP_TO_PAY_ENABLED || Number(digits) < 50} style={[styles.tapButton, styles.readerButton, { backgroundColor: colors.muted }]}><Feather name="radio" size={20} color={colors.mutedForeground} /><Text style={[styles.tapButtonText, { color: colors.mutedForeground }]}>Tap to Pay pending Apple</Text></TouchableOpacity>
+        </View> : <TouchableOpacity testID={`record-${paymentMethod}`} onPress={processManualPayment} disabled={Number(digits) < 50} style={[styles.tapButton, { backgroundColor: Number(digits) < 50 ? colors.muted : colors.primary }]}><Feather name={selectedMethod.icon} size={20} color={Number(digits) < 50 ? colors.mutedForeground : colors.primaryForeground} /><Text style={[styles.tapButtonText, { color: Number(digits) < 50 ? colors.mutedForeground : colors.primaryForeground }]}>Record {selectedMethod.label} payment</Text></TouchableOpacity>}
         <View style={styles.recentHeader}><Text style={[styles.sectionTitle, { color: colors.foreground }]}>Recent payments</Text></View>
-        <View style={styles.saleList}>{sales.slice(0, 3).map((sale, index) => <View key={`${sale.time}-${index}`} style={[styles.saleRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.saleIcon, { backgroundColor: colors.secondary }]}><Feather name="check" size={15} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={[styles.quickTitle, { color: colors.foreground }]}>{sale.label}</Text><Text style={[styles.saleTime, { color: colors.mutedForeground }]}>{sale.time}</Text></View><Text style={[styles.saleAmount, { color: colors.foreground }]}>{sale.amount}</Text></View>)}</View>
+        <View style={styles.saleList}>{sales.slice(0, 3).map((sale, index) => <View key={`${sale.time}-${index}`} style={[styles.saleRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.saleIcon, { backgroundColor: colors.secondary }]}><Feather name="check" size={17} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={[styles.quickTitle, { color: colors.foreground }]}>{sale.label}</Text><Text style={[styles.saleTime, { color: colors.mutedForeground }]}>{sale.time}</Text></View><Text style={[styles.saleAmount, { color: colors.foreground }]}>{sale.amount}</Text></View>)}</View>
         <Text style={[styles.disclaimer, { color: colors.mutedForeground }]}>Payments are processed by Certxa Connect in a custom native build.</Text>
       </ScrollView>
     </View>
@@ -685,61 +688,61 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   pageContent: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 130 },
   topLine: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 23 },
-  eyebrow: { fontSize: 10, letterSpacing: 1.4, fontFamily: 'Inter_700Bold' },
+  eyebrow: { fontSize: 13, letterSpacing: 1.4, fontFamily: 'Inter_700Bold' },
   title: { fontSize: 27, letterSpacing: -0.5, fontFamily: 'Inter_600SemiBold', marginTop: 4 },
   secureBadge: { paddingVertical: 7, paddingHorizontal: 10, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  secureText: { fontSize: 9, letterSpacing: 1, fontFamily: 'Inter_700Bold' },
-  amountPanel: { borderWidth: 1, borderRadius: 20, alignItems: 'center', paddingHorizontal: 15, paddingTop: 19, paddingBottom: 14 },
-  amountCaption: { fontSize: 9, letterSpacing: 1.45, fontFamily: 'Inter_600SemiBold' },
+  secureText: { fontSize: 12, letterSpacing: 1, fontFamily: 'Inter_700Bold' },
+  amountPanel: { borderWidth: 1, borderRadius: 20, alignItems: 'center', paddingHorizontal: 15, paddingTop: 19, paddingBottom: 14, ...cardShadow },
+  amountCaption: { fontSize: 12, letterSpacing: 1.45, fontFamily: 'Inter_600SemiBold' },
   amount: { fontSize: 40, letterSpacing: -1.3, fontFamily: 'Inter_500Medium', marginTop: 6, marginBottom: 15 },
-  liveAmountNote: { fontSize: 11, lineHeight: 16, textAlign: 'center' },
-  quickTitle: { fontSize: 11, fontFamily: 'Inter_500Medium' },
+  liveAmountNote: { fontSize: 14, lineHeight: 20, textAlign: 'center' },
+  quickTitle: { fontSize: 14, fontFamily: 'Inter_500Medium' },
   form: { gap: 12, marginTop: 14 },
   formField: { gap: 6 },
-  fieldLabel: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
-  fieldInput: { borderWidth: 1, borderRadius: 13, minHeight: 45, paddingHorizontal: 12, fontSize: 12, fontFamily: 'Inter_400Regular' },
+  fieldLabel: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  fieldInput: { borderWidth: 1, borderRadius: 13, minHeight: 45, paddingHorizontal: 12, fontSize: 15, fontFamily: 'Inter_400Regular' },
   registrationRow: { flexDirection: 'row', gap: 8 },
   registrationInput: { flex: 1 },
   registerButton: { minWidth: 92, borderRadius: 13, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
-  registerButtonText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
-  setupText: { fontSize: 10, lineHeight: 15, fontFamily: 'Inter_500Medium' },
+  registerButtonText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  setupText: { fontSize: 13, lineHeight: 20, fontFamily: 'Inter_500Medium' },
   tapButton: { height: 54, marginTop: 11, borderRadius: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 11 },
   readerButtons: { flexDirection: 'row', gap: 9 },
   readerButton: { flex: 1 },
-  tapButtonText: { fontSize: 14, fontFamily: 'Inter_600SemiBold', flex: 1, textAlign: 'center' },
-  methodHeading: { fontSize: 16, fontFamily: 'Inter_600SemiBold', marginTop: 25, marginBottom: 10 },
+  tapButtonText: { fontSize: 17, fontFamily: 'Inter_600SemiBold', flex: 1, textAlign: 'center' },
+  methodHeading: { fontSize: 18, fontFamily: 'Inter_600SemiBold', marginTop: 25, marginBottom: 10 },
   methodList: { gap: 8 },
-  methodCard: { borderWidth: 1, borderRadius: 15, padding: 11, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  methodCard: { borderWidth: 1, borderRadius: 15, padding: 11, flexDirection: 'row', alignItems: 'center', gap: 10, ...cardShadow },
   methodIcon: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  methodLabel: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
-  methodDescription: { fontSize: 10, marginTop: 3 },
+  methodLabel: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
+  methodDescription: { fontSize: 13, marginTop: 3 },
   giftCardField: { gap: 6, marginTop: 12 },
   recentHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 26, marginBottom: 11 },
-  sectionTitle: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
+  sectionTitle: { fontSize: 18, fontFamily: 'Inter_600SemiBold' },
   saleList: { gap: 8 },
-  saleRow: { borderWidth: 1, borderRadius: 15, padding: 11, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  saleRow: { borderWidth: 1, borderRadius: 15, padding: 11, flexDirection: 'row', alignItems: 'center', gap: 10, ...cardShadow },
   saleIcon: { width: 34, height: 34, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  saleTime: { fontSize: 10, fontFamily: 'Inter_400Regular', marginTop: 4 },
-  saleAmount: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
-  disclaimer: { textAlign: 'center', fontSize: 10, lineHeight: 15, fontFamily: 'Inter_400Regular', marginTop: 17 },
+  saleTime: { fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 4 },
+  saleAmount: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
+  disclaimer: { textAlign: 'center', fontSize: 13, lineHeight: 20, fontFamily: 'Inter_400Regular', marginTop: 17 },
   tapHeader: { paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   iconButton: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
   backButton: { minWidth: 84, height: 42, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  backText: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
+  backText: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
   tapContent: { flex: 1, alignItems: 'center', paddingHorizontal: 22, paddingTop: 28 },
   nfcCircle: { width: 76, height: 76, borderRadius: 38, alignItems: 'center', justifyContent: 'center', marginBottom: 19 },
-  tapTitle: { fontSize: 22, fontFamily: 'Inter_600SemiBold', letterSpacing: -0.5 },
-  tapSub: { fontSize: 12, lineHeight: 18, textAlign: 'center', fontFamily: 'Inter_400Regular', marginTop: 7, minHeight: 20 },
-  amountCard: { width: '100%', borderWidth: 1, borderRadius: 21, paddingVertical: 22, paddingHorizontal: 16, alignItems: 'center', marginTop: 31 },
+  tapTitle: { fontSize: 23, fontFamily: 'Inter_600SemiBold', letterSpacing: -0.5 },
+  tapSub: { fontSize: 15, lineHeight: 22, textAlign: 'center', fontFamily: 'Inter_400Regular', marginTop: 7, minHeight: 20 },
+  amountCard: { width: '100%', borderWidth: 1, borderRadius: 21, paddingVertical: 22, paddingHorizontal: 16, alignItems: 'center', marginTop: 31, ...cardShadow },
   tapAmount: { fontSize: 38, letterSpacing: -1, fontFamily: 'Inter_500Medium', marginTop: 7 },
-  serviceLabel: { fontSize: 11, textAlign: 'center', fontFamily: 'Inter_400Regular', marginTop: 5 },
+  serviceLabel: { fontSize: 14, textAlign: 'center', fontFamily: 'Inter_400Regular', marginTop: 5 },
   errorNotice: { flexDirection: 'row', alignItems: 'flex-start', gap: 9, padding: 13, borderRadius: 14, width: '100%', marginTop: 13 },
-  previewText: { flex: 1, fontSize: 11, lineHeight: 16, fontFamily: 'Inter_500Medium' },
+  previewText: { flex: 1, fontSize: 14, lineHeight: 20, fontFamily: 'Inter_500Medium' },
   primaryButton: { height: 53, width: '100%', borderRadius: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, marginTop: 'auto', marginBottom: 24 },
-  primaryButtonText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  primaryButtonText: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
   successContent: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28 },
   successBadge: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', marginBottom: 21 },
-  successTitle: { fontSize: 22, fontFamily: 'Inter_600SemiBold' },
+  successTitle: { fontSize: 23, fontFamily: 'Inter_600SemiBold' },
   successAmount: { fontSize: 35, fontFamily: 'Inter_500Medium', marginTop: 13 },
-  successNote: { fontSize: 10, textAlign: 'center', lineHeight: 15, fontFamily: 'Inter_400Regular', marginTop: 7 },
+  successNote: { fontSize: 13, textAlign: 'center', lineHeight: 20, fontFamily: 'Inter_400Regular', marginTop: 7 },
 });

@@ -35,5 +35,5 @@ export function HoldToDelete({ label, busy, onDone, testID }: { label: string; b
 const styles = StyleSheet.create({
   button: { height: 54, borderWidth: 1.5, borderColor: '#000000', borderRadius: 14, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   fill: { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: '#D9C9F7' },
-  label: { fontSize: 16, fontFamily: 'Inter_600SemiBold', color: '#000000' },
+  label: { fontSize: 18, fontFamily: 'Inter_600SemiBold', color: '#000000' },
 });

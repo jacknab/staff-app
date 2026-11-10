@@ -15,6 +15,8 @@ import { api } from '@/lib/live-api';
 import { zonedTimeLabel } from '@/lib/businessTime';
 import { HelpTitle } from '@/components/HelpTitle';
 
+import { AppBackground } from '@/components/look/AppBackground';
+import { look, cardShadow } from '@/components/look/tokens';
 type Note = { id: number; noteContent: string; createdAt: string; appointmentId?: number | null; pinned?: boolean };
 const MAX = 5000;
 
@@ -73,7 +75,8 @@ export default function NotesScreen() {
   const canSave = hasClient && !!text.trim() && !saving;
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={[styles.root, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={[styles.root, { backgroundColor: look.pageTop, paddingTop: insets.top }]}>
+      <AppBackground />
       <StatusBar barStyle="dark-content" />
       <View style={styles.header}>
         <TouchableOpacity testID="notes-back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} style={styles.back} accessibilityLabel="Back">
@@ -125,15 +128,15 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 8, gap: 4 },
   back: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: 20, fontFamily: 'Inter_600SemiBold' },
-  subtitle: { fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 1 },
+  title: { fontSize: 22, fontFamily: 'Inter_600SemiBold' },
+  subtitle: { fontSize: 16, fontFamily: 'Inter_400Regular', marginTop: 1 },
   compose: { gap: 10, paddingTop: 8, paddingBottom: 16 },
-  input: { minHeight: 110, maxHeight: 220, borderWidth: 1, borderRadius: 16, padding: 14, fontSize: 15, lineHeight: 21, textAlignVertical: 'top', fontFamily: 'Inter_400Regular' },
+  input: { minHeight: 110, maxHeight: 220, borderWidth: 1, borderRadius: 16, padding: 14, fontSize: 17, lineHeight: 24, textAlignVertical: 'top', fontFamily: 'Inter_400Regular' },
   save: { height: 50, borderRadius: 25, alignItems: 'center', justifyContent: 'center' },
-  saveText: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
-  error: { fontSize: 13, fontFamily: 'Inter_500Medium' },
-  card: { borderWidth: 1, borderRadius: 16, padding: 14, marginBottom: 10, gap: 8 },
-  noteText: { fontSize: 15, lineHeight: 21, fontFamily: 'Inter_400Regular' },
-  noteMeta: { fontSize: 12, fontFamily: 'Inter_400Regular' },
-  empty: { textAlign: 'center', marginTop: 24, fontSize: 14, paddingHorizontal: 24 },
+  saveText: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
+  error: { fontSize: 16, fontFamily: 'Inter_500Medium' },
+  card: { borderWidth: 1, borderRadius: 16, padding: 14, marginBottom: 10, gap: 8, ...cardShadow },
+  noteText: { fontSize: 17, lineHeight: 24, fontFamily: 'Inter_400Regular' },
+  noteMeta: { fontSize: 15, fontFamily: 'Inter_400Regular' },
+  empty: { textAlign: 'center', marginTop: 24, fontSize: 17, paddingHorizontal: 24 },
 });

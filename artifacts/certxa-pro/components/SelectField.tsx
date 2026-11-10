@@ -61,14 +61,14 @@ export function SelectField<T extends string | number | boolean>({ value, option
 
 const styles = StyleSheet.create({
   field: { minHeight: 52, borderWidth: 1, borderRadius: 14, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  fieldText: { flex: 1, fontSize: 15, fontFamily: 'Inter_500Medium' },
+  fieldText: { flex: 1, fontSize: 17, fontFamily: 'Inter_500Medium' },
   compact: { minHeight: 40, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start' },
-  compactText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  compactText: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
   backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' },
   sheet: { borderTopLeftRadius: 22, borderTopRightRadius: 22, paddingHorizontal: 22, paddingTop: 10 },
   handle: { alignSelf: 'center', width: 40, height: 5, borderRadius: 3, marginBottom: 12 },
-  sheetTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold', textAlign: 'center', marginBottom: 8 },
+  sheetTitle: { fontSize: 19, fontFamily: 'Inter_600SemiBold', textAlign: 'center', marginBottom: 8 },
   option: { minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
-  optionText: { fontSize: 16 },
-  optionHint: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
+  optionText: { fontSize: 18 },
+  optionHint: { fontSize: 15, fontFamily: 'Inter_400Regular', marginTop: 2 },
 });

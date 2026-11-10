@@ -38,6 +38,15 @@ export type AppointmentRecord = {
   depositDue?: boolean;
   /** A deposit the client already paid: it comes off what checkout charges. */
   depositPaidCents?: number;
+  /** Cancelled online by the client: within the policy (true) or late (false); null otherwise. */
+  cancelledInPolicy?: boolean | null;
+  /** The deposit refunded automatically for a cancel within the policy, and whether that refund failed. */
+  depositRefundedCents?: number | null;
+  depositRefundFailed?: boolean;
+  /** A declined fee the server keeps trying (pending), settled with half (partial), or stopped (gave_up). */
+  feeRetry?: { status: string; owedCents: number; collectedCents: number | null; error: string | null } | null;
+  /** A failed deposit refund being tried again ('pending') or done. */
+  depositRefundRetry?: string | null;
   time: string;
   name: string;
   service: string;
@@ -64,9 +73,11 @@ export type AppointmentRecord = {
   /** Paid: what was paid (cents) and how much of it has been refunded since. */
   totalPaidCents?: number | null;
   refundedCents?: number;
-  /** No-show / late-cancel fee: the client's card on file, the shop's fee %, and a fee already charged. */
+  /** No-show / late-cancel fee: the client's card on file, the fee % and amount agreed when booking, and a fee already charged. */
   cardOnFile?: boolean;
   feePercent?: number | null;
+  /** The fee agreed when the client booked online; null for older bookings (worked out from the %). */
+  feeCents?: number | null;
   feeChargedCents?: number | null;
 };
 
@@ -121,7 +132,7 @@ type ApiCustomer = {
   allergies?: string | null; isVip?: boolean | null; tags?: string[] | null; avatarUrl?: string | null;
 };
 type ApiService = { id: number; offeredAt?: string | null; name?: string | null; duration?: number | string | null; price?: number | string | null };
-export type ApiAppointment = { cardOnFile?: boolean | null; feePercent?: number | null; feeChargedCents?: number | null; totalPaid?: number | null; refundedCents?: number | null; calendarHidden?: boolean | null; paymentStatus?: string | null; depositCollected?: number | null; visitAt?: string | null; clientAddress?: HouseCallAddress | null; travelFee?: number | null; appointmentAddons?: { addon?: { id?: number; name?: string | null; price?: number | string | null } | null }[] | null; customLines?: { label?: string; price?: number | string | null }[] | null; id: number; date: string; duration?: number | null; status?: string | null; notes?: string | null; customer?: ApiCustomer | null; service?: ApiService | null };
+export type ApiAppointment = { feeRetry?: { status: string; owedCents: number; collectedCents: number | null; error: string | null } | null; depositRefundRetry?: string | null; cancelledInPolicy?: boolean | null; depositRefundedCents?: number | null; depositRefundFailed?: boolean | null; cardOnFile?: boolean | null; feePercent?: number | null; feeCents?: number | null; feeChargedCents?: number | null; totalPaid?: number | null; refundedCents?: number | null; calendarHidden?: boolean | null; paymentStatus?: string | null; depositCollected?: number | null; visitAt?: string | null; clientAddress?: HouseCallAddress | null; travelFee?: number | null; appointmentAddons?: { addon?: { id?: number; name?: string | null; price?: number | string | null } | null }[] | null; customLines?: { label?: string; price?: number | string | null }[] | null; id: number; date: string; duration?: number | null; status?: string | null; notes?: string | null; customer?: ApiCustomer | null; service?: ApiService | null };
 
 const BookingContext = createContext<BookingContextValue | null>(null);
 
@@ -168,6 +179,11 @@ export function mapAppointment(appointment: ApiAppointment, timeZone: string): A
     avatarUrl: appointment.customer?.avatarUrl ?? null,
     depositDue: appointment.paymentStatus === 'awaiting_payment',
     depositPaidCents: appointment.paymentStatus === 'awaiting_payment' ? 0 : Math.round((Number(appointment.depositCollected ?? 0) || 0) * 100),
+    cancelledInPolicy: appointment.cancelledInPolicy ?? null,
+    depositRefundedCents: appointment.depositRefundedCents != null ? Number(appointment.depositRefundedCents) : null,
+    depositRefundFailed: !!appointment.depositRefundFailed,
+    feeRetry: appointment.feeRetry ?? null,
+    depositRefundRetry: appointment.depositRefundRetry ?? null,
     visitAt: appointment.visitAt === 'client' ? 'client' : 'place', clientAddress: appointment.clientAddress ?? null, travelFee: Number(appointment.travelFee ?? 0) || 0,
     extraLines: (Array.isArray(appointment.customLines) ? appointment.customLines : []).map((line) => ({ label: String(line?.label ?? ''), price: Number(line?.price ?? 0) || 0 })).filter((line) => line.label),
     addonIds: (appointment.appointmentAddons ?? []).map((row) => Number(row?.addon?.id)).filter((n) => Number.isInteger(n) && n > 0),
@@ -175,6 +191,7 @@ export function mapAppointment(appointment: ApiAppointment, timeZone: string): A
     totalPaidCents: appointment.totalPaid != null ? Math.round(Number(appointment.totalPaid) * 100) : null,
     refundedCents: Number(appointment.refundedCents ?? 0) || 0,
     cardOnFile: !!appointment.cardOnFile, feePercent: appointment.feePercent != null ? Number(appointment.feePercent) : null,
+    feeCents: appointment.feeCents != null ? Number(appointment.feeCents) : null,
     feeChargedCents: appointment.feeChargedCents != null ? Number(appointment.feeChargedCents) : null };
 }
 
@@ -227,7 +244,9 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       setClients((Array.isArray(customerRows) ? customerRows : []).map(mapCustomer));
       setServices((Array.isArray(serviceRows) ? serviceRows : []).filter((service) => ownServiceIds.length === 0 || ownServiceIds.includes(Number(service.id))).map(mapService));
       // Tickets kept off the calendar (POS quick sales, bookings held for a deposit) are not drawn.
-      setBookings((Array.isArray(appointmentRows) ? appointmentRows : []).filter((row) => row.calendarHidden !== true).map((row) => mapAppointment(row, tz)));
+      // A booking held for a deposit is hidden from clients but holds the time, so it's on the calendar ("DEPOSIT DUE"):
+      // otherwise its slot looks free and moving another booking there is refused (owner, 2026-11-07).
+      setBookings((Array.isArray(appointmentRows) ? appointmentRows : []).filter((row) => row.calendarHidden !== true || row.paymentStatus === 'awaiting_payment').map((row) => mapAppointment(row, tz)));
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not load Certxa data.'); }
     finally { setLoading(false); }
   }, [calendarDate, ownStaffId]);
@@ -293,6 +312,11 @@ export function appointmentParams(item: AppointmentRecord) {
       email: item.email ?? '',
       depositDue: item.depositDue ? '1' : '0',
       depositPaidCents: String(item.depositPaidCents ?? 0),
+      cancelledInPolicy: item.cancelledInPolicy == null ? '' : item.cancelledInPolicy ? '1' : '0',
+      depositRefundedCents: item.depositRefundedCents != null ? String(item.depositRefundedCents) : '',
+      depositRefundFailed: item.depositRefundFailed ? '1' : '0',
+      feeRetry: item.feeRetry ? JSON.stringify(item.feeRetry) : '',
+      depositRefundRetry: item.depositRefundRetry ?? '',
       visitAt: item.visitAt ?? 'place',
       clientAddress: item.clientAddress ? JSON.stringify(item.clientAddress) : '',
       travelFeeCents: String(Math.round((item.travelFee ?? 0) * 100)),
@@ -303,6 +327,7 @@ export function appointmentParams(item: AppointmentRecord) {
       refundedCents: String(item.refundedCents ?? 0),
       cardOnFile: item.cardOnFile ? '1' : '0',
       feePercent: item.feePercent != null ? String(item.feePercent) : '',
+      feeCents: item.feeCents != null ? String(item.feeCents) : '',
       feeChargedCents: item.feeChargedCents != null ? String(item.feeChargedCents) : '',
     },
   };

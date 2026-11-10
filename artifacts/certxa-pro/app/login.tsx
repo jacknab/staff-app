@@ -8,6 +8,9 @@ import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/contexts/AuthContext';
 import { CertxaApiError, certxaRequest } from '@/lib/certxa-api';
 
+import { AppBackground } from '@/components/look/AppBackground';
+import { look } from '@/components/look/tokens';
+import { HelpTitle } from '@/components/HelpTitle';
 export default function LoginScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -61,8 +64,10 @@ export default function LoginScreen() {
   };
 
   return (
+    <View style={{ flex: 1, backgroundColor: look.pageTop }}>
+      <AppBackground />
     <KeyboardAwareScrollViewCompat
-      style={[styles.root, { backgroundColor: colors.background }]}
+      style={styles.root}
       contentContainerStyle={[styles.content, { paddingTop: topInset + 42, paddingBottom: bottomInset + 26 }]}
       keyboardShouldPersistTaps="handled"
       bottomOffset={20}
@@ -71,7 +76,7 @@ export default function LoginScreen() {
         <Feather name="arrow-up-right" size={22} color={colors.primaryForeground} />
       </View>
       <Text style={[styles.eyebrow, { color: colors.primary }]}>CERTXA PRO</Text>
-      <Text style={[styles.title, { color: colors.foreground }]}>Welcome back.</Text>
+      <HelpTitle help="login" style={[styles.title, { color: colors.foreground }]}>Welcome back.</HelpTitle>
       <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Sign in to manage your business, clients, and checkout.</Text>
 
       <View style={styles.form}>
@@ -114,7 +119,7 @@ export default function LoginScreen() {
           <Text style={[styles.buttonText, { color: isSubmitting ? colors.mutedForeground : colors.primaryForeground }]}>
             {isSubmitting ? 'Signing in…' : 'Sign in'}
           </Text>
-          {!isSubmitting && <Feather name="arrow-right" size={17} color={colors.primaryForeground} />}
+          {!isSubmitting && <Feather name="arrow-right" size={19} color={colors.primaryForeground} />}
         </TouchableOpacity>
         {notice ? <Text style={[styles.error, { color: colors.primary, marginTop: 0 }]}>{notice}</Text> : null}
         <TouchableOpacity disabled={isSendingReset} onPress={() => void forgotPassword()} style={{ alignSelf: 'center', minHeight: 40, justifyContent: 'center' }} testID="login-forgot-password">
@@ -127,10 +132,11 @@ export default function LoginScreen() {
       </View>
 
       <View style={[styles.secureNote, { backgroundColor: colors.secondary }]}>
-        <Feather name="shield" size={16} color={colors.primary} />
+        <Feather name="shield" size={18} color={colors.primary} />
         <Text style={[styles.secureText, { color: colors.secondaryForeground }]}>Your Certxa session is stored securely on this device.</Text>
       </View>
     </KeyboardAwareScrollViewCompat>
+    </View>
   );
 }
 
@@ -138,15 +144,15 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   content: { flexGrow: 1, paddingHorizontal: 24, justifyContent: 'center' },
   logo: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
-  eyebrow: { fontSize: 10, letterSpacing: 1.6, fontFamily: 'Inter_700Bold' },
+  eyebrow: { fontSize: 13, letterSpacing: 1.6, fontFamily: 'Inter_700Bold' },
   title: { fontSize: 34, letterSpacing: -1, fontFamily: 'Inter_600SemiBold', marginTop: 8 },
-  subtitle: { fontSize: 14, lineHeight: 21, fontFamily: 'Inter_400Regular', marginTop: 10, maxWidth: 300 },
+  subtitle: { fontSize: 17, lineHeight: 26, fontFamily: 'Inter_400Regular', marginTop: 10, maxWidth: 300 },
   form: { gap: 17, marginTop: 34 },
-  label: { fontSize: 12, fontFamily: 'Inter_600SemiBold', marginBottom: 7 },
-  input: { borderWidth: 1, borderRadius: 14, height: 52, paddingHorizontal: 14, fontSize: 14, fontFamily: 'Inter_400Regular' },
-  error: { fontSize: 12, lineHeight: 17, fontFamily: 'Inter_500Medium', marginTop: -5 },
+  label: { fontSize: 15, fontFamily: 'Inter_600SemiBold', marginBottom: 7 },
+  input: { borderWidth: 1, borderRadius: 14, height: 52, paddingHorizontal: 14, fontSize: 17, fontFamily: 'Inter_400Regular' },
+  error: { fontSize: 15, lineHeight: 21, fontFamily: 'Inter_500Medium', marginTop: -5 },
   button: { height: 53, borderRadius: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
-  buttonText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  buttonText: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
   secureNote: { flexDirection: 'row', alignItems: 'center', gap: 9, borderRadius: 14, padding: 12, marginTop: 26 },
-  secureText: { flex: 1, fontSize: 11, lineHeight: 16, fontFamily: 'Inter_400Regular' },
+  secureText: { flex: 1, fontSize: 14, lineHeight: 20, fontFamily: 'Inter_400Regular' },
 });

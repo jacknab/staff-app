@@ -13,6 +13,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { SelectField } from '@/components/SelectField';
 
+import { AppBackground } from '@/components/look/AppBackground';
+import { look, cardShadow } from '@/components/look/tokens';
 export function money(value: number | string | null | undefined) {
   return `$${(Number(value) || 0).toFixed(2)}`;
 }
@@ -58,7 +60,8 @@ export function CatalogScreen({ title, help, onBack, onAdd, addLabel, testID, ch
   const colors = useColors();
   const insets = useSafeAreaInsets();
   return (
-    <KeyboardAvoidingView style={[styles.root, { backgroundColor: colors.background, paddingTop: insets.top }]} behavior="padding" keyboardVerticalOffset={0}>
+    <KeyboardAvoidingView style={[styles.root, { backgroundColor: look.pageTop, paddingTop: insets.top }]} behavior="padding" keyboardVerticalOffset={0}>
+      <AppBackground />
       <StatusBar barStyle="dark-content" />
       <View style={styles.header}>
         <TouchableOpacity testID={`${testID}-back`} accessibilityLabel="Back" onPress={onBack} style={styles.headerButton}><Feather name="arrow-left" size={21} color={colors.foreground} /></TouchableOpacity>
@@ -103,7 +106,7 @@ export function Row({ title, hint, right, onPress, testID, dim }: { title: strin
         {hint ? <Text numberOfLines={2} style={[styles.rowHint, { color: colors.mutedForeground }]}>{hint}</Text> : null}
       </View>
       {right ? <Text style={[styles.rowTitle, { color: colors.foreground }]}>{right}</Text> : null}
-      <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+      <Feather name="chevron-right" size={20} color={colors.mutedForeground} />
     </TouchableOpacity>
   );
 }
@@ -152,7 +155,7 @@ export function Checklist({ items, picked, onToggle, testID, empty }: { items: A
         return (
           <TouchableOpacity key={item.id} testID={`${testID}-${item.id}`} accessibilityRole="checkbox" accessibilityState={{ checked: on }} onPress={() => onToggle(item.id)} style={[styles.checkRow, { backgroundColor: colors.card, borderColor: on ? colors.primary : colors.border }]}>
             <View style={[styles.box, { borderColor: on ? colors.primary : colors.border, backgroundColor: on ? colors.primary : 'transparent' }]}>
-              {on ? <Feather name="check" size={13} color={colors.primaryForeground} /> : null}
+              {on ? <Feather name="check" size={15} color={colors.primaryForeground} /> : null}
             </View>
             <Text numberOfLines={1} style={[styles.rowTitle, { flex: 1, color: colors.foreground }]}>{item.title}</Text>
             {item.hint ? <Text style={[styles.rowHint, { marginTop: 0, color: colors.mutedForeground }]}>{item.hint}</Text> : null}
@@ -198,25 +201,25 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   header: { minHeight: 52, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerButton: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
+  headerTitle: { fontSize: 18, fontFamily: 'Inter_600SemiBold' },
   content: { paddingHorizontal: 20, paddingTop: 8 },
   list: { gap: 8 },
-  section: { fontSize: 11, letterSpacing: 0.8, fontFamily: 'Inter_700Bold', marginTop: 18, marginBottom: 8 },
-  row: { borderWidth: 1, borderRadius: 15, minHeight: 60, paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 11 },
-  checkRow: { borderWidth: 1, borderRadius: 13, minHeight: 50, paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 11 },
-  box: { width: 20, height: 20, borderRadius: 6, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
-  rowTitle: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  rowHint: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 3 },
-  label: { fontSize: 12, fontFamily: 'Inter_600SemiBold', marginTop: 18, marginBottom: 8 },
-  input: { borderWidth: 1, borderRadius: 14, height: 52, paddingHorizontal: 14, fontSize: 14, fontFamily: 'Inter_400Regular' },
+  section: { fontSize: 14, letterSpacing: 0.8, fontFamily: 'Inter_700Bold', marginTop: 18, marginBottom: 8 },
+  row: { borderWidth: 1, borderRadius: 15, minHeight: 60, paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 11, ...cardShadow },
+  checkRow: { borderWidth: 1, borderRadius: 13, minHeight: 50, paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 11, ...cardShadow },
+  box: { width: 20, height: 20, borderRadius: 6, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', ...cardShadow },
+  rowTitle: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
+  rowHint: { fontSize: 14, fontFamily: 'Inter_400Regular', marginTop: 3 },
+  label: { fontSize: 15, fontFamily: 'Inter_600SemiBold', marginTop: 18, marginBottom: 8 },
+  input: { borderWidth: 1, borderRadius: 14, height: 52, paddingHorizontal: 14, fontSize: 17, fontFamily: 'Inter_400Regular' },
   textArea: { height: 100, paddingTop: 12, textAlignVertical: 'top' },
   pair: { flexDirection: 'row', gap: 10 },
   chip: { flex: 1, borderWidth: 1, borderRadius: 12, height: 44, alignItems: 'center', justifyContent: 'center' },
-  chipText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  error: { fontSize: 12, lineHeight: 17, fontFamily: 'Inter_500Medium', marginTop: 14 },
-  empty: { fontSize: 13, lineHeight: 19, fontFamily: 'Inter_400Regular', marginTop: 24, textAlign: 'center' },
+  chipText: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
+  error: { fontSize: 15, lineHeight: 21, fontFamily: 'Inter_500Medium', marginTop: 14 },
+  empty: { fontSize: 16, lineHeight: 23, fontFamily: 'Inter_400Regular', marginTop: 24, textAlign: 'center' },
   button: { height: 53, borderRadius: 15, alignItems: 'center', justifyContent: 'center', marginTop: 24 },
-  buttonText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  buttonText: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
   photoRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   photo: { width: 72, height: 72, borderRadius: 14, borderWidth: 1, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   quiet: { height: 48, alignItems: 'center', justifyContent: 'center', marginTop: 8 },

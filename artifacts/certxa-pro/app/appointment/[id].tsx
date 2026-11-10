@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
+import { callClient } from '@/lib/voice';
 import { addressLine, appointmentParams, mapAppointment, type ApiAppointment, type HouseCallAddress } from '@/contexts/BookingContext';
 import { Feather } from '@expo/vector-icons';
-import { ActivityIndicator, Alert, Linking, Modal, Platform, ScrollView, Share, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, InputAccessoryView, Keyboard, Linking, Modal, Platform, ScrollView, Share, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,6 +14,8 @@ import { api, ApiError } from '@/lib/live-api';
 import { HelpTitle } from '@/components/HelpTitle';
 import { ClientAvatar } from '@/components/ClientAvatar';
 
+import { AppBackground } from '@/components/look/AppBackground';
+import { look, cardShadow } from '@/components/look/tokens';
 /** Every quarter hour of the working day, and the booking's own time when it is between them. */
 function timeChoices(current: string): string[] {
   const label = (m: number) => `${((Math.floor(m / 60) + 11) % 12) + 1}:${String(m % 60).padStart(2, '0')} ${m < 720 ? 'AM' : 'PM'}`;
@@ -77,6 +81,11 @@ type AppointmentRouteParams = {
     travelFeeCents?: string;
     depositDue?: string;
     depositPaidCents?: string;
+    cancelledInPolicy?: string;
+    depositRefundedCents?: string;
+    depositRefundFailed?: string;
+    feeRetry?: string;
+    depositRefundRetry?: string;
     extraLines?: string;
     addonIds?: string;
     addonLines?: string;
@@ -84,6 +93,7 @@ type AppointmentRouteParams = {
     refundedCents?: string;
     cardOnFile?: string;
     feePercent?: string;
+    feeCents?: string;
     feeChargedCents?: string;
   };
 
@@ -155,6 +165,9 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
   const serviceName = selectedService?.name || params.serviceName || 'Service';
   // The whole visit's length, add-ons and extra services included; the service's own only for a booking without one.
   const duration = hoursAndMinutes(params.duration || selectedService?.duration || '60 min');
+  // The visit on one line (owner, 2026-11-07): "Sat, Nov 7 · 9:00 AM – 10:00 AM (1 hr)".
+  const visitMinutes = Number(String(params.duration || selectedService?.duration || '60 min').match(/^(\d+)/)?.[1] ?? 60);
+  const visitEnd = zonedTimeLabel(new Date(withTime(day, time, timeZone).getTime() + visitMinutes * 60_000), timeZone);
   const topInset = Platform.OS === 'web' ? 67 : insets.top;
 
   // ── Edit (owner, 2026-11-03): only a booking that is still to come — not paid, not cancelled, not on a past day. ──
@@ -190,9 +203,17 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
   }, [editing, addonOptions.length, isPreview]);
 
   // ── Paid: Rebook and Refund (owner, 2026-11-03). ──
-  const paidCents = params.totalPaidCents ? Number(params.totalPaidCents) : amountCents;
+  // What was paid: set here when it is paid on this screen (cash = the total, a package visit = $0), else Certxa's total.
+  const [paidHere, setPaidHere] = useState<number | null>(null);
+  const paidCents = paidHere ?? (params.totalPaidCents ? Number(params.totalPaidCents) : amountCents);
+  // A payment on record (an amount): marked paid here, or totalPaid from Certxa. An older app build marked bookings
+  // "paid" without recording anything; those have nothing to refund (owner, 2026-11-07).
+  const [paidRecorded, setPaidRecorded] = useState(!!params.totalPaidCents);
   const [refundedCents, setRefundedCents] = useState(Number(params.refundedCents ?? 0) || 0);
   const refundable = Math.max(0, paidCents - refundedCents);
+  // Refunded in full: the booking says REFUNDED instead of PAID; in part, the ticket gets a "Part refunded" line.
+  const fullyRefunded = paidRecorded && refundedCents > 0 && refundable <= 0;
+  const partRefunded = paidRecorded && refundedCents > 0 && refundable > 0;
   const [refundOpen, setRefundOpen] = useState(false);
   const rebook = () => router.push({
     pathname: '/booking',
@@ -212,7 +233,7 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
     setError('');
     try {
       const applicable = addonOptions.filter((a) => a.serviceIds.length === 0 || a.serviceIds.some((sid) => serviceIds.includes(sid)));
-      const addons = applicable.filter((a) => addonIds.includes(a.id));
+      const addons = addonIds.map((aid) => applicable.find((a) => a.id === aid)).filter((a): a is AddonOption => !!a); // the same one twice is a quantity
       const lines: Line[] = [...chosen.slice(1).map((item) => ({ label: item.name, price: item.priceValue })), ...keptLines];
       const minutes = chosen.reduce((sum, item) => sum + item.durationMinutes, 0) + addons.reduce((sum, a) => sum + a.minutes, 0);
       const nextDate = withTime(day, time, timeZone);
@@ -245,9 +266,17 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
   };
 
   // Paid in full when booking online: there's nothing to charge, only the visit to finish.
+  // A house call's plan: when to leave, from where, and when they're done (server: lib/routePlanner.ts).
+  const [route, setRoute] = useState<{ leaveBy: string; driveMinutes: number; miles: number | null; fromHome: boolean; setupMinutes: number; packUpMinutes: number; doneBy: string } | null>(null);
+  useEffect(() => {
+    if (isPreview || params.visitAt !== 'client' || !appointmentId) return;
+    api.get<typeof route>(`/api/pro/appointments/${appointmentId}/route`).then(setRoute).catch(() => setRoute(null));
+  }, [appointmentId, isPreview, params.visitAt, params.dateIso, params.duration]);
   const prepaid = depositPaidCents > 0 && depositPaidCents >= amountCents;
   // Everything on the ticket. The first line is what's left of the total, so the lines always add up to it.
-  const otherLines = [...extraLines, ...addonLines];
+  // An add-on on the ticket more than once is one line with its quantity.
+  const addonCounts = addonLines.reduce((map, line) => map.set(line.label, { price: Number(line.price), count: (map.get(line.label)?.count ?? 0) + 1 }), new Map<string, { price: number; count: number }>());
+  const otherLines: Line[] = [...extraLines, ...[...addonCounts].map(([label, { price, count }]) => ({ label: count > 1 ? `${label} × ${count}` : label, price: price * count }))];
   const otherCents = otherLines.reduce((sum, line) => sum + Math.round(Number(line.price) * 100), 0);
   const ticketLines = otherLines.length > 0 || travelFeeCents > 0 ? [
     { label: selectedService?.name ?? params.serviceName ?? 'Service', cents: amountCents - otherCents - travelFeeCents },
@@ -269,6 +298,7 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
         });
         await refresh();
       }
+      setPaidHere(Math.max(0, amountCents)); setPaidRecorded(true);
       setStatus('paid');
     } catch (cause) {
       setError(cause instanceof ApiError ? cause.message : 'Could not mark appointment as paid.');
@@ -298,6 +328,7 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
       }
       await refresh();
       setPackages((list) => list.map((p) => (p.id === packageForVisit.id ? { ...p, visitsLeft: p.visitsLeft - 1 } : p)).filter((p) => p.visitsLeft > 0));
+      setPaidHere(0); setPaidRecorded(true);
       setStatus('paid');
     } catch (cause) {
       setError(cause instanceof ApiError ? cause.message : 'The package visit could not be used.');
@@ -314,6 +345,9 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
         if (path === 'cancel' && body?.notifyClient && r?.notification?.status === 'not_sent') {
           Alert.alert('Cancelled', 'The booking is cancelled, but the text to the client could not be sent.');
         }
+        // Marking a no-show charges the no-show fee to the card on file (11-07); a declined card is said here.
+        if (path === 'no-show' && r?.feeError) Alert.alert('No-show fee not charged', String(r.feeError));
+        if (path === 'no-show' && r?.feeChargedCents != null) setFeeCharged(Number(r.feeChargedCents));
       }
       setStatus(path === 'cancel' ? 'cancelled' : 'no_show');
     } catch (cause) {
@@ -329,12 +363,32 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
     { text: 'Not now', style: 'cancel' },
     { text: 'Mark as no-show', style: 'destructive', onPress: () => void close('no-show') },
   ]);
-  // The fee (decided 10-22): only when the pro taps it — the shop's fee % of the booking, to the client's card on file.
+  // The fee (decided 10-22): only when the pro taps it, to the client's card on file. The amount is the one agreed
+  // when the client booked (saved with the booking, 11-07); older bookings: the fee % of the booking.
   const [feeCharged, setFeeCharged] = useState<number | null>(params.feeChargedCents ? Number(params.feeChargedCents) : null);
   const feePercent = Number(params.feePercent || 0);
-  // Of the booking's price without the travel fee — the same amount the server charges.
-  const feeCents = Math.round(Math.max(0, amountCents - travelFeeCents) * feePercent / 100);
-  const canChargeFee = closed && feeCharged == null && params.cardOnFile === '1' && feePercent > 0 && feeCents >= 50 && !isPreview;
+  // Else of the booking's price without the travel fee — the same amount the server charges.
+  const feeCents = params.feeCents ? Number(params.feeCents) : Math.round(Math.max(0, amountCents - travelFeeCents) * feePercent / 100);
+  // A paid deposit is the penalty (kept for a no-show or a late cancel), so no fee is charged on top (11-07).
+  // A declined fee the server keeps trying (11-08): twice a day, half after 5 days, stopped after 7.
+  const feeRetry = (() => { try { return params.feeRetry ? JSON.parse(params.feeRetry) as { status: string; owedCents: number; collectedCents: number | null; error: string | null } : null; } catch { return null; } })();
+  const feeLabel = status === 'no_show' ? 'No-show' : 'Late-cancel';
+  const feeRetryLine = !feeRetry ? null
+    : feeRetry.status === 'pending' ? `${feeLabel} fee of $${(feeRetry.owedCents / 100).toFixed(2)} not collected yet: the card was declined. We try again twice a day.`
+    : feeRetry.status === 'partial' ? `We couldn't collect the full ${feeLabel.toLowerCase()} fee of $${(feeRetry.owedCents / 100).toFixed(2)}. Collected $${((feeRetry.collectedCents ?? 0) / 100).toFixed(2)}, and the card won't be charged again.`
+    : feeRetry.status === 'gave_up' ? `${feeLabel} fee of $${(feeRetry.owedCents / 100).toFixed(2)} couldn't be collected${feeRetry.error ? `: ${feeRetry.error}` : ''}. We stopped trying the card.`
+    : null;
+  const canChargeFee = closed && feeCharged == null && depositPaidCents <= 0 && feeRetry?.status !== 'gave_up' && params.cardOnFile === '1' && feePercent > 0 && feeCents >= 50 && !isPreview;
+  // What happened to the deposit: refunded automatically for a client's cancel within the policy, kept if late or a no-show.
+  const depositMoney = `$${(depositPaidCents / 100).toFixed(2)}`;
+  const depositLine = status === 'no_show' ? `No-show · deposit ${depositMoney} kept`
+    : status === 'cancelled' && params.cancelledInPolicy === '1'
+      ? (params.depositRefundedCents ? `Cancelled within the cancellation policy · deposit $${(Number(params.depositRefundedCents) / 100).toFixed(2)} refunded automatically`
+        : params.depositRefundFailed === '1' || params.depositRefundRetry === 'pending' ? `Cancelled within the cancellation policy · the deposit refund of ${depositMoney} didn't go through yet, we try again twice a day`
+        : `Cancelled within the cancellation policy · deposit ${depositMoney}`)
+    : status === 'cancelled' && params.cancelledInPolicy === '0' ? `Cancelled after the cancellation window · deposit ${depositMoney} kept`
+    : status === 'cancelled' ? `Deposit paid · ${depositMoney}`
+    : prepaid ? 'Paid in full online' : `Deposit paid · ${depositMoney} comes off at checkout`;
   const feeName = status === 'no_show' ? 'no-show fee' : 'late-cancel fee';
   const chargeFee = () => Alert.alert(`Charge a ${feeName}?`, `$${(feeCents / 100).toFixed(2)} (${feePercent}%) will be charged to ${clientName}'s card on file.`, [
     { text: 'Not now', style: 'cancel' },
@@ -398,6 +452,12 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
 
   const openContact = async (type: 'text' | 'call' | 'email') => {
     const value = type === 'email' ? params.email : params.phone;
+    // Call from the business number (Business Phone / Plus), as the client profile does (owner, 2026-11-07); the
+    // phone's own dialer only when there's no line.
+    if (type === 'call' && value) {
+      try { await callClient(value); } catch (cause) { Alert.alert('Call', cause instanceof Error ? cause.message : 'The call could not be made.'); }
+      return;
+    }
     const url = type === 'email' ? (value ? `mailto:${value}` : '') : value ? `${type === 'text' ? 'sms' : 'tel'}:${value}` : '';
     if (url) {
       await Linking.openURL(url);
@@ -407,11 +467,12 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
   };
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.background, paddingTop: topInset }]}>
+    <View style={[styles.root, { backgroundColor: look.pageTop, paddingTop: topInset }]}>
+      <AppBackground />
       <StatusBar barStyle="dark-content" />
       <View style={styles.nav}>
         <TouchableOpacity testID="appointment-back" onPress={() => router.back()} style={styles.navSide}>
-          <Feather name="arrow-left" size={18} color={colors.primary} />
+          <Feather name="arrow-left" size={20} color={colors.primary} />
           <Text style={[styles.backText, { color: colors.primary }]}>Back</Text>
         </TouchableOpacity>
         <HelpTitle help="appointment" style={[styles.navTitle, { color: colors.foreground }]}>Details</HelpTitle>
@@ -434,7 +495,8 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
           error={error}
           save={save}
           saving={saving}
-          services={services}
+          // Where the visit already is decides which services can go on it.
+          services={services.filter((item) => serviceIds.includes(item.id) || item.offeredAt !== (params.visitAt === 'client' ? 'place' : 'client'))}
           serviceIds={serviceIds}
           setServiceIds={setServiceIds}
           addonOptions={addonOptions}
@@ -467,7 +529,7 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
               <Text style={[styles.sectionLabel, { color: colors.foreground }]}>Notes</Text>
               {params.note ? <Text numberOfLines={1} style={[styles.notesPreview, { color: colors.mutedForeground }]}>{params.note}</Text> : null}
             </View>
-            <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+            <Feather name="chevron-right" size={20} color={colors.mutedForeground} />
           </TouchableOpacity>
 
           <View style={[styles.appointmentCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -475,17 +537,24 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
               <View style={[styles.serviceIcon, { backgroundColor: colors.secondary }]}><Feather name="scissors" size={19} color={colors.primary} /></View>
               <View style={styles.statusStack}>
                 <Text style={[styles.metaLabel, { color: colors.mutedForeground }]}>APPOINTMENT</Text>
-                <Text style={[styles.statusText, { color: closed ? colors.destructive : colors.primary }]}>{depositDue && !closed ? 'DEPOSIT DUE' : statusLabel(status)}</Text>
+                <Text style={[styles.statusText, { color: closed ? colors.destructive : colors.primary }]}>{depositDue && !closed ? 'DEPOSIT DUE' : status === 'paid' && fullyRefunded ? 'REFUNDED' : statusLabel(status)}</Text>
               </View>
               <Text style={[styles.amount, { color: colors.foreground }]}>${(amountCents / 100).toFixed(2)}</Text>
             </View>
             <Text style={[styles.serviceName, { color: colors.foreground }]}>{serviceName}</Text>
             <View style={styles.detailRows}>
-              <DetailRow icon="calendar" label={day.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} colors={colors} />
-              <DetailRow icon="clock" label={`${time} · ${duration}`} colors={colors} />
+              <View style={styles.visitWhenRow} testID="appointment-when">
+                <Feather name="calendar" size={19} color={colors.primary} />
+                <Text style={[styles.visitWhenText, { color: colors.foreground }]} numberOfLines={2}>
+                  {day.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · {time} – {visitEnd} <Text style={{ color: colors.mutedForeground }}>({duration})</Text>
+                </Text>
+              </View>
               {depositDue ? <DetailRow icon="clock" label="Waiting for the client to pay the deposit (link sent by text)" colors={colors} /> : null}
-              {depositPaidCents > 0 ? <DetailRow icon="check" label={prepaid ? 'Paid in full online' : `Deposit paid · $${(depositPaidCents / 100).toFixed(2)} comes off at checkout`} colors={colors} /> : null}
+              {depositPaidCents > 0 ? <DetailRow icon="check" label={depositLine} colors={colors} /> : null}
+              {status === 'paid' && partRefunded ? <DetailRow icon="rotate-ccw" label={`Part refunded · −$${(refundedCents / 100).toFixed(2)}`} colors={colors} /> : null}
               {params.visitAt === 'client' ? <DetailRow icon="navigation" label={`House call${travelFeeCents ? ` · $${(travelFeeCents / 100).toFixed(2)} travel fee` : ''}`} colors={colors} /> : null}
+              {route && !closed && status !== 'paid' ? <DetailRow icon="truck" label={`Leave by ${zonedTimeLabel(new Date(route.leaveBy), timeZone)} · ${route.driveMinutes} min drive${route.miles != null ? ` (${route.miles} mi)` : ''} from ${route.fromHome ? 'home' : 'your last client'}`} colors={colors} /> : null}
+              {route && !closed && status !== 'paid' ? <DetailRow icon="package" label={`${route.setupMinutes} min setup · pack up until ${zonedTimeLabel(new Date(route.doneBy), timeZone)}`} colors={colors} /> : null}
             </View>
             {ticketLines.length > 0 ? (
               <View testID="appointment-ticket" style={[styles.ticket, { borderTopColor: colors.border }]}>
@@ -512,7 +581,7 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
             ) : null}
           </View>
 
-          {error ? <View style={[styles.errorBox, { backgroundColor: colors.accent }]}><Feather name="alert-circle" size={15} color={colors.accentForeground} /><Text style={[styles.errorText, { color: colors.accentForeground }]}>{error}</Text></View> : null}
+          {error ? <View style={[styles.errorBox, { backgroundColor: colors.accent }]}><Feather name="alert-circle" size={17} color={colors.accentForeground} /><Text style={[styles.errorText, { color: colors.accentForeground }]}>{error}</Text></View> : null}
 
           {status === 'paid' ? (
             <>
@@ -521,30 +590,35 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
                 Refunded ${(refundedCents / 100).toFixed(2)}{refundable > 0 ? ` of $${(paidCents / 100).toFixed(2)}` : ' · full refund'}</Text> : null}
               <LinearGradient colors={[colors.primary, '#A855F7']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.checkoutGradient}>
                 <TouchableOpacity testID="appointment-rebook" onPress={rebook} style={styles.actionButton}>
-                  <Feather name="repeat" size={17} color={colors.primaryForeground} />
+                  <Feather name="repeat" size={19} color={colors.primaryForeground} />
                   <Text style={[styles.actionText, { color: colors.primaryForeground }]}>REBOOK</Text>
                 </TouchableOpacity>
               </LinearGradient>
+              {!paidRecorded && !isPreview ? (
+                <Text testID="appointment-no-payment" style={[styles.refundedNote, { color: colors.mutedForeground }]}>No payment was recorded for this booking (it was marked paid in an older version of the app), so there's nothing to refund.</Text>
+              ) : (
               <TouchableOpacity testID="appointment-refund" disabled={refundable <= 0 || isPreview} onPress={() => setRefundOpen(true)}
-                style={[styles.secondaryAction, { backgroundColor: colors.card, borderColor: colors.border, opacity: refundable <= 0 ? 0.6 : 1 }]}>
-                <Feather name="rotate-ccw" size={18} color={colors.primary} />
-                <Text style={[styles.secondaryActionText, { color: colors.foreground }]}>{refundable <= 0 ? 'REFUNDED' : 'REFUND'}</Text>
-              </TouchableOpacity>
+                  style={[styles.secondaryAction, { backgroundColor: colors.card, borderColor: colors.border, opacity: refundable <= 0 ? 0.6 : 1 }]}>
+                  <Feather name="rotate-ccw" size={20} color={colors.primary} />
+                  <Text style={[styles.secondaryActionText, { color: colors.foreground }]}>{refundable > 0 ? 'REFUND' : refundedCents > 0 ? 'REFUNDED' : 'NOTHING TO REFUND'}</Text>
+                </TouchableOpacity>
+              )}
             </>
           ) : closed ? (
             <>
               {/* Cancelled or no-show: book again, charge the fee (only when tapped), or remove the booking for good. */}
-              {feeCharged != null ? <Text testID="appointment-fee-charged" style={[styles.refundedNote, { color: colors.mutedForeground }]}>
-                {status === 'no_show' ? 'No-show' : 'Late-cancel'} fee of ${(feeCharged / 100).toFixed(2)} charged</Text> : null}
+              {feeRetryLine && (feeRetry?.status !== 'done') ? <Text testID="appointment-fee-retry" style={[styles.refundedNote, { color: colors.mutedForeground }]}>{feeRetryLine}</Text>
+                : feeCharged != null ? <Text testID="appointment-fee-charged" style={[styles.refundedNote, { color: colors.mutedForeground }]}>
+                {feeLabel} fee of ${(feeCharged / 100).toFixed(2)} charged</Text> : null}
               <LinearGradient colors={[colors.primary, '#A855F7']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.checkoutGradient}>
                 <TouchableOpacity testID="appointment-rebook" onPress={rebook} style={styles.actionButton}>
-                  <Feather name="repeat" size={17} color={colors.primaryForeground} />
+                  <Feather name="repeat" size={19} color={colors.primaryForeground} />
                   <Text style={[styles.actionText, { color: colors.primaryForeground }]}>REBOOK</Text>
                 </TouchableOpacity>
               </LinearGradient>
               {canChargeFee ? (
                 <TouchableOpacity testID="appointment-charge-fee" disabled={saving} onPress={chargeFee} style={[styles.secondaryAction, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  <Feather name="credit-card" size={18} color={colors.primary} />
+                  <Feather name="credit-card" size={20} color={colors.primary} />
                   <Text style={[styles.secondaryActionText, { color: colors.foreground }]}>CHARGE {feeName.toUpperCase()} · ${(feeCents / 100).toFixed(2)}</Text>
                 </TouchableOpacity>
               ) : null}
@@ -557,29 +631,29 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
               {!prepaid ? (
                 <LinearGradient colors={[colors.primary, '#A855F7']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.checkoutGradient}>
                   <TouchableOpacity testID="appointment-checkout" disabled={saving} onPress={checkout} style={styles.actionButton}>
-                    <Feather name="credit-card" size={17} color={colors.primaryForeground} />
+                    <Feather name="credit-card" size={19} color={colors.primaryForeground} />
                     <Text style={[styles.actionText, { color: colors.primaryForeground }]}>CHECKOUT</Text>
                   </TouchableOpacity>
                 </LinearGradient>
               ) : null}
               <TouchableOpacity testID="appointment-mark-paid" disabled={saving} onPress={() => void markPaid()} style={[styles.secondaryAction, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <Feather name="check" size={18} color={colors.primary} />
+                <Feather name="check" size={20} color={colors.primary} />
                 <Text style={[styles.secondaryActionText, { color: colors.foreground }]}>{saving ? 'UPDATING…' : prepaid ? 'MARK AS DONE' : 'MARK AS PAID'}</Text>
               </TouchableOpacity>
               {packageForVisit ? (
                 <TouchableOpacity testID="appointment-use-package" disabled={saving} onPress={() => void spendPackageVisit()} style={[styles.secondaryAction, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  <Feather name="package" size={18} color={colors.primary} />
+                  <Feather name="package" size={20} color={colors.primary} />
                   <Text style={[styles.secondaryActionText, { color: colors.foreground }]}>USE A PACKAGE VISIT ({packageForVisit.visitsLeft} LEFT)</Text>
                 </TouchableOpacity>
               ) : null}
               {/* Cancel and no-show replace Delete (owner, 2026-11-03): the booking stays on the client's record. */}
               <View style={styles.closeRow}>
                 <TouchableOpacity testID="appointment-no-show" disabled={saving} onPress={markNoShow} style={[styles.closeAction, { backgroundColor: colors.muted, borderColor: colors.border }]}>
-                  <Feather name="user-x" size={17} color={colors.foreground} />
+                  <Feather name="user-x" size={19} color={colors.foreground} />
                   <Text style={[styles.secondaryActionText, { color: colors.foreground }]}>NO-SHOW</Text>
                 </TouchableOpacity>
                 <TouchableOpacity testID="appointment-cancel" disabled={saving} onPress={cancelBooking} style={[styles.closeAction, { backgroundColor: colors.muted, borderColor: colors.border }]}>
-                  <Feather name="x" size={17} color={colors.destructive} />
+                  <Feather name="x" size={19} color={colors.destructive} />
                   <Text style={[styles.secondaryActionText, { color: colors.destructive }]}>CANCEL</Text>
                 </TouchableOpacity>
               </View>
@@ -604,14 +678,14 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
 function QuickAction({ icon, label, color, onPress }: { icon: React.ComponentProps<typeof Feather>['name']; label: string; color: string; onPress: () => void }) {
   return (
     <TouchableOpacity accessibilityLabel={label} onPress={onPress} style={styles.quickAction}>
-      <View style={[styles.quickIcon, { backgroundColor: `${color}18` }]}><Feather name={icon} size={17} color={color} /></View>
+      <View style={[styles.quickIcon, { backgroundColor: `${color}18` }]}><Feather name={icon} size={19} color={color} /></View>
       <Text style={[styles.quickLabel, { color }]}>{label}</Text>
     </TouchableOpacity>
   );
 }
 
 function DetailRow({ icon, label, colors }: { icon: React.ComponentProps<typeof Feather>['name']; label: string; colors: ReturnType<typeof useColors> }) {
-  return <View style={styles.detailRow}><Feather name={icon} size={14} color={colors.mutedForeground} /><Text style={[styles.detailText, { color: colors.mutedForeground }]}>{label}</Text></View>;
+  return <View style={styles.detailRow}><Feather name={icon} size={16} color={colors.mutedForeground} /><Text style={[styles.detailText, { color: colors.mutedForeground }]}>{label}</Text></View>;
 }
 
 type ServiceOption = { id: number; name: string; duration: string; durationMinutes: number; price: string; priceValue: number; icon: 'eye' | 'droplet' | 'briefcase' | 'star' };
@@ -642,7 +716,7 @@ function EditAppointment({ colors, day, time, error, save, saving, services, ser
   // An add-on linked to no service is offered with every service (as when booking).
   const applicable = addonOptions.filter((a) => a.serviceIds.length === 0 || a.serviceIds.some((sid) => serviceIds.includes(sid)));
   const chosen = serviceIds.map((sid) => services.find((x) => x.id === sid)).filter((v): v is ServiceOption => !!v);
-  const addons = applicable.filter((a) => addonIds.includes(a.id));
+  const addons = addonIds.map((aid) => applicable.find((a) => a.id === aid)).filter((a): a is AddonOption => !!a); // the same one twice is a quantity
   const total = chosen.reduce((n, x) => n + x.priceValue, 0) + addons.reduce((n, a) => n + a.priceValue, 0) + keptLines.reduce((n, l) => n + l.price, 0);
   const minutes = chosen.reduce((n, x) => n + x.durationMinutes, 0) + addons.reduce((n, a) => n + a.minutes, 0);
   return (
@@ -652,21 +726,21 @@ function EditAppointment({ colors, day, time, error, save, saving, services, ser
       <Text style={[styles.editTitle, { color: colors.foreground }]}>Make a change</Text>
       <Text style={[styles.editSection, { color: colors.foreground }]}>Date and time</Text>
       <TouchableOpacity testID="edit-when" onPress={openWhen} style={[styles.whenRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <Feather name="calendar" size={17} color={colors.primary} />
+        <Feather name="calendar" size={19} color={colors.primary} />
         <Text style={[styles.whenText, { color: colors.foreground }]}>{day.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · {time}</Text>
         <Text style={[styles.whenChange, { color: colors.primary }]}>Change</Text>
       </TouchableOpacity>
       <Text style={[styles.editSection, { color: colors.foreground }]}>Services</Text>
       <View style={styles.serviceList}>{services.map((service) => {
         const on = serviceIds.includes(service.id);
-        return <TouchableOpacity key={service.id} testID={`edit-service-${service.id}`} onPress={() => toggleService(service.id)} style={[styles.serviceRow, { backgroundColor: colors.card, borderColor: on ? colors.primary : colors.border }]}><View style={[styles.serviceIcon, { backgroundColor: colors.secondary }]}><Feather name={service.icon} size={17} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={[styles.serviceName, { color: colors.foreground }]}>{service.name}</Text><Text style={[styles.serviceMeta, { color: colors.mutedForeground }]}>{service.duration}</Text></View><Text style={[styles.servicePrice, { color: colors.foreground }]}>{service.price}</Text><Feather name={on ? 'check-square' : 'square'} size={18} color={on ? colors.primary : colors.border} /></TouchableOpacity>;
+        return <TouchableOpacity key={service.id} testID={`edit-service-${service.id}`} onPress={() => toggleService(service.id)} style={[styles.serviceRow, { backgroundColor: colors.card, borderColor: on ? colors.primary : colors.border }]}><View style={[styles.serviceIcon, { backgroundColor: colors.secondary }]}><Feather name={service.icon} size={19} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={[styles.serviceName, { color: colors.foreground }]}>{service.name}</Text><Text style={[styles.serviceMeta, { color: colors.mutedForeground }]}>{service.duration}</Text></View><Text style={[styles.servicePrice, { color: colors.foreground }]}>{service.price}</Text><Feather name={on ? 'check-square' : 'square'} size={20} color={on ? colors.primary : colors.border} /></TouchableOpacity>;
       })}</View>
       {applicable.length > 0 ? (
         <>
           <Text style={[styles.editSection, { color: colors.foreground }]}>Add-ons</Text>
           <View style={styles.serviceList}>{applicable.map((a) => {
             const on = addonIds.includes(a.id);
-            return <TouchableOpacity key={a.id} testID={`edit-addon-${a.id}`} onPress={() => toggleAddon(a.id)} style={[styles.serviceRow, { backgroundColor: colors.card, borderColor: on ? colors.primary : colors.border }]}><View style={{ flex: 1 }}><Text style={[styles.serviceName, { color: colors.foreground, marginTop: 0 }]}>{a.name}</Text>{a.minutes ? <Text style={[styles.serviceMeta, { color: colors.mutedForeground }]}>{a.minutes} min</Text> : null}</View><Text style={[styles.servicePrice, { color: colors.foreground }]}>${a.priceValue.toFixed(2)}</Text><Feather name={on ? 'check-square' : 'square'} size={18} color={on ? colors.primary : colors.border} /></TouchableOpacity>;
+            return <TouchableOpacity key={a.id} testID={`edit-addon-${a.id}`} onPress={() => toggleAddon(a.id)} style={[styles.serviceRow, { backgroundColor: colors.card, borderColor: on ? colors.primary : colors.border }]}><View style={{ flex: 1 }}><Text style={[styles.serviceName, { color: colors.foreground, marginTop: 0 }]}>{a.name}</Text>{a.minutes ? <Text style={[styles.serviceMeta, { color: colors.mutedForeground }]}>{a.minutes} min</Text> : null}</View><Text style={[styles.servicePrice, { color: colors.foreground }]}>${a.priceValue.toFixed(2)}</Text><Feather name={on ? 'check-square' : 'square'} size={20} color={on ? colors.primary : colors.border} /></TouchableOpacity>;
           })}</View>
         </>
       ) : null}
@@ -676,7 +750,7 @@ function EditAppointment({ colors, day, time, error, save, saving, services, ser
       {/* Stays at the bottom however long the list of services is. */}
       <View testID="edit-footer" style={[styles.editFooter, { backgroundColor: colors.background, borderTopColor: colors.border, paddingBottom: insets.bottom + 12 }]}>
           {error ? <Text style={[styles.error, { color: colors.destructive }]}>{error}</Text> : null}
-          <TouchableOpacity testID="edit-save" disabled={saving || chosen.length === 0} onPress={() => void save()} style={[styles.save, { marginTop: 0, backgroundColor: colors.primary, opacity: saving || chosen.length === 0 ? 0.6 : 1 }]}><Feather name="check" size={17} color={colors.primaryForeground} /><Text style={[styles.saveText, { color: colors.primaryForeground }]}>{saving ? 'Saving…' : chosen.length === 0 ? 'Choose a service' : 'Save changes'}</Text></TouchableOpacity>
+          <TouchableOpacity testID="edit-save" disabled={saving || chosen.length === 0} onPress={() => void save()} style={[styles.save, { marginTop: 0, backgroundColor: colors.primary, opacity: saving || chosen.length === 0 ? 0.6 : 1 }]}><Feather name="check" size={19} color={colors.primaryForeground} /><Text style={[styles.saveText, { color: colors.primaryForeground }]}>{saving ? 'Saving…' : chosen.length === 0 ? 'Choose a service' : 'Save changes'}</Text></TouchableOpacity>
       </View>
     </View>
   );
@@ -709,6 +783,8 @@ function WhenSheet({ open, colors, day, time, shiftDay, setTime, onClose }: {
   );
 }
 
+const REFUND_KEYPAD = 'refund-keypad';
+
 /** Refund a paid booking, all of it or part (owner, 2026-11-03). Card payments go back to the card through Stripe. */
 function RefundSheet({ open, colors, appointmentId, refundableCents, onClose, onRefunded }: {
   open: boolean; colors: ReturnType<typeof useColors>; appointmentId: number; refundableCents: number; onClose: () => void; onRefunded: (totalRefundedCents: number) => void;
@@ -738,7 +814,11 @@ function RefundSheet({ open, colors, appointmentId, refundableCents, onClose, on
   };
   const partCents = Math.round((Number(amount.replace(/[^0-9.]/g, '')) || 0) * 100);
   return (
-    <Modal visible={open} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={open} transparent animationType="slide" onRequestClose={() => { Keyboard.dismiss(); onClose(); }}>
+      {/* The number pad has no return key (owner, 2026-11-07: it couldn't be closed): tapping anywhere closes it, a Done
+          bar sits on top of it on iPhone, and the sheet moves up so its buttons stay above it. */}
+      <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
       <View style={styles.sheetBackdrop}>
         <View style={[styles.sheet, { backgroundColor: colors.background }]}>
           <Text style={[styles.sheetTitle, { color: colors.foreground }]}>Refund</Text>
@@ -749,6 +829,7 @@ function RefundSheet({ open, colors, appointmentId, refundableCents, onClose, on
           <View style={[styles.whenRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.whenText, { color: colors.foreground, flex: 0 }]}>$</Text>
             <TextInput testID="refund-amount" value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor={colors.mutedForeground}
+              returnKeyType="done" onSubmitEditing={Keyboard.dismiss} inputAccessoryViewID={Platform.OS === 'ios' ? REFUND_KEYPAD : undefined}
               style={[styles.whenText, { color: colors.foreground, padding: 0 }]} />
           </View>
           <TouchableOpacity testID="refund-part" disabled={busy || partCents <= 0 || partCents > refundableCents} onPress={() => send(partCents)}
@@ -756,9 +837,20 @@ function RefundSheet({ open, colors, appointmentId, refundableCents, onClose, on
             <Text style={[styles.secondaryActionText, { color: colors.foreground }]}>{partCents > refundableCents ? `At most $${full}` : `Refund $${(partCents / 100).toFixed(2)}`}</Text>
           </TouchableOpacity>
           {error ? <Text style={[styles.error, { color: colors.destructive }]}>{error}</Text> : null}
-          <TouchableOpacity onPress={onClose} disabled={busy} style={{ alignItems: 'center', paddingVertical: 14 }}><Text style={[styles.secondaryActionText, { color: colors.mutedForeground }]}>Close</Text></TouchableOpacity>
+          <TouchableOpacity onPress={() => { Keyboard.dismiss(); onClose(); }} disabled={busy} style={{ alignItems: 'center', paddingVertical: 14 }}><Text style={[styles.secondaryActionText, { color: colors.mutedForeground }]}>Close</Text></TouchableOpacity>
         </View>
       </View>
+      </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
+      {Platform.OS === 'ios' ? (
+        <InputAccessoryView nativeID={REFUND_KEYPAD}>
+          <View style={[styles.keypadBar, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
+            <TouchableOpacity testID="refund-keypad-done" onPress={Keyboard.dismiss} style={styles.keypadDone}>
+              <Text style={[styles.secondaryActionText, { color: colors.primary }]}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </InputAccessoryView>
+      ) : null}
     </Modal>
   );
 }
@@ -767,83 +859,87 @@ const styles = StyleSheet.create({
   closeRow: { flexDirection: 'row', gap: 10, marginTop: 10 },
   closeAction: { flex: 1, height: 50, borderRadius: 14, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   textAction: { alignSelf: 'center', paddingVertical: 14 },
-  textActionText: { fontSize: 14, fontFamily: 'Inter_500Medium' },
-  refundedNote: { fontSize: 12, fontFamily: 'Inter_500Medium', textAlign: 'center', marginTop: 14 },
-  whenRow: { minHeight: 54, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  whenText: { flex: 1, fontSize: 15, fontFamily: 'Inter_500Medium' },
-  whenChange: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  editTotal: { fontSize: 15, fontFamily: 'Inter_600SemiBold', marginTop: 16, textAlign: 'right' },
+  textActionText: { fontSize: 17, fontFamily: 'Inter_500Medium' },
+  refundedNote: { fontSize: 15, fontFamily: 'Inter_500Medium', textAlign: 'center', marginTop: 14 },
+  whenRow: { minHeight: 54, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 10, ...cardShadow },
+  whenText: { flex: 1, fontSize: 17, fontFamily: 'Inter_500Medium' },
+  whenChange: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
+  editTotal: { fontSize: 17, fontFamily: 'Inter_600SemiBold', marginTop: 16, textAlign: 'right' },
   sheetBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' },
+  keypadBar: { flexDirection: 'row', justifyContent: 'flex-end', borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 12 },
+  keypadDone: { paddingVertical: 10, paddingHorizontal: 8 },
   sheet: { borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 20, paddingBottom: 34 },
-  sheetTitle: { fontSize: 19, fontFamily: 'Inter_600SemiBold', marginBottom: 14 },
+  sheetTitle: { fontSize: 21, fontFamily: 'Inter_600SemiBold', marginBottom: 14 },
   mapRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderTopWidth: 1, marginTop: 14, paddingTop: 14 },
-  mapAddress: { fontSize: 14, lineHeight: 20, fontFamily: 'Inter_500Medium', marginTop: 4 },
-  mapLink: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  mapAddress: { fontSize: 17, lineHeight: 24, fontFamily: 'Inter_500Medium', marginTop: 4 },
+  mapLink: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
   root: { flex: 1 },
   editFooter: { paddingHorizontal: 20, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
   nav: { height: 55, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   navSide: { width: 74, minHeight: 42, flexDirection: 'row', alignItems: 'center', gap: 3 },
-  navTitle: { fontSize: 18, fontFamily: 'Inter_600SemiBold' },
-  backText: { fontSize: 14, fontFamily: 'Inter_500Medium' },
-  editText: { fontSize: 14, fontFamily: 'Inter_500Medium', marginLeft: 'auto' },
+  navTitle: { fontSize: 20, fontFamily: 'Inter_600SemiBold' },
+  backText: { fontSize: 17, fontFamily: 'Inter_500Medium' },
+  editText: { fontSize: 17, fontFamily: 'Inter_500Medium', marginLeft: 'auto' },
   content: { paddingHorizontal: 18, paddingTop: 10, paddingBottom: 55 },
   profile: { alignItems: 'center', paddingTop: 14 },
   avatar: { width: 77, height: 77, borderRadius: 39, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: 22, fontFamily: 'Inter_400Regular', letterSpacing: 1 },
-  clientName: { fontSize: 24, fontFamily: 'Inter_500Medium', letterSpacing: 0.2, marginTop: 11 },
-  clientSubtitle: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 4 },
+  avatarText: { fontSize: 23, fontFamily: 'Inter_400Regular', letterSpacing: 1 },
+  clientName: { fontSize: 25, fontFamily: 'Inter_500Medium', letterSpacing: 0.2, marginTop: 11 },
+  clientSubtitle: { fontSize: 14, fontFamily: 'Inter_400Regular', marginTop: 4 },
   quickActions: { flexDirection: 'row', justifyContent: 'center', gap: 19, marginTop: 21, marginBottom: 20 },
   quickAction: { width: 52, alignItems: 'center', gap: 6 },
   quickIcon: { width: 37, height: 37, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
-  quickLabel: { fontSize: 10, fontFamily: 'Inter_500Medium' },
-  notesRow: { minHeight: 58, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  quickLabel: { fontSize: 13, fontFamily: 'Inter_500Medium' },
+  notesRow: { minHeight: 58, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', ...cardShadow },
   notesCopy: { flex: 1, paddingRight: 12 },
-  sectionLabel: { fontSize: 14, fontFamily: 'Inter_500Medium' },
-  notesPreview: { fontSize: 11, marginTop: 4, fontFamily: 'Inter_400Regular' },
-  appointmentCard: { borderWidth: 1, borderRadius: 17, padding: 15, marginTop: 12 },
+  sectionLabel: { fontSize: 17, fontFamily: 'Inter_500Medium' },
+  notesPreview: { fontSize: 14, marginTop: 4, fontFamily: 'Inter_400Regular' },
+  appointmentCard: { borderWidth: 1, borderRadius: 17, padding: 15, marginTop: 12, ...cardShadow },
   appointmentMeta: { flexDirection: 'row', alignItems: 'center' },
   serviceIcon: { width: 43, height: 43, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   statusStack: { flex: 1, marginLeft: 11 },
-  metaLabel: { fontSize: 9, letterSpacing: 1, fontFamily: 'Inter_700Bold' },
-  statusText: { fontSize: 11, letterSpacing: 0.5, fontFamily: 'Inter_700Bold', marginTop: 4 },
-  amount: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
-  serviceName: { fontSize: 17, fontFamily: 'Inter_600SemiBold', marginTop: 14 },
+  metaLabel: { fontSize: 12, letterSpacing: 1, fontFamily: 'Inter_700Bold' },
+  statusText: { fontSize: 14, letterSpacing: 0.5, fontFamily: 'Inter_700Bold', marginTop: 4 },
+  amount: { fontSize: 19, fontFamily: 'Inter_600SemiBold' },
+  serviceName: { fontSize: 19, fontFamily: 'Inter_600SemiBold', marginTop: 14 },
   ticket: { marginTop: 14, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, gap: 8 },
   ticketRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
-  ticketLabel: { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular' },
-  ticketPrice: { fontSize: 14, fontFamily: 'Inter_500Medium' },
+  ticketLabel: { flex: 1, fontSize: 17, fontFamily: 'Inter_400Regular' },
+  ticketPrice: { fontSize: 17, fontFamily: 'Inter_500Medium' },
   ticketTotal: { marginTop: 2, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth },
-  ticketTotalText: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
+  ticketTotalText: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
   detailRows: { gap: 8, marginTop: 11, paddingTop: 11, borderTopWidth: 1, borderTopColor: '#E6E2F1' },
   detailRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  detailText: { fontSize: 12, fontFamily: 'Inter_400Regular' },
+  visitWhenRow: { flexDirection: 'row', alignItems: 'center', gap: 9, marginBottom: 2 },
+  visitWhenText: { flex: 1, fontSize: 18, fontFamily: 'Inter_600SemiBold' },
+  detailText: { fontSize: 15, fontFamily: 'Inter_400Regular' },
   errorBox: { borderRadius: 12, padding: 11, flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 13 },
-  errorText: { flex: 1, fontSize: 11, lineHeight: 16, fontFamily: 'Inter_500Medium' },
+  errorText: { flex: 1, fontSize: 14, lineHeight: 20, fontFamily: 'Inter_500Medium' },
   checkoutGradient: { borderRadius: 14, marginTop: 18, overflow: 'hidden' },
   actionButton: { height: 53, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 9 },
-  actionText: { fontSize: 14, letterSpacing: 0.5, fontFamily: 'Inter_700Bold' },
+  actionText: { fontSize: 17, letterSpacing: 0.5, fontFamily: 'Inter_700Bold' },
   secondaryAction: { height: 52, borderWidth: 1, borderRadius: 14, marginTop: 9, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
-  secondaryActionText: { fontSize: 13, fontFamily: 'Inter_600SemiBold', letterSpacing: 0.2 },
+  secondaryActionText: { fontSize: 16, fontFamily: 'Inter_600SemiBold', letterSpacing: 0.2 },
   deleteAction: { height: 51, borderWidth: 1, borderRadius: 14, marginTop: 9, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
-  deleteText: { fontSize: 13, fontFamily: 'Inter_600SemiBold', letterSpacing: 0.2 },
-  previewNote: { textAlign: 'center', fontSize: 10, fontFamily: 'Inter_400Regular', marginTop: 15 },
+  deleteText: { fontSize: 16, fontFamily: 'Inter_600SemiBold', letterSpacing: 0.2 },
+  previewNote: { textAlign: 'center', fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 15 },
   editContent: { paddingHorizontal: 20, paddingTop: 15, paddingBottom: 50 },
-  editEyebrow: { fontSize: 10, letterSpacing: 1.4, fontFamily: 'Inter_700Bold' },
+  editEyebrow: { fontSize: 13, letterSpacing: 1.4, fontFamily: 'Inter_700Bold' },
   editTitle: { fontSize: 27, letterSpacing: -0.5, fontFamily: 'Inter_600SemiBold', marginTop: 5 },
-  editSubtitle: { fontSize: 12, marginTop: 5 },
-  editSection: { fontSize: 15, fontFamily: 'Inter_600SemiBold', marginTop: 25, marginBottom: 10 },
-  dateCard: { borderWidth: 1, borderRadius: 16, minHeight: 73, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 9 },
+  editSubtitle: { fontSize: 15, marginTop: 5 },
+  editSection: { fontSize: 17, fontFamily: 'Inter_600SemiBold', marginTop: 25, marginBottom: 10 },
+  dateCard: { borderWidth: 1, borderRadius: 16, minHeight: 73, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 9, ...cardShadow },
   arrow: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
-  dateMain: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  dateSub: { fontSize: 11, marginTop: 4 },
+  dateMain: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
+  dateSub: { fontSize: 14, marginTop: 4 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { borderWidth: 1, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 13 },
-  chipText: { fontSize: 11, fontFamily: 'Inter_500Medium' },
+  chipText: { fontSize: 14, fontFamily: 'Inter_500Medium' },
   serviceList: { gap: 8 },
-  serviceRow: { borderWidth: 1, borderRadius: 15, padding: 11, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  serviceMeta: { fontSize: 10, marginTop: 3 },
-  servicePrice: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
-  error: { textAlign: 'center', marginTop: 15, fontSize: 11 },
+  serviceRow: { borderWidth: 1, borderRadius: 15, padding: 11, flexDirection: 'row', alignItems: 'center', gap: 10, ...cardShadow },
+  serviceMeta: { fontSize: 13, marginTop: 3 },
+  servicePrice: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
+  error: { textAlign: 'center', marginTop: 15, fontSize: 14 },
   save: { height: 53, borderRadius: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, marginTop: 25 },
-  saveText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  saveText: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
 });

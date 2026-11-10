@@ -15,6 +15,8 @@ import { approveBookingRequest, declineBookingRequest, getBookingRequest, offerB
 import { businessToday, zonedDateLabel, zonedTimeLabel } from '@/lib/businessTime';
 import { HelpTitle } from '@/components/HelpTitle';
 
+import { AppBackground } from '@/components/look/AppBackground';
+import { look, cardShadow } from '@/components/look/tokens';
 const MAX_TIMES = 8;
 function isoDay(day: Date) { return `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`; }
 
@@ -120,7 +122,8 @@ export default function RequestScreen() {
   };
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.background, paddingTop: Platform.OS === 'web' ? 67 : insets.top }]}>
+    <View style={[styles.root, { backgroundColor: look.pageTop, paddingTop: Platform.OS === 'web' ? 67 : insets.top }]}>
+      <AppBackground />
       <View style={styles.nav}>
         <TouchableOpacity accessibilityLabel="Back" onPress={() => (offering ? setOffering(false) : router.back())} style={styles.back} testID="request-back"><Feather name="arrow-left" size={20} color={colors.foreground} /></TouchableOpacity>
         <HelpTitle help="request" style={[styles.navTitle, { color: colors.foreground }]}>{offering ? 'Offer other times' : 'Booking request'}</HelpTitle>
@@ -163,7 +166,7 @@ export default function RequestScreen() {
                 {picked.map((time) => (
                   <View key={time} style={[styles.pickedRow, { borderColor: colors.border, backgroundColor: colors.card }]}>
                     <Text style={[styles.body, { flex: 1, marginTop: 0, color: colors.foreground }]}>{`${zonedDateLabel(time, timeZone)} at ${zonedTimeLabel(time, timeZone)}`}</Text>
-                    <TouchableOpacity accessibilityLabel="Remove" onPress={() => toggle(time)}><Feather name="x" size={18} color={colors.mutedForeground} /></TouchableOpacity>
+                    <TouchableOpacity accessibilityLabel="Remove" onPress={() => toggle(time)}><Feather name="x" size={20} color={colors.mutedForeground} /></TouchableOpacity>
                   </View>
                 ))}
               </>
@@ -227,27 +230,27 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   nav: { height: 50, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12 },
   back: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  navTitle: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
+  navTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
   content: { paddingHorizontal: 20, paddingTop: 8 },
   client: { fontSize: 25, letterSpacing: -0.4, fontFamily: 'Inter_600SemiBold' },
-  body: { fontSize: 13, lineHeight: 19, fontFamily: 'Inter_400Regular', marginTop: 4 },
+  body: { fontSize: 16, lineHeight: 23, fontFamily: 'Inter_400Regular', marginTop: 4 },
   contactRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
   contact: { borderWidth: 1, borderRadius: 11, paddingVertical: 8, paddingHorizontal: 16 },
-  contactText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  card: { borderWidth: 1, borderRadius: 15, padding: 15, marginTop: 16 },
-  cardTitle: { fontSize: 16, fontFamily: 'Inter_600SemiBold', marginTop: 4 },
-  label: { fontSize: 11, letterSpacing: 0.6, fontFamily: 'Inter_700Bold', marginTop: 18 },
-  error: { fontSize: 12, fontFamily: 'Inter_500Medium', marginTop: 14 },
+  contactText: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
+  card: { borderWidth: 1, borderRadius: 15, padding: 15, marginTop: 16, ...cardShadow },
+  cardTitle: { fontSize: 18, fontFamily: 'Inter_600SemiBold', marginTop: 4 },
+  label: { fontSize: 14, letterSpacing: 0.6, fontFamily: 'Inter_700Bold', marginTop: 18 },
+  error: { fontSize: 15, fontFamily: 'Inter_500Medium', marginTop: 14 },
   button: { height: 52, borderRadius: 15, alignItems: 'center', justifyContent: 'center', marginTop: 20 },
-  buttonText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  buttonText: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
   decline: { alignSelf: 'center', minHeight: 44, justifyContent: 'center', marginTop: 8 },
-  declineText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  declineText: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
   day: { width: 50, borderWidth: 1, borderRadius: 13, paddingVertical: 8, alignItems: 'center' },
-  dayName: { fontSize: 10, fontFamily: 'Inter_600SemiBold' },
-  dayNum: { fontSize: 16, fontFamily: 'Inter_700Bold', marginTop: 2 },
+  dayName: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  dayNum: { fontSize: 18, fontFamily: 'Inter_700Bold', marginTop: 2 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   slot: { width: '31%', borderWidth: 1, borderRadius: 12, paddingVertical: 11, alignItems: 'center' },
-  slotText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  pickedRow: { borderWidth: 1, borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', marginTop: 8 },
+  slotText: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
+  pickedRow: { borderWidth: 1, borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', marginTop: 8, ...cardShadow },
   footer: { position: 'absolute', left: 0, right: 0, bottom: 0, borderTopWidth: 1, paddingHorizontal: 20, paddingTop: 12 },
 });

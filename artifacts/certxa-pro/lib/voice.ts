@@ -11,7 +11,11 @@ import type { Call, CallInvite, Voice } from '@twilio/voice-react-native-sdk';
 import { api } from '@/lib/live-api';
 import { certxaRequest } from '@/lib/certxa-api';
 
-export type ActiveCall = { call: Call; number: string; incoming: boolean; state: 'calling' | 'ringing' | 'connected'; connectedAt: number | null; muted: boolean; speaker: boolean;
+export type ActiveCall = { call: Call | null; number: string; incoming: boolean; state: 'incoming' | 'calling' | 'ringing' | 'connected'; connectedAt: number | null; muted: boolean; speaker: boolean;
+  /** A call coming in that hasn't been answered yet (owner, 2026-11-07): the app shows its own call screen with Answer / Decline. */
+  invite?: CallInvite | null;
+  /** The caller line Certxa sends with an incoming call ("Client: Jane Smith · Regular"). */
+  displayName?: string | null;
   /** The call screen is set aside (e.g. to look at the client's profile); a bar at the top brings it back. */
   minimized: boolean };
 
@@ -32,14 +36,24 @@ function sdk(): Voice {
     const { Voice: VoiceSdk, CallInvite: Invite } = twilioSdk();
     voice = new VoiceSdk();
     voice.on(VoiceSdk.Event.CallInvite, (invite: CallInvite) => {
+      // Ringing with the app open: the same call screen as a call out, with Answer and Decline (CallKit still rings too).
+      if (!active) {
+        const params = (invite.getCustomParameters?.() ?? {}) as Record<string, string>;
+        set({ call: null, invite, number: String(invite.getFrom() ?? '').replace(/^client:/, ''), incoming: true, state: 'incoming', connectedAt: null,
+          muted: false, speaker: false, minimized: false, displayName: params.DisplayName ?? null });
+      }
       invite.on(Invite.Event.Accepted, (call: Call) => track(call, invite.getFrom(), true));
+      const gone = () => { if (active?.invite === invite && active.state === 'incoming') set(null); };
+      invite.on(Invite.Event.Rejected, gone);
+      invite.on(Invite.Event.Cancelled, gone);
     });
   }
   return voice;
 }
 
 function track(call: Call, number: string, incoming: boolean) {
-  set({ call, number: number.replace(/^client:/, ''), incoming, state: incoming ? 'connected' : 'calling', connectedAt: incoming ? Date.now() : null, muted: false, speaker: false, minimized: false });
+  set({ call, number: number.replace(/^client:/, ''), incoming, state: incoming ? 'connected' : 'calling', connectedAt: incoming ? Date.now() : null, muted: false, speaker: false, minimized: false,
+    displayName: incoming ? active?.displayName ?? null : null, invite: null });
   const { Call: CallSdk } = twilioSdk();
   call.on(CallSdk.Event.Ringing, () => patch({ state: 'ringing' }));
   call.on(CallSdk.Event.Connected, () => patch({ state: 'connected', connectedAt: Date.now() }));
@@ -114,13 +128,24 @@ export async function callClient(number: string): Promise<void> {
   await Linking.openURL(`tel:${number.replace(/[^\d+]/g, '')}`);
 }
 
-export async function hangUp() { await active?.call.disconnect(); }
+/** Answer the call ringing on the call screen (it then carries on there, as a call out does). */
+export async function answerIncoming() {
+  const invite = active?.state === 'incoming' ? active.invite : null;
+  if (!invite) return;
+  const call = await invite.accept();
+  track(call, invite.getFrom() ?? active?.number ?? '', true);
+}
+/** Decline (or end) the call: a ringing one is turned down, a call in progress is hung up. */
+export async function hangUp() {
+  if (active?.state === 'incoming' && active.invite) { const invite = active.invite; set(null); await invite.reject(); return; }
+  await active?.call?.disconnect();
+}
 export async function toggleMute() {
-  if (!active) return;
+  if (!active?.call) return;
   patch({ muted: await active.call.mute(!active.muted) });
 }
 export async function toggleSpeaker() {
-  if (!active) return;
+  if (!active?.call) return;
   const { audioDevices } = await sdk().getAudioDevices();
   const { AudioDevice } = twilioSdk();
   const want = active.speaker ? AudioDevice.Type.Earpiece : AudioDevice.Type.Speaker;
@@ -130,7 +155,10 @@ export async function toggleSpeaker() {
   patch({ speaker: !active.speaker });
 }
 export function setCallMinimized(minimized: boolean) { patch({ minimized }); }
-export async function sendDigits(digits: string) { await active?.call.sendDigits(digits); }
+export async function sendDigits(digits: string) { await active?.call?.sendDigits(digits); }
+
+/** A call is in progress (the alarm page then stays silent). */
+export const hasActiveCall = () => !!active && active.state !== 'incoming';
 
 export function useActiveCall(): ActiveCall | null {
   return useSyncExternalStore((l) => { listeners.add(l); return () => listeners.delete(l); }, () => active);

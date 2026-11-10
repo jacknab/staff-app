@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Constants from 'expo-constants';
-import { Feather } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { ActivityIndicator, Alert, Image, Platform, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -8,6 +8,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { api } from '@/lib/live-api';
 import { HelpTitle } from '@/components/HelpTitle';
+import { AppBackground } from '@/components/look/AppBackground';
+import { MenuCard } from '@/components/look/MenuCard';
+import { PromoCarousel } from '@/components/look/PromoCarousel';
+import { SectionHeader } from '@/components/look/SectionHeader';
+import { look, cardShadow } from '@/components/look/tokens';
 
 type DaySchedule = { day: string; short: string; enabled: boolean; hours: string };
 const initialHours: DaySchedule[] = [
@@ -89,11 +94,12 @@ export default function MoreScreen() {
   };
   const topInset = Platform.OS === 'web' ? 67 : insets.top;
   const showingAvailability = params.screen === 'availability';
-  useEffect(() => {
+  // Checked each time More opens, so the Tap to Pay banner goes as soon as Stripe Connect is set up (owner, 2026-11-07).
+  useFocusEffect(useCallback(() => {
     api.get<{ connected?: boolean; chargesEnabled?: boolean }>('/api/payments/stripe/status')
       .then((status) => setStripeReady(Boolean(status?.chargesEnabled && status?.connected !== false)))
       .catch(() => setStripeReady(false));
-  }, []);
+  }, []));
   const weekDays = useMemo(() => {
     const monday = new Date(selectedDate);
     monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
@@ -126,13 +132,16 @@ export default function MoreScreen() {
   };
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.background, paddingTop: topInset }]}>
+    <View style={[styles.root, { backgroundColor: look.pageTop, paddingTop: topInset }]}>
+      {/* The Certxa Pro look (owner, 2026-11-09; components/look): lavender page, white cards, violet-barred sections.
+          Behind the whole screen, the status bar included. */}
+      {!showingAvailability && params.screen !== 'payments' ? <AppBackground /> : null}
       {showingAvailability ? (
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.availabilityNav}>
-            <TouchableOpacity testID="availability-back" onPress={leaveAvailability} style={styles.availabilityBack}><Feather name="arrow-left" size={18} color={colors.foreground} /><Text style={[styles.backText, { color: colors.foreground }]}>Back</Text></TouchableOpacity>
+            <TouchableOpacity testID="availability-back" onPress={leaveAvailability} style={styles.availabilityBack}><Feather name="arrow-left" size={20} color={colors.foreground} /><Text style={[styles.backText, { color: colors.foreground }]}>Back</Text></TouchableOpacity>
             <Text style={[styles.availabilityNavTitle, { color: colors.foreground }]}>AVAILABILITY</Text>
-            <TouchableOpacity testID="availability-weekly-hours" accessibilityLabel={showWeeklyHours ? 'Hide weekly hours' : 'Show weekly hours'} onPress={() => setShowWeeklyHours((visible) => !visible)} style={[styles.availabilityMenu, { backgroundColor: colors.primary }]}><Feather name={showWeeklyHours ? 'x' : 'menu'} size={18} color={colors.primaryForeground} /></TouchableOpacity>
+            <TouchableOpacity testID="availability-weekly-hours" accessibilityLabel={showWeeklyHours ? 'Hide weekly hours' : 'Show weekly hours'} onPress={() => setShowWeeklyHours((visible) => !visible)} style={[styles.availabilityMenu, { backgroundColor: colors.primary }]}><Feather name={showWeeklyHours ? 'x' : 'menu'} size={20} color={colors.primaryForeground} /></TouchableOpacity>
           </View>
           <View style={styles.availabilityMonthRow}>
             <TouchableOpacity testID="availability-previous-week" accessibilityLabel="Previous week" onPress={() => shiftAvailabilityWeek(-1)} style={styles.availabilityArrow}><Feather name="chevron-left" size={20} color={colors.foreground} /></TouchableOpacity>
@@ -207,14 +216,14 @@ export default function MoreScreen() {
               );
             })}
           </View>
-          <TouchableOpacity testID="weekly-hours-toggle" onPress={() => setShowWeeklyHours((visible) => !visible)} style={[styles.weeklyHoursToggle, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.weeklyHoursIcon, { backgroundColor: colors.secondary }]}><Feather name="clock" size={16} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>Weekly hours</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>Manage your regular schedule</Text></View><Feather name={showWeeklyHours ? 'chevron-up' : 'chevron-down'} size={17} color={colors.mutedForeground} /></TouchableOpacity>
+          <TouchableOpacity testID="weekly-hours-toggle" onPress={() => setShowWeeklyHours((visible) => !visible)} style={[styles.weeklyHoursToggle, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.weeklyHoursIcon, { backgroundColor: colors.secondary }]}><Feather name="clock" size={18} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>Weekly hours</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>Manage your regular schedule</Text></View><Feather name={showWeeklyHours ? 'chevron-up' : 'chevron-down'} size={19} color={colors.mutedForeground} /></TouchableOpacity>
           {showWeeklyHours && <View style={[styles.weeklyHoursPanel, { backgroundColor: colors.background }]}>
             <View style={styles.dayList}>
               {availability.map((day, index) => <View key={day.day} style={[styles.dayRow, { backgroundColor: colors.card, borderColor: colors.border, opacity: day.enabled ? 1 : 0.63 }]}><View style={[styles.dayCircle, { backgroundColor: day.enabled ? colors.secondary : colors.muted }]}><Text style={[styles.dayInitial, { color: day.enabled ? colors.primary : colors.mutedForeground }]}>{day.short}</Text></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>{day.day}</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>{day.hours}</Text></View><Switch testID={`toggle-${day.day}`} value={day.enabled} onValueChange={(enabled) => setAvailability((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, enabled, hours: enabled ? item.day === 'Sunday' ? '10:00 AM – 2:00 PM' : item.hours === 'Closed' ? '9:00 AM – 5:00 PM' : item.hours : 'Closed' } : item))} trackColor={{ false: colors.border, true: colors.primary }} thumbColor={colors.card} /></View>)}
             </View>
           </View>}
           <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 22 }]}>Time off</Text>
-          <TouchableOpacity testID="block-time" onPress={() => setBlockedDates((current) => current.includes(availabilityDateKey(selectedDate)) ? current.filter((date) => date !== availabilityDateKey(selectedDate)) : [...current, availabilityDateKey(selectedDate)])} style={[styles.timeOffCard, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.timeOffIcon, { backgroundColor: colors.accent }]}><Feather name="calendar" size={17} color={colors.accentForeground} /></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>{blockedDates.includes(availabilityDateKey(selectedDate)) ? selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }) : 'Block out this day'}</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>{blockedDates.includes(availabilityDateKey(selectedDate)) ? 'Unavailable all day · Tap to restore slots' : `Mark ${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} unavailable`}</Text></View><Feather name={blockedDates.includes(availabilityDateKey(selectedDate)) ? 'x-circle' : 'plus'} size={18} color={colors.primary} /></TouchableOpacity>
+          <TouchableOpacity testID="block-time" onPress={() => setBlockedDates((current) => current.includes(availabilityDateKey(selectedDate)) ? current.filter((date) => date !== availabilityDateKey(selectedDate)) : [...current, availabilityDateKey(selectedDate)])} style={[styles.timeOffCard, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.timeOffIcon, { backgroundColor: colors.accent }]}><Feather name="calendar" size={19} color={colors.accentForeground} /></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>{blockedDates.includes(availabilityDateKey(selectedDate)) ? selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }) : 'Block out this day'}</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>{blockedDates.includes(availabilityDateKey(selectedDate)) ? 'Unavailable all day · Tap to restore slots' : `Mark ${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} unavailable`}</Text></View><Feather name={blockedDates.includes(availabilityDateKey(selectedDate)) ? 'x-circle' : 'plus'} size={20} color={colors.primary} /></TouchableOpacity>
           <Text style={[styles.previewNote, { color: colors.mutedForeground }]}>Availability changes are saved in this preview session only.</Text>
         </ScrollView>
       ) : params.screen === 'payments' ? (
@@ -229,60 +238,48 @@ export default function MoreScreen() {
         </ScrollView>
       ) : (
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          {/* Tap to Pay card (owner, 2026-11-03): the same size as the Plus Plan card below; opens the payments screen,
-              whose button starts Stripe's sign-up for Certxa's card payments. */}
-          <TouchableOpacity testID="more-tap-to-pay" onPress={() => router.push('/payments-intro')} activeOpacity={0.85}
-            accessibilityRole="button" accessibilityLabel="Accept payments with Tap to Pay, powered by Stripe">
-            <View style={styles.planCard}>
-              <Image source={require('@/assets/images/tap-to-pay-banner.jpg')} resizeMode="cover" style={styles.planImage} />
-            </View>
-          </TouchableOpacity>
-          {/* Business Phone card (owner, 2026-11-04): opens the Business Phone screen (app/phone.tsx). Its picture is a
-              little taller than the others, so the box takes the picture's own shape and nothing is cut off. */}
-          {enrolled && !enrolled.phone ? <TouchableOpacity testID="more-business-phone" onPress={() => router.push('/phone')} activeOpacity={0.85}
-            accessibilityRole="button" accessibilityLabel="Business Phone: a dedicated business number for your clients">
-            <View style={[styles.planCard, { aspectRatio: 1200 / 676 }]}>
-              <Image source={require('@/assets/images/business-phone-banner.jpg')} resizeMode="cover" style={styles.planImage} />
-            </View>
-          </TouchableOpacity> : null}
-          {/* Plus plan card (owner, 2026-10-30): opens certxa.com/pro-plus, already signed in, to pay by card.
-              Apple allows a US app to send people to a website for this, not a card form inside the app. */}
-          {enrolled && !enrolled.plus ? <TouchableOpacity testID="more-plus-plan" disabled={openingPlus} onPress={() => void openPlus()} activeOpacity={0.85}
-            accessibilityRole="button" accessibilityLabel="Plus Plan, $5 a month: unlock the app with unlimited SMS notifications">
-            {/* The box has the picture's own shape and the picture fills it, so there is no empty space above or below
-                it (an Image sized only by aspectRatio got a much taller box on the web). */}
-            <View style={[styles.planCard, { aspectRatio: 1200 / 676 }]}>
-              <Image source={require('@/assets/images/plus-plan.jpg')} resizeMode="cover" style={styles.planImage} />
-              {openingPlus ? <View style={styles.planBusy}><ActivityIndicator color="#FFFFFF" /></View> : null}
-            </View>
-          </TouchableOpacity> : null}
-          <HelpTitle help="more" style={[styles.sectionTitle, { color: colors.foreground, marginTop: 28, marginBottom: 12 }]}>Manage</HelpTitle>
-          <View style={styles.menuList}>
-            {/* Owner, 2026-11-03: Booking requests first, then Reviews and Credit balance; Availability removed, Catalog and Payments are in Settings. */}
-            {/* Money (owner, 2026-11-03): sales, the next payout, payouts and this month's payments (app/money.tsx). */}
-            <TouchableOpacity testID="menu-money" onPress={() => router.push('/money')} style={[styles.menuRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.menuIcon, { backgroundColor: colors.secondary }]}><Feather name="dollar-sign" size={17} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>Money</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>Sales, payouts and payments</Text></View><Feather name="chevron-right" size={17} color={colors.mutedForeground} /></TouchableOpacity>
-            {/* Two-way texting with clients (app/messages.tsx, owner 2026-11-03). */}
-            <TouchableOpacity testID="menu-messages" onPress={() => router.push('/messages')} style={[styles.menuRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.menuIcon, { backgroundColor: colors.secondary }]}><Feather name="message-circle" size={17} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>Messages</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>Text with your clients</Text></View><Feather name="chevron-right" size={17} color={colors.mutedForeground} /></TouchableOpacity>
-            {/* Gift cards: sell, use and see balances (app/gift-cards.tsx, owner 2026-11-03). */}
-            <TouchableOpacity testID="menu-gift-cards" onPress={() => router.push('/gift-cards')} style={[styles.menuRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.menuIcon, { backgroundColor: colors.secondary }]}><Feather name="gift" size={17} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>Gift cards</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>Sell, use and check balances</Text></View><Feather name="chevron-right" size={17} color={colors.mutedForeground} /></TouchableOpacity>
-            {/* Business Phone: a business number for calls and texts (app/phone.tsx, owner 2026-11-04). */}
-            <TouchableOpacity testID="menu-phone" onPress={() => router.push('/phone')} style={[styles.menuRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.menuIcon, { backgroundColor: colors.secondary }]}><Feather name="phone" size={17} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>Business Phone</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>Your business number for calls and texts</Text></View><Feather name="chevron-right" size={17} color={colors.mutedForeground} /></TouchableOpacity>
-            {/* Packages: prepaid visits sold on the pro's website (app/packages.tsx, owner 2026-11-04). */}
-            <TouchableOpacity testID="menu-packages" onPress={() => router.push('/packages')} style={[styles.menuRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.menuIcon, { backgroundColor: colors.secondary }]}><Feather name="package" size={17} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>Packages</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>Prepaid visits on your website</Text></View><Feather name="chevron-right" size={17} color={colors.mutedForeground} /></TouchableOpacity>
-            {/* Waitlist: clients who want in on a full day (app/waitlist.tsx, owner 2026-11-03). */}
-            <TouchableOpacity testID="menu-waitlist" onPress={() => router.push('/waitlist')} style={[styles.menuRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.menuIcon, { backgroundColor: colors.secondary }]}><Feather name="list" size={17} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>Waitlist</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>Clients waiting for a time</Text></View><Feather name="chevron-right" size={17} color={colors.mutedForeground} /></TouchableOpacity>
-            {/* Portfolio: photos of your work on your website's gallery (app/portfolio.tsx, owner 2026-11-03). */}
-            <TouchableOpacity testID="menu-portfolio" onPress={() => router.push('/portfolio')} style={[styles.menuRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.menuIcon, { backgroundColor: colors.secondary }]}><Feather name="image" size={17} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>Portfolio</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>Photos of your work on your website</Text></View><Feather name="chevron-right" size={17} color={colors.mutedForeground} /></TouchableOpacity>
-            {/* Campaigns: one text to many clients (app/campaigns.tsx, owner 2026-11-03). */}
-            <TouchableOpacity testID="menu-campaigns" onPress={() => router.push('/campaigns')} style={[styles.menuRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.menuIcon, { backgroundColor: colors.secondary }]}><Feather name="send" size={17} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>Campaigns</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>Text a special to your clients</Text></View><Feather name="chevron-right" size={17} color={colors.mutedForeground} /></TouchableOpacity>
-            <TouchableOpacity testID="menu-requests" onPress={() => router.push('/requests')} style={[styles.menuRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.menuIcon, { backgroundColor: colors.secondary }]}><Feather name="inbox" size={17} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>Booking requests</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>Approve, offer other times, or decline</Text></View><Feather name="chevron-right" size={17} color={colors.mutedForeground} /></TouchableOpacity>
-            <TouchableOpacity testID="menu-reviews" onPress={() => router.push('/reviews')} style={[styles.menuRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.menuIcon, { backgroundColor: colors.accent }]}><Feather name="star" size={17} color={colors.accentForeground} /></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>Reviews</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>See what clients said and reply</Text></View><Feather name="chevron-right" size={17} color={colors.mutedForeground} /></TouchableOpacity>
-            {/* Text message credits: the balance and packages to buy more (app/credits.tsx, owner 2026-11-03). */}
-            <TouchableOpacity testID="menu-credits" onPress={() => router.push('/credits')} style={[styles.menuRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.menuIcon, { backgroundColor: colors.secondary }]}><Feather name="message-square" size={17} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>Credit balance</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>Text message credits · buy more</Text></View><Feather name="chevron-right" size={17} color={colors.mutedForeground} /></TouchableOpacity>
-            <TouchableOpacity testID="menu-business-ai" onPress={() => router.push('/ai')} style={[styles.menuRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.menuIcon, { backgroundColor: colors.primary }]}><Feather name="zap" size={17} color={colors.primaryForeground} /></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>Business AI</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>Ask about your earnings, schedule and clients</Text></View><Feather name="chevron-right" size={17} color={colors.mutedForeground} /></TouchableOpacity>
-            <TouchableOpacity testID="menu-settings" onPress={() => router.push('/settings')} style={[styles.menuRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.menuIcon, { backgroundColor: colors.secondary }]}><Feather name="settings" size={17} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={[styles.itemTitle, { color: colors.foreground }]}>Settings</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>Business, booking, messages, payments, account</Text></View><Feather name="chevron-right" size={17} color={colors.mutedForeground} /></TouchableOpacity>
+          <View style={styles.header}>
+            <HelpTitle help="more" style={styles.pageTitle}>More</HelpTitle>
+            <TouchableOpacity testID="more-profile" onPress={() => router.push('/about-me')} accessibilityRole="button" accessibilityLabel="About you" style={styles.profileButton}>
+              <MaterialCommunityIcons name="account" size={30} color={look.violet} />
+            </TouchableOpacity>
           </View>
-          <View style={[styles.certxaCard, { backgroundColor: colors.primary }]}><Text style={[styles.certxaBrand, { color: colors.primaryForeground }]}>CERTXA PRO</Text><Text style={[styles.certxaTitle, { color: colors.primaryForeground }]}>Your business, beautifully in sync.</Text><Text style={[styles.certxaSub, { color: colors.primaryForeground }]}>Calendar, clients, services, appointments, and payments are connected to Certxa.</Text></View>
+          {/* The three offers stacked in one place (owner, 2026-11-09): random order, a new one every 15 seconds. Each
+              shows only while the account doesn't have it: Tap to Pay until Stripe is set up (2026-11-07), Business
+              Phone until there's a number and Plus until it's bought (2026-11-04; checked each time More opens). */}
+          <PromoCarousel promos={[
+            ...(!stripeReady ? [{ key: 'tap', title: 'Accept Payments', pill: 'Tap to Pay', points: ['Powered by Stripe', 'Paid to your bank'] as [string, string], art: 'contactless-payment' as const,
+              onPress: () => router.push('/payments-intro'), label: 'Accept payments with Tap to Pay, powered by Stripe' }] : []),
+            ...(enrolled && !enrolled.phone ? [{ key: 'phone', title: 'Business Phone', pill: '$10/mo', points: ['Dedicated number', 'Unlimited calling'] as [string, string], art: 'phone-in-talk' as const,
+              onPress: () => router.push('/phone'), label: 'Business Phone: a dedicated business number for your clients' }] : []),
+            // Plus opens certxa.com/pro-plus, already signed in, to pay by card (owner, 2026-10-30; Apple allows this for a US app).
+            ...(enrolled && !enrolled.plus ? [{ key: 'plus', title: 'Plus Plan', pill: '$5/mo', points: ['Unlimited SMS', 'Full App Access'] as [string, string], art: 'crown' as const,
+              onPress: () => void openPlus(), busy: openingPlus, label: 'Plus Plan, $5 a month: unlimited SMS and full app access' }] : []),
+          ]} />
+
+          <SectionHeader title="Business" />
+          <View style={styles.menuList}>
+            <MenuCard testID="menu-money" icon={{ feather: 'dollar-sign' }} title="Money" subtitle="Sales, payouts and payments" onPress={() => router.push('/money')} />
+            <MenuCard testID="menu-phone" icon={{ feather: 'phone' }} title="Business Phone" subtitle="Your business number for calls and texts" onPress={() => router.push('/phone')} />
+          </View>
+
+          <SectionHeader title="Client Growth" />
+          <View style={styles.menuList}>
+            <MenuCard testID="menu-waitlist" icon={{ mci: 'calendar-clock-outline' }} title="Waitlist" subtitle="Clients waiting for a time" onPress={() => router.push('/waitlist')} />
+            <MenuCard testID="menu-campaigns" icon={{ mci: 'bullhorn-outline' }} title="Campaigns" subtitle="Text a special to clients" onPress={() => router.push('/campaigns')} />
+            <MenuCard testID="menu-reviews" icon={{ feather: 'star' }} title="Reviews" subtitle="See what clients said and reply" onPress={() => router.push('/reviews')} />
+            <MenuCard testID="menu-portfolio" icon={{ feather: 'image' }} title="Portfolio" subtitle="Photos of your work on your website" onPress={() => router.push('/portfolio')} />
+          </View>
+
+          <SectionHeader title="Account" />
+          <View style={styles.menuList}>
+            <MenuCard testID="menu-business-ai" icon={{ feather: 'message-square' }} title="Business AI" subtitle="AI chat; ask questions and get help" onPress={() => router.push('/ai')} />
+            {/* Gift cards and packages share one row (owner, 2026-11-09); app/sell.tsx offers the two. */}
+            <MenuCard testID="menu-gift-cards" icon={{ feather: 'gift' }} title="Gift Cards & Packages" subtitle="Sell gift cards and packages" onPress={() => router.push('/sell')} />
+            {/* Not in the 2026-11-09 design, kept so the text credits can still be reached (app/credits.tsx). */}
+            <MenuCard testID="menu-credits" icon={{ feather: 'message-circle' }} title="Credit balance" subtitle="Text message credits · buy more" onPress={() => router.push('/credits')} />
+            <MenuCard testID="menu-settings" icon={{ feather: 'settings' }} title="Settings" subtitle="Account, preferences, billing" onPress={() => router.push('/settings')} />
+          </View>
           <Text style={[styles.version, { color: colors.mutedForeground }]}>LIVE · {Constants.expoConfig?.version ?? ''}</Text>
         </ScrollView>
       )}
@@ -293,83 +290,86 @@ export default function MoreScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   content: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 120 },
-  eyebrow: { fontSize: 10, letterSpacing: 1.4, fontFamily: 'Inter_700Bold' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
+  pageTitle: { fontSize: 40, letterSpacing: -0.8, fontFamily: 'Inter_700Bold', color: look.heading },
+  profileButton: { width: 52, height: 52, borderRadius: 16, backgroundColor: look.tile, alignItems: 'center', justifyContent: 'center' },
+  eyebrow: { fontSize: 13, letterSpacing: 1.4, fontFamily: 'Inter_700Bold' },
   title: { fontSize: 27, letterSpacing: -0.5, fontFamily: 'Inter_600SemiBold', marginTop: 4 },
-  caption: { fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 7, marginBottom: 22 },
+  caption: { fontSize: 16, fontFamily: 'Inter_400Regular', marginTop: 7, marginBottom: 22 },
   planBusy: { position: 'absolute', left: 0, right: 0, bottom: 0, top: 0, borderRadius: 17, backgroundColor: 'rgba(0,0,0,0.25)', alignItems: 'center', justifyContent: 'center' },
   planCard: { width: '100%', aspectRatio: 1200 / 594, borderRadius: 17, marginTop: 16, overflow: 'hidden' },
   planImage: { width: '100%', height: '100%' },
-  profileCard: { borderWidth: 1, borderRadius: 17, padding: 13, flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 23 },
+  profileCard: { borderWidth: 1, borderRadius: 17, padding: 13, flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 23, ...cardShadow },
   profileAvatar: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: 14, fontFamily: 'Inter_700Bold' },
-  profileName: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  sectionTitle: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
+  avatarText: { fontSize: 17, fontFamily: 'Inter_700Bold' },
+  profileName: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
+  sectionTitle: { fontSize: 18, fontFamily: 'Inter_600SemiBold' },
   menuList: { gap: 9 },
-  menuRow: { borderWidth: 1, borderRadius: 15, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 11, minHeight: 70 },
+  menuRow: { borderWidth: 1, borderRadius: 15, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 11, minHeight: 70, ...cardShadow },
   menuIcon: { width: 38, height: 38, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-  itemTitle: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  itemSubtitle: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 4, lineHeight: 16 },
-  preferenceRow: { borderWidth: 1, borderRadius: 15, paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 11 },
+  itemTitle: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
+  itemSubtitle: { fontSize: 14, fontFamily: 'Inter_400Regular', marginTop: 4, lineHeight: 20 },
+  preferenceRow: { borderWidth: 1, borderRadius: 15, paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 11, ...cardShadow },
   certxaCard: { borderRadius: 19, padding: 18, marginTop: 22 },
-  certxaBrand: { fontSize: 9, letterSpacing: 1.6, fontFamily: 'Inter_700Bold' },
-  certxaTitle: { fontSize: 17, lineHeight: 23, fontFamily: 'Inter_600SemiBold', marginTop: 11, maxWidth: 260 },
-  certxaSub: { fontSize: 11, lineHeight: 17, fontFamily: 'Inter_400Regular', marginTop: 7, opacity: 0.82 },
-  version: { textAlign: 'center', fontSize: 9, letterSpacing: 1.3, fontFamily: 'Inter_600SemiBold', marginTop: 23 },
+  certxaBrand: { fontSize: 12, letterSpacing: 1.6, fontFamily: 'Inter_700Bold' },
+  certxaTitle: { fontSize: 19, lineHeight: 26, fontFamily: 'Inter_600SemiBold', marginTop: 11, maxWidth: 260 },
+  certxaSub: { fontSize: 14, lineHeight: 22, fontFamily: 'Inter_400Regular', marginTop: 7, opacity: 0.82 },
+  version: { textAlign: 'center', fontSize: 12, letterSpacing: 1.3, fontFamily: 'Inter_600SemiBold', marginTop: 23 },
   backRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 26 },
-  backText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
+  backText: { fontSize: 16, fontFamily: 'Inter_500Medium' },
   availabilityNav: { height: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', position: 'relative', marginBottom: 13 },
   availabilityBack: { flexDirection: 'row', alignItems: 'center', gap: 6, zIndex: 1, minWidth: 70 },
-  availabilityNavTitle: { position: 'absolute', left: 0, right: 0, textAlign: 'center', fontSize: 10, letterSpacing: 1.1, fontFamily: 'Inter_700Bold' },
+  availabilityNavTitle: { position: 'absolute', left: 0, right: 0, textAlign: 'center', fontSize: 13, letterSpacing: 1.1, fontFamily: 'Inter_700Bold' },
   availabilityMenu: { width: 32, height: 32, borderRadius: 6, alignItems: 'center', justifyContent: 'center', zIndex: 1 },
   availabilityMonthRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 11 },
-  availabilityMonth: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
+  availabilityMonth: { fontSize: 19, fontFamily: 'Inter_600SemiBold' },
   availabilityArrow: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   weekStrip: { borderWidth: 1, borderRadius: 15, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 7, paddingVertical: 10 },
   weekColumn: { flex: 1, alignItems: 'center', gap: 5 },
-  weekdayLabel: { fontSize: 8, fontFamily: 'Inter_500Medium' },
+  weekdayLabel: { fontSize: 12, fontFamily: 'Inter_500Medium' },
   weekDate: { width: 31, height: 38, borderRadius: 9, alignItems: 'center', justifyContent: 'center', gap: 3 },
-  weekDateText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
+  weekDateText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
   weekDot: { width: 3, height: 3, borderRadius: 2 },
   availabilityHint: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 13, marginBottom: 12 },
-  availabilityHintText: { fontSize: 10, fontFamily: 'Inter_400Regular' },
+  availabilityHintText: { fontSize: 13, fontFamily: 'Inter_400Regular' },
   slotLegend: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   legendDot: { width: 6, height: 6, borderRadius: 3 },
-  legendText: { fontSize: 9, fontFamily: 'Inter_500Medium' },
+  legendText: { fontSize: 12, fontFamily: 'Inter_500Medium' },
   scheduleDays: { gap: 14 },
   scheduleDay: { flexDirection: 'row', alignItems: 'flex-start', gap: 9 },
   scheduleDateColumn: { width: 34, alignItems: 'flex-start', paddingTop: 2 },
-  scheduleDateNumber: { fontSize: 18, lineHeight: 21, fontFamily: 'Inter_600SemiBold' },
-  scheduleWeekday: { fontSize: 9, fontFamily: 'Inter_500Medium', marginTop: 1 },
+  scheduleDateNumber: { fontSize: 20, lineHeight: 25, fontFamily: 'Inter_600SemiBold' },
+  scheduleWeekday: { fontSize: 12, fontFamily: 'Inter_500Medium', marginTop: 1 },
   scheduleSlots: { flex: 1 },
   scheduleHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 20, marginBottom: 7 },
-  scheduleDateTitle: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
-  slotCount: { fontSize: 9, fontFamily: 'Inter_400Regular' },
+  scheduleDateTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  slotCount: { fontSize: 12, fontFamily: 'Inter_400Regular' },
   slotGrid: { gap: 7 },
   slotRow: { flexDirection: 'row', alignItems: 'center' },
   slotRowSpacing: { marginBottom: 7 },
   slotButton: { flex: 1, height: 36, borderWidth: 1, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   slotButtonSpacing: { marginRight: 7 },
-  slotButtonText: { fontSize: 10, fontFamily: 'Inter_600SemiBold' },
+  slotButtonText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   closedDay: { minHeight: 38, borderRadius: 10, justifyContent: 'center', paddingHorizontal: 10 },
-  closedDayText: { fontSize: 10, fontFamily: 'Inter_500Medium' },
+  closedDayText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
   weeklyHoursToggle: { borderWidth: 1, borderRadius: 15, padding: 11, flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 58, marginTop: 19 },
   weeklyHoursIcon: { width: 35, height: 35, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   weeklyHoursPanel: { marginTop: 9 },
-  previewNote: { textAlign: 'center', fontSize: 9, fontFamily: 'Inter_400Regular', lineHeight: 14, marginTop: 14 },
+  previewNote: { textAlign: 'center', fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 19, marginTop: 14 },
   availabilityIntro: { borderRadius: 16, padding: 13, flexDirection: 'row', alignItems: 'center', gap: 11, marginTop: 5, marginBottom: 15 },
   clockIcon: { width: 39, height: 39, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   dayList: { gap: 8 },
   dayRow: { borderWidth: 1, borderRadius: 15, minHeight: 66, paddingHorizontal: 11, paddingVertical: 9, flexDirection: 'row', alignItems: 'center', gap: 10 },
   dayCircle: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
-  dayInitial: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  dayInitial: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
   timeOffCard: { borderWidth: 1, borderRadius: 15, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 11, marginTop: 12 },
   timeOffIcon: { width: 38, height: 38, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-  paymentCard: { borderWidth: 1, borderRadius: 16, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 5 },
+  paymentCard: { borderWidth: 1, borderRadius: 16, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 5, ...cardShadow },
   paymentMark: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   statusPill: { paddingHorizontal: 9, paddingVertical: 6, borderRadius: 10 },
-  statusText: { fontSize: 9, letterSpacing: 0.8, fontFamily: 'Inter_700Bold' },
+  statusText: { fontSize: 12, letterSpacing: 0.8, fontFamily: 'Inter_700Bold' },
   paymentInfo: { borderRadius: 15, padding: 15, marginTop: 12 },
   primaryAction: { height: 50, borderRadius: 15, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 9, marginTop: 18 },
-  primaryActionText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  paymentDisclaimer: { textAlign: 'center', fontSize: 10, fontFamily: 'Inter_400Regular', lineHeight: 15, marginTop: 14 },
+  primaryActionText: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
+  paymentDisclaimer: { textAlign: 'center', fontSize: 13, fontFamily: 'Inter_400Regular', lineHeight: 20, marginTop: 14 },
 });

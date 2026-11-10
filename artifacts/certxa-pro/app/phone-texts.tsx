@@ -11,6 +11,8 @@ import { useColors } from '@/hooks/useColors';
 import { api } from '@/lib/live-api';
 import { HelpTitle } from '@/components/HelpTitle';
 
+import { AppBackground } from '@/components/look/AppBackground';
+import { look, cardShadow } from '@/components/look/tokens';
 type TextRow = { id: number; display: string; clientName: string | null; body: string; mediaCount: number; at: string };
 
 export default function PhoneTextsScreen() {
@@ -26,7 +28,8 @@ export default function PhoneTextsScreen() {
 
   const topInset = Platform.OS === 'web' ? 67 : insets.top;
   return (
-    <View style={[styles.root, { backgroundColor: colors.background, paddingTop: topInset }]} testID="phone-texts-screen">
+    <View style={[styles.root, { backgroundColor: look.pageTop, paddingTop: topInset }]} testID="phone-texts-screen">
+      <AppBackground />
       <View style={styles.nav}>
         <TouchableOpacity onPress={() => router.back()} style={styles.navSide} accessibilityLabel="Back"><Feather name="arrow-left" size={24} color={colors.foreground} /></TouchableOpacity>
         <HelpTitle help="phone-texts" style={[styles.navTitle, { color: colors.foreground }]}>Texts</HelpTitle>
@@ -58,12 +61,12 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   nav: { height: 56, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   navSide: { width: 44, height: 44, justifyContent: 'center' },
-  navTitle: { fontSize: 18, fontFamily: 'Inter_500Medium' },
+  navTitle: { fontSize: 20, fontFamily: 'Inter_500Medium' },
   content: { paddingHorizontal: 20, paddingBottom: 60, gap: 12, paddingTop: 6 },
-  muted: { fontSize: 13, lineHeight: 18, fontFamily: 'Inter_400Regular' },
-  list: { borderWidth: 1, borderRadius: 14, overflow: 'hidden' },
+  muted: { fontSize: 16, lineHeight: 22, fontFamily: 'Inter_400Regular' },
+  list: { borderWidth: 1, borderRadius: 14, overflow: 'hidden', ...cardShadow },
   row: { paddingHorizontal: 14, paddingVertical: 12, gap: 4 },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-  rowTitle: { fontSize: 15, fontFamily: 'Inter_600SemiBold', flexShrink: 1 },
-  body: { fontSize: 15, lineHeight: 21, fontFamily: 'Inter_400Regular' },
+  rowTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold', flexShrink: 1 },
+  body: { fontSize: 17, lineHeight: 24, fontFamily: 'Inter_400Regular' },
 });

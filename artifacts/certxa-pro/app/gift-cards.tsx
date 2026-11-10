@@ -12,6 +12,8 @@ import { useColors } from '@/hooks/useColors';
 import { api, ApiError } from '@/lib/live-api';
 import { HelpTitle } from '@/components/HelpTitle';
 
+import { AppBackground } from '@/components/look/AppBackground';
+import { look, cardShadow } from '@/components/look/tokens';
 type GiftCard = { id: number; code: string; originalAmount: string; remainingBalance: string; issuedToName: string | null; isActive: boolean; createdAt: string };
 const money = (v: string | number) => `$${Number(v).toFixed(2)}`;
 
@@ -87,7 +89,8 @@ export default function GiftCardsScreen() {
     </TouchableOpacity>
   );
   return (
-    <View style={[styles.root, { backgroundColor: colors.background, paddingTop: topInset }]} testID="gift-cards">
+    <View style={[styles.root, { backgroundColor: look.pageTop, paddingTop: topInset }]} testID="gift-cards">
+      <AppBackground />
       <View style={styles.nav}>
         <TouchableOpacity onPress={() => (mode === 'list' ? router.back() : reset('list'))} style={styles.navSide} accessibilityLabel="Back"><Feather name="arrow-left" size={24} color={colors.foreground} /></TouchableOpacity>
         <HelpTitle help="gift-cards" style={[styles.navTitle, { color: colors.foreground }]}>{mode === 'sell' ? 'Sell a gift card' : mode === 'redeem' ? 'Use a gift card' : 'Gift cards'}</HelpTitle>
@@ -135,10 +138,10 @@ export default function GiftCardsScreen() {
             ) : null}
             <View style={styles.actions}>
               <TouchableOpacity onPress={() => reset('sell')} style={[styles.action, { borderColor: colors.border, backgroundColor: colors.card }]} testID="gift-open-sell">
-                <Feather name="gift" size={18} color={colors.primary} /><Text style={[styles.actionText, { color: colors.foreground }]}>Sell</Text>
+                <Feather name="gift" size={20} color={colors.primary} /><Text style={[styles.actionText, { color: colors.foreground }]}>Sell</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => reset('redeem')} style={[styles.action, { borderColor: colors.border, backgroundColor: colors.card }]} testID="gift-open-redeem">
-                <Feather name="check-circle" size={18} color={colors.primary} /><Text style={[styles.actionText, { color: colors.foreground }]}>Use a card</Text>
+                <Feather name="check-circle" size={20} color={colors.primary} /><Text style={[styles.actionText, { color: colors.foreground }]}>Use a card</Text>
               </TouchableOpacity>
             </View>
             {cards == null ? <ActivityIndicator style={{ marginTop: 40 }} color={colors.mutedForeground} />
@@ -165,22 +168,22 @@ export default function GiftCardsScreen() {
 
 const styles = StyleSheet.create({
   sellRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  sellTitle: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
+  sellTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
   root: { flex: 1 },
   nav: { height: 56, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   navSide: { width: 44, height: 44, justifyContent: 'center' },
-  navTitle: { fontSize: 18, fontFamily: 'Inter_500Medium' },
+  navTitle: { fontSize: 20, fontFamily: 'Inter_500Medium' },
   content: { paddingHorizontal: 20, paddingBottom: 60, gap: 12, paddingTop: 6 },
-  muted: { fontSize: 13, lineHeight: 18, fontFamily: 'Inter_400Regular' },
-  input: { borderWidth: 1, borderRadius: 14, height: 54, paddingHorizontal: 16, fontSize: 16, fontFamily: 'Inter_400Regular' },
+  muted: { fontSize: 16, lineHeight: 22, fontFamily: 'Inter_400Regular' },
+  input: { borderWidth: 1, borderRadius: 14, height: 54, paddingHorizontal: 16, fontSize: 18, fontFamily: 'Inter_400Regular' },
   button: { height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  buttonText: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
-  card: { borderWidth: 1, borderRadius: 14, padding: 16, gap: 4 },
+  buttonText: { fontSize: 18, fontFamily: 'Inter_600SemiBold' },
+  card: { borderWidth: 1, borderRadius: 14, padding: 16, gap: 4, ...cardShadow },
   big: { fontSize: 26, fontFamily: 'Inter_600SemiBold' },
   actions: { flexDirection: 'row', gap: 10 },
   action: { flex: 1, height: 52, borderRadius: 14, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  actionText: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
-  list: { borderWidth: 1, borderRadius: 14, overflow: 'hidden', marginTop: 4 },
+  actionText: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
+  list: { borderWidth: 1, borderRadius: 14, overflow: 'hidden', marginTop: 4, ...cardShadow },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12 },
-  rowTitle: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
+  rowTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
 });

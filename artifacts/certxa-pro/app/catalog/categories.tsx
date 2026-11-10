@@ -120,8 +120,8 @@ export default function CategoriesScreen() {
                   <Row testID={`category-${row.id}`} title={row.name} hint={row.hiddenFromPublic ? 'Hidden from your booking site' : undefined} onPress={() => { setError(''); setDraft({ id: row.id, name: row.name, color: row.color, imageUrl: row.imageUrl, hiddenFromPublic: row.hiddenFromPublic }); }} />
                 </View>
                 <View>
-                  <TouchableOpacity testID={`category-up-${row.id}`} accessibilityLabel={`Move ${row.name} up`} disabled={index === 0} onPress={() => void move(index, -1)} style={styles.arrow}><Feather name="chevron-up" size={18} color={index === 0 ? colors.border : colors.mutedForeground} /></TouchableOpacity>
-                  <TouchableOpacity testID={`category-down-${row.id}`} accessibilityLabel={`Move ${row.name} down`} disabled={index === rows.length - 1} onPress={() => void move(index, 1)} style={styles.arrow}><Feather name="chevron-down" size={18} color={index === rows.length - 1 ? colors.border : colors.mutedForeground} /></TouchableOpacity>
+                  <TouchableOpacity testID={`category-up-${row.id}`} accessibilityLabel={`Move ${row.name} up`} disabled={index === 0} onPress={() => void move(index, -1)} style={styles.arrow}><Feather name="chevron-up" size={20} color={index === 0 ? colors.border : colors.mutedForeground} /></TouchableOpacity>
+                  <TouchableOpacity testID={`category-down-${row.id}`} accessibilityLabel={`Move ${row.name} down`} disabled={index === rows.length - 1} onPress={() => void move(index, 1)} style={styles.arrow}><Feather name="chevron-down" size={20} color={index === rows.length - 1 ? colors.border : colors.mutedForeground} /></TouchableOpacity>
                 </View>
               </View>
             ))}
@@ -135,7 +135,7 @@ export default function CategoriesScreen() {
 const styles = StyleSheet.create({
   swatches: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   swatch: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
-  none: { fontSize: 9, fontFamily: 'Inter_600SemiBold' },
+  none: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
   orderRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   arrow: { width: 34, height: 30, alignItems: 'center', justifyContent: 'center' },
 });

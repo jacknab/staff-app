@@ -15,6 +15,8 @@ import { useBookingData } from '@/contexts/BookingContext';
 import { validTimeZone } from '@/lib/businessTime';
 import { HelpTitle } from '@/components/HelpTitle';
 
+import { AppBackground } from '@/components/look/AppBackground';
+import { look } from '@/components/look/tokens';
 type Address = { address: string; city: string; state: string; postcode: string };
 type Store = Partial<Address> & { id: number };
 
@@ -113,7 +115,9 @@ export default function GetPaidScreen() {
   );
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: colors.background }} contentContainerStyle={[styles.content, { paddingTop: topInset + 18, paddingBottom: insets.bottom + 28 }]}>
+    <View style={{ flex: 1, backgroundColor: look.pageTop }}>
+      <AppBackground />
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.content, { paddingTop: topInset + 18, paddingBottom: insets.bottom + 28 }]}>
       {from !== 'signup' && (
         <TouchableOpacity accessibilityLabel="Back" onPress={leave} style={styles.back} testID="get-paid-back">
           <Feather name="arrow-left" size={20} color={colors.foreground} />
@@ -201,29 +205,30 @@ export default function GetPaidScreen() {
         </>
       )}
     </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   content: { flexGrow: 1, paddingHorizontal: 24 },
   back: { width: 42, height: 42, justifyContent: 'center', marginLeft: -8, marginBottom: 10 },
-  eyebrow: { fontSize: 10, letterSpacing: 1.6, fontFamily: 'Inter_700Bold' },
+  eyebrow: { fontSize: 13, letterSpacing: 1.6, fontFamily: 'Inter_700Bold' },
   title: { fontSize: 30, letterSpacing: -0.9, fontFamily: 'Inter_600SemiBold', marginTop: 8 },
-  body: { fontSize: 14, lineHeight: 21, fontFamily: 'Inter_400Regular', marginTop: 10 },
+  body: { fontSize: 17, lineHeight: 26, fontFamily: 'Inter_400Regular', marginTop: 10 },
   center: { alignItems: 'center', marginTop: 80 },
   points: { gap: 10, marginTop: 24 },
   point: { borderWidth: 1, borderRadius: 14, padding: 14 },
-  pointTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  pointLine: { fontSize: 13, lineHeight: 19, fontFamily: 'Inter_400Regular', marginTop: 4 },
-  error: { fontSize: 12, lineHeight: 17, fontFamily: 'Inter_500Medium', marginTop: 16 },
+  pointTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
+  pointLine: { fontSize: 16, lineHeight: 23, fontFamily: 'Inter_400Regular', marginTop: 4 },
+  error: { fontSize: 15, lineHeight: 21, fontFamily: 'Inter_500Medium', marginTop: 16 },
   form: { gap: 16, marginTop: 24 },
   pair: { flexDirection: 'row', gap: 10 },
-  label: { fontSize: 12, fontFamily: 'Inter_600SemiBold', marginBottom: 7 },
-  input: { borderWidth: 1, borderRadius: 14, height: 52, paddingHorizontal: 14, fontSize: 14, fontFamily: 'Inter_400Regular' },
+  label: { fontSize: 15, fontFamily: 'Inter_600SemiBold', marginBottom: 7 },
+  input: { borderWidth: 1, borderRadius: 14, height: 52, paddingHorizontal: 14, fontSize: 17, fontFamily: 'Inter_400Regular' },
   actions: { gap: 6, marginTop: 28 },
   button: { height: 53, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-  buttonText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  buttonText: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
   secondary: { height: 46, alignItems: 'center', justifyContent: 'center' },
-  secondaryText: { fontSize: 14, fontFamily: 'Inter_500Medium' },
-  fine: { fontSize: 11, lineHeight: 16, fontFamily: 'Inter_400Regular', marginTop: 18, textAlign: 'center' },
+  secondaryText: { fontSize: 17, fontFamily: 'Inter_500Medium' },
+  fine: { fontSize: 14, lineHeight: 20, fontFamily: 'Inter_400Regular', marginTop: 18, textAlign: 'center' },
 });

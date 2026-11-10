@@ -9,6 +9,9 @@ import { SelectField } from '@/components/SelectField';
 import { api } from '@/lib/live-api';
 import { HelpTitle } from '@/components/HelpTitle';
 
+import { AppBackground } from '@/components/look/AppBackground';
+import { SectionTitle } from '@/components/look/SectionHeader';
+import { look, cardShadow } from '@/components/look/tokens';
 /**
  * Settings → Client notifications (owner, 2026-10-30): the website's Settings › Client Notifications in native code —
  * appointment reminders, booking confirmations, review requests (by text, e-mail or both, each with its own wording),
@@ -162,7 +165,8 @@ export default function NotificationsScreen() {
   const reminderOn = sms.reminderEnabled || mail.reminderEnabled;
 
   return (
-    <KeyboardAvoidingView style={[styles.root, { backgroundColor: colors.background, paddingTop: insets.top }]} behavior="padding" keyboardVerticalOffset={0}>
+    <KeyboardAvoidingView style={[styles.root, { backgroundColor: look.pageTop, paddingTop: insets.top }]} behavior="padding" keyboardVerticalOffset={0}>
+      <AppBackground />
       <StatusBar barStyle="dark-content" />
       <View style={styles.header}>
         <TouchableOpacity testID="notifications-back" accessibilityLabel="Back" onPress={back} style={styles.headerButton}><Feather name="arrow-left" size={21} color={colors.foreground} /></TouchableOpacity>
@@ -174,9 +178,17 @@ export default function NotificationsScreen() {
       ) : (
         <>
           <ScrollView contentContainerStyle={[styles.content, { paddingBottom: 24 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-            <Text style={[styles.intro, { color: colors.mutedForeground }]}>Confirmations, reminders and review requests — by text, e-mail or both.</Text>
+            <Text style={[styles.intro, { color: colors.mutedForeground }]}>The texts and e-mails Certxa sends your clients for you, before and after their appointments.</Text>
 
-            <Section colors={colors} icon="bell" title="Appointment reminder" hint="Send clients a reminder before their appointment.">
+            {/* Grouped by when they're sent (owner, 2026-11-09; GlossGenius review): before, after, then replies and numbers. */}
+            <SectionTitle style={styles.group}>Before the appointment</SectionTitle>
+            <Section colors={colors} icon="calendar" title="Booking confirmation" hint="Let clients know their appointment is booked, as soon as it's made.">
+              {toggle("confirmation-text", "message-square", "Text", sms.bookingConfirmationEnabled, (v) => setSms((s) => ({ ...s, bookingConfirmationEnabled: v })))}
+              {toggle("confirmation-email", "mail", "E-mail", mail.bookingConfirmationEnabled, (v) => setMail((m) => ({ ...m, bookingConfirmationEnabled: v })))}
+              {customize("confirmation", sms.bookingConfirmationEnabled, mail.bookingConfirmationEnabled, "confirmationTemplate", BOOKING_VARS)}
+            </Section>
+
+            <Section colors={colors} icon="bell" title="Appointment reminder" hint="Remind clients of their appointment ahead of time, so fewer forget.">
               {toggle("reminder-text", "message-square", "Text", sms.reminderEnabled, (v) => setSms((s) => ({ ...s, reminderEnabled: v })))}
               {toggle("reminder-email", "mail", "E-mail", mail.reminderEnabled, (v) => setMail((m) => ({ ...m, reminderEnabled: v })))}
               {reminderOn && (
@@ -189,12 +201,7 @@ export default function NotificationsScreen() {
               {customize("reminder", sms.reminderEnabled, mail.reminderEnabled, "reminderTemplate", BOOKING_VARS)}
             </Section>
 
-            <Section colors={colors} icon="calendar" title="Booking confirmation" hint="Confirm the appointment as soon as it's booked.">
-              {toggle("confirmation-text", "message-square", "Text", sms.bookingConfirmationEnabled, (v) => setSms((s) => ({ ...s, bookingConfirmationEnabled: v })))}
-              {toggle("confirmation-email", "mail", "E-mail", mail.bookingConfirmationEnabled, (v) => setMail((m) => ({ ...m, bookingConfirmationEnabled: v })))}
-              {customize("confirmation", sms.bookingConfirmationEnabled, mail.bookingConfirmationEnabled, "confirmationTemplate", BOOKING_VARS)}
-            </Section>
-
+            <SectionTitle style={styles.group}>After the appointment</SectionTitle>
             <Section colors={colors} icon="star" title="Review request" hint="Ask clients to review their visit. Reviews show on your booking site and in Reviews, where you can reply.">
               {toggle("review-text", "message-square", "Text", sms.reviewRequestEnabled, (v) => setSms((s) => ({ ...s, reviewRequestEnabled: v })))}
               {toggle("review-email", "mail", "E-mail", mail.reviewRequestEnabled, (v) => setMail((m) => ({ ...m, reviewRequestEnabled: v })))}
@@ -209,7 +216,7 @@ export default function NotificationsScreen() {
             </Section>
 
             {winBack ? (
-              <Section colors={colors} icon="heart" title="Win-back text" hint="One text inviting a client back when they haven't visited for a while, with your booking link. Only to clients who agreed to marketing texts; once per absence.">
+              <Section colors={colors} icon="heart" title="Rebooking reminder" hint="Remind clients to book again when they haven't visited for a while: one text with your booking link. Only to clients who agreed to marketing texts, once each time they're away.">
                 <ToggleRow colors={colors} id="winback" icon="message-square" label="Text" value={winBack.enabled} onChange={(v) => saveWinBack({ enabled: v })} />
                 {winBack.enabled ? (
                   <View style={{ marginTop: 8 }}>
@@ -223,6 +230,7 @@ export default function NotificationsScreen() {
               </Section>
             ) : null}
 
+            <SectionTitle style={styles.group}>Replies and phone numbers</SectionTitle>
             <Section colors={colors} icon="x-circle" title="Cancellation replies" hint="Recognize clear cancellation requests in clients' text replies.">
               {toggle("cancellation", "message-square", "Text", sms.smsCancellationEnabled, (v) => setSms((s) => ({ ...s, smsCancellationEnabled: v })))}
               {sms.smsCancellationEnabled ? (
@@ -270,7 +278,7 @@ function Section({ colors, icon, title, hint, children }: { colors: Colors; icon
   return (
     <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <View style={styles.sectionHead}>
-        <Feather name={icon} size={17} color={colors.mutedForeground} style={{ marginTop: 1 }} />
+        <Feather name={icon} size={19} color={colors.mutedForeground} style={{ marginTop: 1 }} />
         <View style={{ flex: 1 }}>
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{title}</Text>
           <Text style={[styles.hint, { color: colors.mutedForeground }]}>{hint}</Text>
@@ -284,7 +292,7 @@ function Section({ colors, icon, title, hint, children }: { colors: Colors; icon
 function ToggleRow({ colors, id, icon, label, value, onChange }: { colors: Colors; id: string; icon: keyof typeof Feather.glyphMap; label: string; value: boolean; onChange: (v: boolean) => void }) {
   return (
     <View style={[styles.toggle, { borderColor: colors.border }]}>
-      <Feather name={icon} size={15} color={colors.mutedForeground} />
+      <Feather name={icon} size={17} color={colors.mutedForeground} />
       <Text style={[styles.toggleText, { color: colors.foreground }]}>{label}</Text>
       <Switch testID={`notifications-${id}`} value={value} onValueChange={onChange} trackColor={{ true: colors.primary, false: colors.border }} />
     </View>
@@ -339,29 +347,30 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header: { minHeight: 52, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerButton: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
+  headerTitle: { fontSize: 18, fontFamily: 'Inter_600SemiBold' },
   content: { paddingHorizontal: 20, paddingTop: 4, gap: 14 },
-  intro: { fontSize: 13, lineHeight: 19, fontFamily: 'Inter_400Regular' },
-  section: { borderWidth: 1, borderRadius: 16, padding: 16, gap: 10 },
+  intro: { fontSize: 16, lineHeight: 23, fontFamily: 'Inter_400Regular' },
+  section: { borderWidth: 1, borderRadius: 16, padding: 16, gap: 10, ...cardShadow },
   sectionHead: { flexDirection: 'row', gap: 10, marginBottom: 2 },
-  sectionTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  hint: { fontSize: 12, lineHeight: 17, fontFamily: 'Inter_400Regular', marginTop: 2 },
+  sectionTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
+  group: { marginTop: 20, marginBottom: 10 },
+  hint: { fontSize: 15, lineHeight: 21, fontFamily: 'Inter_400Regular', marginTop: 2 },
   toggle: { borderWidth: 1, borderRadius: 12, minHeight: 48, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  toggleText: { flex: 1, fontSize: 14, fontFamily: 'Inter_500Medium' },
-  label: { fontSize: 12, fontFamily: 'Inter_600SemiBold', marginTop: 4, marginBottom: 8 },
+  toggleText: { flex: 1, fontSize: 17, fontFamily: 'Inter_500Medium' },
+  label: { fontSize: 15, fontFamily: 'Inter_600SemiBold', marginTop: 4, marginBottom: 8 },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { borderWidth: 1, borderRadius: 12, minHeight: 38, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center' },
-  chipText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  input: { borderWidth: 1, borderRadius: 12, height: 48, paddingHorizontal: 12, fontSize: 14, fontFamily: 'Inter_400Regular' },
-  textArea: { borderWidth: 1, borderRadius: 12, minHeight: 72, padding: 12, fontSize: 13, lineHeight: 19, fontFamily: 'Inter_400Regular', textAlignVertical: 'top' },
-  mono: { fontFamily: 'Courier', fontSize: 12 },
+  chipText: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
+  input: { borderWidth: 1, borderRadius: 12, height: 48, paddingHorizontal: 12, fontSize: 17, fontFamily: 'Inter_400Regular' },
+  textArea: { borderWidth: 1, borderRadius: 12, minHeight: 72, padding: 12, fontSize: 16, lineHeight: 23, fontFamily: 'Inter_400Regular', textAlignVertical: 'top' },
+  mono: { fontFamily: 'Courier', fontSize: 15 },
   counterRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginTop: 4 },
-  small: { fontSize: 11, lineHeight: 16, fontFamily: 'Inter_400Regular' },
+  small: { fontSize: 14, lineHeight: 20, fontFamily: 'Inter_400Regular' },
   linkButton: { paddingVertical: 4 },
-  link: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  link: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
   outlineButton: { height: 46, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  message: { fontSize: 12, lineHeight: 17, fontFamily: 'Inter_500Medium' },
+  message: { fontSize: 15, lineHeight: 21, fontFamily: 'Inter_500Medium' },
   footer: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 20, paddingTop: 10 },
   button: { height: 52, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-  buttonText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  buttonText: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
 });

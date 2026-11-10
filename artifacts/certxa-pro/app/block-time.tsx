@@ -15,6 +15,8 @@ import { api, ApiError } from '@/lib/live-api';
 import { clockLabel, TimeWheel } from '@/components/TimeWheel';
 import { HelpTitle } from '@/components/HelpTitle';
 
+import { AppBackground } from '@/components/look/AppBackground';
+import { look, cardShadow } from '@/components/look/tokens';
 function dateFromKey(key?: string) {
   if (!key) return null;
   const [year, month, day] = key.split('-').map(Number);
@@ -56,7 +58,8 @@ export default function BlockTimeScreen() {
   const topInset = Platform.OS === 'web' ? 67 : insets.top;
   const row = { backgroundColor: colors.card, borderColor: colors.border };
   return (
-    <View style={[styles.root, { backgroundColor: colors.background, paddingTop: topInset }]} testID="block-time">
+    <View style={[styles.root, { backgroundColor: look.pageTop, paddingTop: topInset }]} testID="block-time">
+      <AppBackground />
       <View style={styles.nav}>
         <TouchableOpacity onPress={() => router.back()} style={styles.navSide} accessibilityLabel="Back"><Feather name="arrow-left" size={24} color={colors.foreground} /></TouchableOpacity>
         <HelpTitle help="block-time" style={[styles.navTitle, { color: colors.foreground }]}>Block time</HelpTitle>
@@ -104,17 +107,17 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   nav: { height: 56, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   navSide: { width: 44, height: 44, justifyContent: 'center' },
-  navTitle: { fontSize: 20, fontFamily: 'Inter_500Medium' },
+  navTitle: { fontSize: 22, fontFamily: 'Inter_500Medium' },
   content: { paddingHorizontal: 20, paddingBottom: 60, gap: 12 },
-  hint: { fontSize: 14, lineHeight: 20, fontFamily: 'Inter_400Regular' },
-  dateCard: { borderWidth: 1, borderRadius: 14, minHeight: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 6 },
+  hint: { fontSize: 17, lineHeight: 24, fontFamily: 'Inter_400Regular' },
+  dateCard: { borderWidth: 1, borderRadius: 14, minHeight: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 6, ...cardShadow },
   arrow: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  dateText: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
-  row: { borderWidth: 1, borderRadius: 14, minHeight: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16 },
-  rowText: { fontSize: 16, fontFamily: 'Inter_500Medium' },
-  rowValue: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
-  input: { borderWidth: 1, borderRadius: 14, height: 56, paddingHorizontal: 16, fontSize: 16, fontFamily: 'Inter_400Regular' },
-  error: { fontSize: 13, fontFamily: 'Inter_500Medium' },
+  dateText: { fontSize: 18, fontFamily: 'Inter_600SemiBold' },
+  row: { borderWidth: 1, borderRadius: 14, minHeight: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, ...cardShadow },
+  rowText: { fontSize: 18, fontFamily: 'Inter_500Medium' },
+  rowValue: { fontSize: 18, fontFamily: 'Inter_600SemiBold' },
+  input: { borderWidth: 1, borderRadius: 14, height: 56, paddingHorizontal: 16, fontSize: 18, fontFamily: 'Inter_400Regular' },
+  error: { fontSize: 16, fontFamily: 'Inter_500Medium' },
   button: { height: 54, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginTop: 6 },
-  buttonText: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
+  buttonText: { fontSize: 18, fontFamily: 'Inter_600SemiBold' },
 });

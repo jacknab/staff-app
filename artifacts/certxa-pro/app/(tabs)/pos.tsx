@@ -18,6 +18,8 @@ import { CertxaApiError } from '@/lib/certxa-api';
 import { HelpTitle } from '@/components/HelpTitle';
 import { ClientAvatar } from '@/components/ClientAvatar';
 
+import { AppBackground } from '@/components/look/AppBackground';
+import { look, cardShadow } from '@/components/look/tokens';
 const MAX_CENTS = 10_000_000; // $100,000
 const MIN_CENTS = 50; // Stripe's smallest card payment
 
@@ -112,7 +114,8 @@ export default function PosScreen() {
   if (stage === 'amount') {
     const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'back'];
     return (
-      <View style={[styles.root, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+      <View style={[styles.root, { backgroundColor: look.pageTop, paddingTop: insets.top }]}>
+        <AppBackground />
         <StatusBar barStyle="dark-content" />
         <View style={styles.pageHeader}><HelpTitle help="pos" style={[styles.pageTitle, { color: colors.foreground }]}>POS</HelpTitle></View>
         <View style={styles.amountArea}>
@@ -161,7 +164,7 @@ export default function PosScreen() {
       {choosing ? (
         <View style={styles.chooser}>
           <View style={[styles.searchBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Feather name="search" size={16} color={colors.mutedForeground} />
+            <Feather name="search" size={18} color={colors.mutedForeground} />
             <TextInput testID="pos-client-search" autoFocus value={search} onChangeText={setSearch} placeholder="Search name, phone or e-mail"
               placeholderTextColor={colors.mutedForeground} autoCorrect={false} autoCapitalize="none" style={[styles.searchInput, { color: colors.foreground }]} />
           </View>
@@ -185,7 +188,7 @@ export default function PosScreen() {
           <HelpTitle help="pos" style={[styles.title, { color: colors.foreground }]}>Who is this sale for?</HelpTitle>
           {picked ? (
             <View testID="pos-picked" style={[styles.card, styles.pickedRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Feather name="user" size={18} color={colors.mutedForeground} />
+              <Feather name="user" size={20} color={colors.mutedForeground} />
               <View style={{ flex: 1 }}>
                 <Text style={[styles.clientName, { color: colors.foreground }]}>{picked.name}</Text>
                 {picked.phone || picked.email ? <Text style={[styles.clientMeta, { color: colors.mutedForeground }]}>{picked.phone || picked.email}</Text> : null}
@@ -222,7 +225,7 @@ function Field({ icon, value, onChange, placeholder, colors, testID, keyboardTyp
 }) {
   return (
     <View style={[styles.field, divider && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}>
-      <Feather name={icon} size={17} color={colors.mutedForeground} />
+      <Feather name={icon} size={19} color={colors.mutedForeground} />
       <TextInput testID={testID} value={value} onChangeText={onChange} placeholder={placeholder} placeholderTextColor={colors.mutedForeground}
         keyboardType={keyboardType} autoCapitalize={autoCapitalize ?? 'none'} autoCorrect={false} style={[styles.fieldInput, { color: colors.foreground }]} />
     </View>
@@ -231,39 +234,39 @@ function Field({ icon, value, onChange, placeholder, colors, testID, keyboardTyp
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  pageHeader: { height: 50, alignItems: 'center', justifyContent: 'center' },
-  pageTitle: { fontSize: 18, fontFamily: 'Inter_500Medium' },
+  pageHeader: { height: 60, paddingHorizontal: 20, alignItems: 'flex-start', justifyContent: 'center' },
+  pageTitle: { fontSize: 38, fontFamily: 'Inter_700Bold', letterSpacing: -0.8 },
   amountArea: { alignItems: 'center', paddingTop: 20, paddingHorizontal: 24, minHeight: 230 },
   amount: { fontSize: 64, letterSpacing: -2, fontFamily: 'Inter_500Medium' },
   descriptionButton: { paddingVertical: 8, paddingHorizontal: 12 },
-  descriptionText: { fontSize: 15, fontFamily: 'Inter_500Medium' },
-  descriptionInput: { marginTop: 6, minWidth: 240, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, height: 42, fontSize: 15, textAlign: 'center', fontFamily: 'Inter_400Regular' },
+  descriptionText: { fontSize: 17, fontFamily: 'Inter_500Medium' },
+  descriptionInput: { marginTop: 6, minWidth: 240, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, height: 42, fontSize: 17, textAlign: 'center', fontFamily: 'Inter_400Regular' },
   keypad: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', paddingHorizontal: 44, rowGap: 16, columnGap: 22, marginTop: 'auto' },
   key: { width: 76, height: 76, borderRadius: 38, alignItems: 'center', justifyContent: 'center' },
   keyText: { fontSize: 28, fontFamily: 'Inter_500Medium' },
   primary: { height: 54, marginHorizontal: 24, marginTop: 24, borderRadius: 27, alignItems: 'center', justifyContent: 'center' },
-  primaryText: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
-  error: { textAlign: 'center', fontSize: 13, marginTop: 12, paddingHorizontal: 24, fontFamily: 'Inter_500Medium' },
+  primaryText: { fontSize: 18, fontFamily: 'Inter_600SemiBold' },
+  error: { textAlign: 'center', fontSize: 16, marginTop: 12, paddingHorizontal: 24, fontFamily: 'Inter_500Medium' },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, height: 50, gap: 8 },
   headerBack: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  headerAmount: { fontSize: 18, fontFamily: 'Inter_600SemiBold' },
-  headerNote: { flex: 1, textAlign: 'right', fontSize: 13, fontFamily: 'Inter_400Regular' },
+  headerAmount: { fontSize: 20, fontFamily: 'Inter_600SemiBold' },
+  headerNote: { flex: 1, textAlign: 'right', fontSize: 16, fontFamily: 'Inter_400Regular' },
   clientArea: { flex: 1, paddingHorizontal: 20, paddingTop: 24 },
-  title: { fontSize: 22, letterSpacing: -0.4, fontFamily: 'Inter_600SemiBold', marginBottom: 16 },
-  card: { borderWidth: 1, borderRadius: 18, overflow: 'hidden' },
+  title: { fontSize: 23, letterSpacing: -0.4, fontFamily: 'Inter_600SemiBold', marginBottom: 16 },
+  card: { borderWidth: 1, borderRadius: 18, overflow: 'hidden', ...cardShadow },
   field: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, height: 56 },
-  fieldInput: { flex: 1, fontSize: 16, fontFamily: 'Inter_400Regular', height: '100%' },
+  fieldInput: { flex: 1, fontSize: 18, fontFamily: 'Inter_400Regular', height: '100%' },
   pickedRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16 },
-  hint: { fontSize: 12, marginTop: 10, textAlign: 'center', fontFamily: 'Inter_400Regular' },
+  hint: { fontSize: 15, marginTop: 10, textAlign: 'center', fontFamily: 'Inter_400Regular' },
   linkButton: { alignSelf: 'center', paddingVertical: 12 },
-  link: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  link: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
   chooser: { flex: 1, paddingHorizontal: 16 },
   searchBox: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 14, paddingHorizontal: 12, height: 46, marginTop: 8, marginBottom: 6 },
-  searchInput: { flex: 1, fontSize: 15, fontFamily: 'Inter_400Regular', height: '100%' },
+  searchInput: { flex: 1, fontSize: 17, fontFamily: 'Inter_400Regular', height: '100%' },
   clientRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   initials: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
-  initialsText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  clientName: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
-  clientMeta: { fontSize: 12, marginTop: 2, fontFamily: 'Inter_400Regular' },
-  empty: { textAlign: 'center', marginTop: 30, fontSize: 14 },
+  initialsText: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
+  clientName: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
+  clientMeta: { fontSize: 15, marginTop: 2, fontFamily: 'Inter_400Regular' },
+  empty: { textAlign: 'center', marginTop: 30, fontSize: 17 },
 });

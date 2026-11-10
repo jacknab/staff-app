@@ -11,6 +11,9 @@ import { CertxaApiError, sendSignupPhoneCode, verifySignupPhoneCode } from '@/li
 import { api } from '@/lib/live-api';
 import { BusinessHoursEditor, DAY_NAMES, type DayHours } from '@/components/BusinessHoursEditor';
 
+import { AppBackground } from '@/components/look/AppBackground';
+import { look, cardShadow } from '@/components/look/tokens';
+import { HelpTitle } from '@/components/HelpTitle';
 // The same list as Settings > Business details. Certxa loads a starter list of services for the types it has one for.
 const BUSINESS_TYPES = ['Nail Salon', 'Hair Salon', 'Barbershop', 'Lash and Brows', 'Esthetician', 'Makeup', 'Massage', 'Wax', 'Tattoo and Piercing', 'Pet Grooming', 'Other'];
 const STEPS = 5;
@@ -145,7 +148,8 @@ export default function SignupScreen() {
   );
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.background }]}>
+    <View style={[styles.root, { backgroundColor: look.pageTop }]}>
+      <AppBackground />
       <KeyboardAwareScrollViewCompat
         style={{ flex: 1 }}
         contentContainerStyle={[styles.content, { paddingTop: topInset + 6, paddingBottom: 30 }]}
@@ -162,7 +166,7 @@ export default function SignupScreen() {
 
         {step === 1 ? (
           <>
-            <Text style={[styles.title, { color: colors.foreground }]}>Tell us about your business</Text>
+            <HelpTitle help="signup" style={[styles.title, { color: colors.foreground }]}>Tell us about your business</HelpTitle>
             <View style={styles.form}>
               <View style={styles.pair}>
                 <TextInput autoCapitalize="words" autoComplete="given-name" onChangeText={setFirstName} placeholder="First name" placeholderTextColor={colors.mutedForeground} style={[styles.input, field, inputText, { flex: 1, minWidth: 0 }]} testID="signup-first-name" value={firstName} />
@@ -176,7 +180,7 @@ export default function SignupScreen() {
           </>
         ) : step === 2 ? (
           <>
-            <Text style={[styles.title, { color: colors.foreground }]}>Where do you offer your services?</Text>
+            <HelpTitle help="signup" style={[styles.title, { color: colors.foreground }]}>Where do you offer your services?</HelpTitle>
             <View style={styles.optionRow}>
               <Text style={[styles.optionTitle, { color: colors.foreground }]}>House call</Text>
               {toggle(houseCalls, setHouseCalls, 'signup-place-house-calls')}
@@ -213,7 +217,7 @@ export default function SignupScreen() {
           </>
         ) : step === 3 ? (
           <>
-            <Text style={[styles.title, { color: colors.foreground }]}>What are your business hours?</Text>
+            <HelpTitle help="signup" style={[styles.title, { color: colors.foreground }]}>What are your business hours?</HelpTitle>
             <Text style={[styles.optionHint, { color: colors.mutedForeground, marginTop: 12 }]}>Clients will only be able to book within these hours. You can edit these later in Settings.</Text>
             <View style={{ marginTop: 18 }}>
               <BusinessHoursEditor hours={hours} onChange={setHours} />
@@ -221,7 +225,7 @@ export default function SignupScreen() {
           </>
         ) : step === 4 ? (
           <>
-            <Text style={[styles.title, { color: colors.foreground }]}>Create your login</Text>
+            <HelpTitle help="signup" style={[styles.title, { color: colors.foreground }]}>Create your login</HelpTitle>
             <View style={styles.form}>
               <TextInput autoCapitalize="none" autoComplete="email" autoCorrect={false} keyboardType="email-address" onChangeText={setEmail} placeholder="Email" placeholderTextColor={colors.mutedForeground} style={[styles.input, field, inputText]} testID="signup-email" value={email} />
               <TextInput autoCapitalize="none" autoComplete="new-password" onChangeText={setPassword} onSubmitEditing={() => void next()} placeholder="Password (at least 8 characters)" placeholderTextColor={colors.mutedForeground} secureTextEntry style={[styles.input, field, inputText]} testID="signup-password" value={password} />
@@ -229,7 +233,7 @@ export default function SignupScreen() {
           </>
         ) : !codeSent ? (
           <>
-            <Text style={[styles.title, { color: colors.foreground }]}>What's your mobile number?</Text>
+            <HelpTitle help="signup" style={[styles.title, { color: colors.foreground }]}>What's your mobile number?</HelpTitle>
             <Text style={[styles.optionHint, { color: colors.mutedForeground, marginTop: 12 }]}>We'll text you a code to confirm it.</Text>
             <View style={styles.form}>
               <TextInput autoComplete="tel" keyboardType="phone-pad" onChangeText={setPhone} onSubmitEditing={() => void next()} placeholder="Mobile number" placeholderTextColor={colors.mutedForeground} style={[styles.input, field, inputText]} testID="signup-phone" textContentType="telephoneNumber" value={phone} />
@@ -237,7 +241,7 @@ export default function SignupScreen() {
           </>
         ) : (
           <>
-            <Text style={[styles.title, { color: colors.foreground }]}>Enter the code</Text>
+            <HelpTitle help="signup" style={[styles.title, { color: colors.foreground }]}>Enter the code</HelpTitle>
             <Text style={[styles.optionHint, { color: colors.mutedForeground, marginTop: 12 }]}>
               We texted a 6-digit code to ({phoneDigits.slice(0, 3)}) {phoneDigits.slice(3, 6)}-{phoneDigits.slice(6)}.
             </Text>
@@ -280,29 +284,29 @@ const styles = StyleSheet.create({
   back: { width: 44, height: 44, justifyContent: 'center', marginLeft: -6, marginBottom: 16 },
   progress: { height: 3, borderRadius: 2, overflow: 'hidden' },
   progressFill: { height: 3, borderRadius: 2 },
-  stepCount: { alignSelf: 'flex-end', fontSize: 17, fontFamily: 'Inter_500Medium', marginTop: 12 },
+  stepCount: { alignSelf: 'flex-end', fontSize: 19, fontFamily: 'Inter_500Medium', marginTop: 12 },
   title: { fontSize: 34, lineHeight: 40, letterSpacing: -0.8, fontFamily: 'Inter_500Medium', marginTop: 6 },
   form: { gap: 12, marginTop: 28 },
   pair: { flexDirection: 'row', gap: 10 },
-  sectionLabel: { fontSize: 15, fontFamily: 'Inter_600SemiBold', marginTop: 12 },
-  input: { borderWidth: 1, borderRadius: 14, height: 56, paddingHorizontal: 16, fontSize: 16, fontFamily: 'Inter_400Regular' },
+  sectionLabel: { fontSize: 17, fontFamily: 'Inter_600SemiBold', marginTop: 12 },
+  input: { borderWidth: 1, borderRadius: 14, height: 56, paddingHorizontal: 16, fontSize: 18, fontFamily: 'Inter_400Regular' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { borderWidth: 1, borderRadius: 22, paddingHorizontal: 16, minHeight: 42, justifyContent: 'center' },
-  chipText: { fontSize: 14, fontFamily: 'Inter_500Medium' },
+  chipText: { fontSize: 17, fontFamily: 'Inter_500Medium' },
   optionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 64, marginTop: 22 },
-  optionTitle: { fontSize: 19, fontFamily: 'Inter_500Medium' },
-  optionHint: { fontSize: 16, lineHeight: 23, fontFamily: 'Inter_400Regular', marginTop: 4 },
+  optionTitle: { fontSize: 21, fontFamily: 'Inter_500Medium' },
+  optionHint: { fontSize: 18, lineHeight: 26, fontFamily: 'Inter_400Regular', marginTop: 4 },
   divider: { height: StyleSheet.hairlineWidth, marginTop: 22 },
-  addressBox: { borderWidth: 1, borderRadius: 14, minHeight: 66, paddingHorizontal: 16, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 22 },
-  addressLabel: { fontSize: 13, fontFamily: 'Inter_500Medium' },
-  addressInput: { fontSize: 17, fontFamily: 'Inter_400Regular', padding: 0, marginTop: 2 },
+  addressBox: { borderWidth: 1, borderRadius: 14, minHeight: 66, paddingHorizontal: 16, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 22, ...cardShadow },
+  addressLabel: { fontSize: 16, fontFamily: 'Inter_500Medium' },
+  addressInput: { fontSize: 19, fontFamily: 'Inter_400Regular', padding: 0, marginTop: 2 },
   checkRow: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44, marginTop: 12 },
-  checkText: { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular' },
-  link: { fontSize: 14, fontFamily: 'Inter_500Medium', textDecorationLine: 'underline' },
+  checkText: { flex: 1, fontSize: 17, fontFamily: 'Inter_400Regular' },
+  link: { fontSize: 17, fontFamily: 'Inter_500Medium', textDecorationLine: 'underline' },
   codeLinks: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
   codeLink: { minHeight: 44, justifyContent: 'center' },
-  error: { fontSize: 13, lineHeight: 18, fontFamily: 'Inter_500Medium', marginTop: 16 },
+  error: { fontSize: 16, lineHeight: 22, fontFamily: 'Inter_500Medium', marginTop: 16 },
   footer: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 24, paddingTop: 14 },
   button: { height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
-  buttonText: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
+  buttonText: { fontSize: 19, fontFamily: 'Inter_600SemiBold' },
 });

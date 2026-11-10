@@ -8,6 +8,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { canTakeCards, getPaymentStatus } from '@/lib/payments-setup';
 
+import { cardShadow } from '@/components/look/tokens';
 export function PaymentsSetupBanner({ message = 'Set up card payments to take Tap to Pay and card payments from your clients.' }: { message?: string }) {
   const colors = useColors();
   const router = useRouter();
@@ -34,9 +35,9 @@ export function PaymentsSetupBanner({ message = 'Set up card payments to take Ta
 }
 
 const styles = StyleSheet.create({
-  card: { borderWidth: 1, borderRadius: 16, padding: 16, gap: 6 },
-  title: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
-  line: { fontSize: 13, lineHeight: 19, fontFamily: 'Inter_400Regular' },
+  card: { borderWidth: 1, borderRadius: 16, padding: 16, gap: 6, ...cardShadow },
+  title: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
+  line: { fontSize: 16, lineHeight: 23, fontFamily: 'Inter_400Regular' },
   button: { alignSelf: 'flex-start', marginTop: 6, height: 40, borderRadius: 12, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' },
-  buttonText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  buttonText: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
 });

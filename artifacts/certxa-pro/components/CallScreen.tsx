@@ -17,7 +17,7 @@ import { useBookingData, type ClientProfile } from '@/contexts/BookingContext';
 import { ClientAvatar } from '@/components/ClientAvatar';
 import { Keypad } from '@/components/Keypad';
 import { clientStatusOf, STATUS_LABEL } from '@/lib/clientStatus';
-import { hangUp, sendDigits, setCallMinimized, toggleMute, toggleSpeaker, useActiveCall } from '@/lib/voice';
+import { answerIncoming, hangUp, sendDigits, setCallMinimized, toggleMute, toggleSpeaker, useActiveCall } from '@/lib/voice';
 
 const ten = (n: string) => n.replace(/\D/g, '').slice(-10);
 const pretty = (n: string) => { const d = ten(n); return d.length === 10 ? `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}` : n; };
@@ -43,13 +43,16 @@ export function CallScreen() {
 
   const seconds = active.connectedAt ? Math.max(0, Math.floor((now - active.connectedAt) / 1000)) : 0;
   const clock = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
-  const status = active.state === 'connected' ? clock : 'Calling...';
+  const incoming = active.state === 'incoming';
+  const status = active.state === 'connected' ? clock : incoming ? 'Incoming call' : active.state === 'ringing' ? 'Ringing...' : 'Calling...';
+  // No client match: the caller line Certxa sent ("Client: Jane Smith · Regular"), else the number.
+  const callerName = client?.name ?? (active.displayName ? active.displayName.replace(/^Client:\s*/, '').split(' · ')[0] : null) ?? pretty(active.number);
 
   // Set aside: a green bar at the top, like the iPhone's, brings the call screen back.
   if (active.minimized) return (
     <TouchableOpacity onPress={() => setCallMinimized(false)} activeOpacity={0.85} accessibilityLabel="Return to call" testID="call-return"
       style={[styles.returnBar, { paddingTop: insets.top + 4 }]}>
-      <Text style={styles.returnText}>Touch to return to call · {active.state === 'connected' ? clock : 'Calling...'}</Text>
+      <Text style={styles.returnText}>Touch to return to call · {status}</Text>
     </TouchableOpacity>
   );
 
@@ -77,7 +80,7 @@ export function CallScreen() {
         <View style={styles.who}>
           {keypad && pressed ? <Text style={styles.name} numberOfLines={1} adjustsFontSizeToFit>{pressed}</Text> : (
             <>
-              <Text style={styles.name} numberOfLines={1} adjustsFontSizeToFit>{client?.name ?? pretty(active.number)}</Text>
+              <Text style={styles.name} numberOfLines={1} adjustsFontSizeToFit>{callerName}</Text>
               <Text style={styles.status}>{status}</Text>
             </>
           )}
@@ -85,7 +88,7 @@ export function CallScreen() {
 
         {showCard ? <ClientCard client={client!} timeZone={timeZone} onOpen={openProfile} /> : null}
 
-        {keypad ? <Keypad dark onPress={(k) => { setPressed((p) => p + k); void sendDigits(k); }} /> : (
+        {incoming ? <View style={styles.controls} /> : keypad ? <Keypad dark onPress={(k) => { setPressed((p) => p + k); void sendDigits(k); }} /> : (
           <View style={[styles.controls, showCard && { marginBottom: 0 }]}>
             <Round icon="microphone-off" label="Mute" on={active.muted} onPress={() => void toggleMute()} />
             <Round icon="dialpad" label="Keypad" onPress={() => setKeypad(true)} />
@@ -93,6 +96,19 @@ export function CallScreen() {
           </View>
         )}
 
+        {incoming ? (
+          // Ringing (owner, 2026-11-07): Decline and Answer, as on the iPhone's own screen.
+          <View style={[styles.bottom, { justifyContent: 'space-around', alignSelf: 'stretch' }]}>
+            <TouchableOpacity onPress={() => void hangUp()} style={styles.control} accessibilityLabel="Decline call" testID="call-decline" activeOpacity={0.7}>
+              <View style={styles.end}><MaterialCommunityIcons name="phone-hangup" size={40} color="#FFFFFF" /></View>
+              <Text style={styles.label}>Decline</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => void answerIncoming()} style={styles.control} accessibilityLabel="Answer call" testID="call-answer" activeOpacity={0.7}>
+              <View style={[styles.end, { backgroundColor: '#34C759' }]}><MaterialCommunityIcons name="phone" size={40} color="#FFFFFF" /></View>
+              <Text style={styles.label}>Answer</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
         <View style={styles.bottom}>
           <View style={styles.side} />
           <TouchableOpacity onPress={() => void hangUp()} style={styles.control} accessibilityLabel="End call" testID="call-end" activeOpacity={0.7}>
@@ -103,6 +119,7 @@ export function CallScreen() {
             {keypad ? <TouchableOpacity onPress={() => setKeypad(false)} accessibilityLabel="Hide keypad" style={styles.hide}><Text style={styles.hideText}>Hide</Text></TouchableOpacity> : null}
           </View>
         </View>
+        )}
       </View>
     </Modal>
   );
@@ -128,7 +145,7 @@ function ClientCard({ client, timeZone, onOpen }: { client: ClientProfile; timeZ
       {client.notes ? <Text style={styles.note} numberOfLines={2}>{client.notes}</Text> : null}
       <TouchableOpacity onPress={onOpen} style={styles.open} accessibilityLabel="View full profile" testID="call-open-profile">
         <Text style={styles.openText}>View full profile</Text>
-        <MaterialCommunityIcons name="chevron-right" size={18} color="#FFFFFF" />
+        <MaterialCommunityIcons name="chevron-right" size={20} color="#FFFFFF" />
       </TouchableOpacity>
     </View>
   );
@@ -147,30 +164,30 @@ const styles = StyleSheet.create({
   root: { flex: 1, justifyContent: 'space-between', paddingHorizontal: 24 },
   who: { alignItems: 'center', gap: 4, minHeight: 80 },
   name: { color: '#FFFFFF', fontSize: 38, fontWeight: '400', letterSpacing: 0.2 },
-  status: { color: 'rgba(235,235,245,0.6)', fontSize: 24, fontWeight: '400' },
+  status: { color: 'rgba(235,235,245,0.6)', fontSize: 25, fontWeight: '400' },
   controls: { flexDirection: 'row', justifyContent: 'center', gap: 28, marginBottom: 60 },
   control: { alignItems: 'center', gap: 10 },
   round: { width: 80, height: 80, borderRadius: 40, alignItems: 'center', justifyContent: 'center' },
-  label: { color: '#FFFFFF', fontSize: 15, fontWeight: '500' },
+  label: { color: '#FFFFFF', fontSize: 17, fontWeight: '500' },
   bottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   side: { width: 108, alignItems: 'center' },
   end: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#EB4034', alignItems: 'center', justifyContent: 'center' },
   hide: { height: 80, justifyContent: 'center', paddingHorizontal: 8 },
-  hideText: { color: '#FFFFFF', fontSize: 17, fontWeight: '400' },
+  hideText: { color: '#FFFFFF', fontSize: 19, fontWeight: '400' },
   card: { backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 20, padding: 16, gap: 8 },
   cardHead: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 4 },
   avatar: { width: 56, height: 56, borderRadius: 28 },
   avatarEmpty: { backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
-  initials: { color: '#FFFFFF', fontSize: 20, fontWeight: '600' },
+  initials: { color: '#FFFFFF', fontSize: 22, fontWeight: '600' },
   pill: { alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 3 },
-  pillText: { color: '#FFFFFF', fontSize: 12, fontWeight: '600' },
-  cardSub: { color: 'rgba(235,235,245,0.7)', fontSize: 14, marginTop: 6 },
+  pillText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
+  cardSub: { color: 'rgba(235,235,245,0.7)', fontSize: 17, marginTop: 6 },
   row: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
-  rowLabel: { color: 'rgba(235,235,245,0.6)', fontSize: 15 },
-  rowValue: { color: '#FFFFFF', fontSize: 15, flexShrink: 1, textAlign: 'right' },
-  note: { color: 'rgba(235,235,245,0.8)', fontSize: 14, lineHeight: 19, fontStyle: 'italic' },
+  rowLabel: { color: 'rgba(235,235,245,0.6)', fontSize: 17 },
+  rowValue: { color: '#FFFFFF', fontSize: 17, flexShrink: 1, textAlign: 'right' },
+  note: { color: 'rgba(235,235,245,0.8)', fontSize: 17, lineHeight: 23, fontStyle: 'italic' },
   open: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2, marginTop: 4, height: 40, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.14)' },
-  openText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
+  openText: { color: '#FFFFFF', fontSize: 17, fontWeight: '600' },
   returnBar: { position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: '#34C759', alignItems: 'center', paddingBottom: 6, zIndex: 1000, elevation: 1000 },
-  returnText: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
+  returnText: { color: '#FFFFFF', fontSize: 17, fontWeight: '600' },
 });

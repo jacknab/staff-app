@@ -13,6 +13,8 @@ import { SelectField } from '@/components/SelectField';
 import { api, ApiError } from '@/lib/live-api';
 import { HelpTitle } from '@/components/HelpTitle';
 
+import { AppBackground } from '@/components/look/AppBackground';
+import { look, cardShadow } from '@/components/look/tokens';
 type Campaign = { id: number; name: string; status: string; audience: string; messageTemplate: string; sentCount: number | null; failedCount: number | null;
   rejectionReason?: string | null; sentAt: string | null; createdAt: string };
 const AUDIENCE = [
@@ -66,7 +68,8 @@ export default function CampaignsScreen() {
 
   const topInset = Platform.OS === 'web' ? 67 : insets.top;
   return (
-    <View style={[styles.root, { backgroundColor: colors.background, paddingTop: topInset }]} testID="campaigns">
+    <View style={[styles.root, { backgroundColor: look.pageTop, paddingTop: topInset }]} testID="campaigns">
+      <AppBackground />
       <View style={styles.nav}>
         <TouchableOpacity onPress={() => (writing ? setWriting(false) : router.back())} style={styles.navSide} accessibilityLabel="Back"><Feather name="arrow-left" size={24} color={colors.foreground} /></TouchableOpacity>
         <HelpTitle help="campaigns" style={[styles.navTitle, { color: colors.foreground }]}>{writing ? 'New campaign' : 'Campaigns'}</HelpTitle>
@@ -116,15 +119,15 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   nav: { height: 56, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   navSide: { width: 44, height: 44, justifyContent: 'center' },
-  navTitle: { fontSize: 18, fontFamily: 'Inter_500Medium' },
+  navTitle: { fontSize: 20, fontFamily: 'Inter_500Medium' },
   content: { paddingHorizontal: 20, paddingBottom: 60, gap: 12, paddingTop: 6 },
-  muted: { fontSize: 13, lineHeight: 18, fontFamily: 'Inter_400Regular' },
-  message: { borderWidth: 1, borderRadius: 14, minHeight: 140, padding: 14, fontSize: 16, textAlignVertical: 'top', fontFamily: 'Inter_400Regular' },
+  muted: { fontSize: 16, lineHeight: 22, fontFamily: 'Inter_400Regular' },
+  message: { borderWidth: 1, borderRadius: 14, minHeight: 140, padding: 14, fontSize: 18, textAlignVertical: 'top', fontFamily: 'Inter_400Regular' },
   inserts: { flexDirection: 'row', gap: 20 },
-  link: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  link: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
   button: { height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  buttonText: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
-  list: { borderWidth: 1, borderRadius: 14, overflow: 'hidden' },
+  buttonText: { fontSize: 18, fontFamily: 'Inter_600SemiBold' },
+  list: { borderWidth: 1, borderRadius: 14, overflow: 'hidden', ...cardShadow },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12 },
-  rowTitle: { fontSize: 15, fontFamily: 'Inter_500Medium' },
+  rowTitle: { fontSize: 17, fontFamily: 'Inter_500Medium' },
 });

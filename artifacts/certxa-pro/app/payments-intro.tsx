@@ -70,9 +70,9 @@ export default function PaymentsIntroScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   header: { position: 'absolute', left: 0, right: 0, height: 56, alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: 18, fontFamily: 'Inter_500Medium', color: '#0F1B2D' },
+  title: { fontSize: 20, fontFamily: 'Inter_500Medium', color: '#0F1B2D' },
   back: { position: 'absolute', left: 14, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.85)', alignItems: 'center', justifyContent: 'center' },
   footer: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 20 },
   button: { height: 56, borderRadius: 16, backgroundColor: '#635BFF', alignItems: 'center', justifyContent: 'center' },
-  buttonText: { color: '#FFFFFF', fontSize: 17, fontFamily: 'Inter_700Bold' },
+  buttonText: { color: '#FFFFFF', fontSize: 19, fontFamily: 'Inter_700Bold' },
 });

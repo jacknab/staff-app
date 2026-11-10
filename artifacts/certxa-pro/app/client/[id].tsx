@@ -23,6 +23,9 @@ import { ClientPhotos } from '@/components/ClientPhotos';
 import { HelpTitle } from '@/components/HelpTitle';
 import { HoldToDelete } from '@/components/HoldToDelete';
 
+import { AppBackground } from '@/components/look/AppBackground';
+import { SectionTitle } from '@/components/look/SectionHeader';
+import { look, cardShadow } from '@/components/look/tokens';
 type Note = { id: number; noteContent: string; createdAt: string; pinned?: boolean | null };
 type Tag = { id: number; tagName: string; tagColor?: string | null };
 type Prefs = { smsMarketingOptIn?: boolean | null; emailMarketingOptIn?: boolean | null; promotionalNotifications?: boolean | null; appointmentReminders?: boolean | null; reviewRequests?: boolean | null };
@@ -35,7 +38,7 @@ type Client = {
   phones?: { displayPhone?: string | null; phoneNumberE164?: string | null; phoneType?: string | null; isPrimary?: boolean | null }[];
   marketingPreferences?: Prefs | null;
 };
-type Visit = { id: number; date: string; status: string; totalPaid?: string | number | null; tipAmount?: string | number | null; serviceName?: string | null };
+type Visit = { id: number; date: string; status: string; totalPaid?: string | number | null; tipAmount?: string | number | null; serviceName?: string | null; refundedCents?: number | null };
 type Intel = { avgVisitCadenceDays?: number | string | null; nextExpectedVisitDate?: string | null };
 
 /** "2026-03-09" (how it's saved) → "03/09/2026". */
@@ -122,6 +125,24 @@ export default function ClientProfileScreen() {
   const primaryPhone = client?.phones?.find((p) => p.isPrimary) ?? client?.phones?.[0];
   // A landline can't get texts (Twilio's lookup said so); an unchecked number is allowed.
   const canText = !!phoneDigits && primaryPhone?.phoneType !== 'landline';
+  // Send booking link: asks first (it uses a text credit), then texts the client their personal link.
+  const [sendingLink, setSendingLink] = useState(false);
+  const sendBookingLink = () => {
+    if (!client || sendingLink) return;
+    const first = (client.preferredName || client.firstName || client.fullName || '').trim().split(/\s+/)[0] || 'this client';
+    Alert.alert('Send booking link', `Text ${first} a link to book with you? Their details are filled in when they open it. Uses 1 text credit.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Send', onPress: async () => {
+        setSendingLink(true);
+        try {
+          await api.post(`/api/pro/clients/${client.id}/booking-link`, {});
+          Alert.alert('Sent', `${first} has been texted your booking link.`);
+        } catch (cause) {
+          Alert.alert('Not sent', cause instanceof Error ? cause.message : 'The text could not be sent. Please try again.');
+        } finally { setSendingLink(false); }
+      } },
+    ]);
+  };
   const email = client?.primaryEmail ?? '';
   const pinnedFirst = useMemo(() => [...(client?.notes ?? [])].sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned) || +new Date(b.createdAt) - +new Date(a.createdAt)), [client]);
   const myTagIds = new Set((client?.tags ?? []).map((t) => t.tagId));
@@ -211,21 +232,26 @@ export default function ClientProfileScreen() {
   const card = { backgroundColor: colors.card, borderColor: colors.border };
   const dateLabel = (iso?: string | null) => (iso ? zonedDateLabel(iso, timeZone) : '—');
   const visitRow = (v: Visit) => {
-    const paid = Number(v.totalPaid ?? 0) - Number(v.tipAmount ?? 0);
+    // Refunded (owner, 2026-11-07): the visit says Refunded / Part refunded and shows what's left after the refund.
+    const refunded = Number(v.refundedCents ?? 0) || 0;
+    const paidTotalCents = Math.round(Number(v.totalPaid ?? 0) * 100);
+    const paid = (paidTotalCents - Math.round(Number(v.tipAmount ?? 0) * 100) - refunded) / 100;
+    const statusText = refunded > 0 && v.status === 'completed' ? (refunded >= paidTotalCents ? 'Refunded' : `Part refunded · $${(refunded / 100).toFixed(2)}`) : STATUS_TEXT[v.status] ?? v.status;
     return (
       <TouchableOpacity key={v.id} testID={`client-visit-${v.id}`} onPress={() => router.push(`/appointment/${v.id}`)} style={[styles.visitRow, { borderBottomColor: colors.border }]}>
         <View style={{ flex: 1 }}>
           <Text style={[styles.rowTitle, { color: colors.foreground }]}>{v.serviceName || 'Visit'}</Text>
-          <Text style={[styles.rowSub, { color: colors.mutedForeground }]}>{dateLabel(v.date)} · {STATUS_TEXT[v.status] ?? v.status}</Text>
+          <Text style={[styles.rowSub, { color: colors.mutedForeground }]}>{dateLabel(v.date)} · {statusText}</Text>
         </View>
         {v.status === 'completed' && paid > 0 ? <Text style={[styles.rowTitle, { color: colors.foreground }]}>{money(Math.round(paid * 100))}</Text> : null}
-        <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+        <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
       </TouchableOpacity>
     );
   };
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+    <View style={[styles.root, { backgroundColor: look.pageTop, paddingTop: insets.top }]}>
+      <AppBackground />
       <StatusBar barStyle="dark-content" />
       <View style={styles.header}>
         <TouchableOpacity testID="client-profile-back" accessibilityLabel="Back" onPress={() => router.back()} style={styles.headerButton}><Feather name="arrow-left" size={21} color={colors.foreground} /></TouchableOpacity>
@@ -239,7 +265,7 @@ export default function ClientProfileScreen() {
       ) : (
         <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           {editing ? (<>
-            <Text style={[styles.section, { color: colors.foreground, marginTop: 6 }]}>Edit {name}</Text>
+            <SectionTitle style={[styles.section, { marginTop: 6 }]}>{`Edit ${name}`}</SectionTitle>
             <View style={[styles.box, card, { padding: 14 }]}>
               {([
                 ['name', 'First and last name', 'default'], ['phone', 'Phone number', 'phone-pad'], ['email', 'E-mail', 'email-address'],
@@ -275,21 +301,30 @@ export default function ClientProfileScreen() {
               { key: 'email', icon: 'mail' as const, label: 'Email', on: () => Linking.openURL(`mailto:${email}`), ok: !!email },
             ].map((a) => (
               <TouchableOpacity key={a.key} testID={`client-action-${a.key}`} accessibilityLabel={a.label} accessibilityState={{ disabled: !a.ok }} disabled={!a.ok} onPress={() => void a.on()} style={styles.quickAction}>
-                <View style={[styles.quickIcon, { backgroundColor: a.ok ? `${colors.primary}18` : colors.muted }]}><Feather name={a.icon} size={17} color={a.ok ? colors.primary : colors.mutedForeground} /></View>
+                <View style={[styles.quickIcon, { backgroundColor: a.ok ? `${colors.primary}18` : colors.muted }]}><Feather name={a.icon} size={19} color={a.ok ? colors.primary : colors.mutedForeground} /></View>
                 <Text style={[styles.quickLabel, { color: a.ok ? colors.primary : colors.mutedForeground }]}>{a.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
           <TouchableOpacity testID="client-book" onPress={() => router.push({ pathname: '/booking', params: { clientId: String(client.id), phone: client.primaryPhone ?? '' } })} style={[styles.bookButton, { backgroundColor: colors.primary }]}>
-            <Feather name="calendar" size={17} color={colors.primaryForeground} /><Text style={[styles.buttonText, { color: colors.primaryForeground }]}>Book appointment</Text>
+            <Feather name="calendar" size={19} color={colors.primaryForeground} /><Text style={[styles.buttonText, { color: colors.primaryForeground }]}>Book appointment</Text>
           </TouchableOpacity>
+          {/* Send booking link (owner, 2026-11-09): texts the client a link to the pro's own site (<slug>.certxa.com) that
+              opens the booking form with their name, phone and e-mail already filled in. Mobile numbers only. */}
+          {canText ? (
+            <TouchableOpacity testID="client-send-booking-link" disabled={sendingLink} onPress={sendBookingLink}
+              style={[styles.bookButton, { marginTop: 10, borderWidth: 1.5, borderColor: colors.primary, backgroundColor: colors.card }]}>
+              {sendingLink ? <ActivityIndicator color={colors.primary} /> : <Feather name="send" size={19} color={colors.primary} />}
+              <Text style={[styles.buttonText, { color: colors.primary }]}>{sendingLink ? 'Sending…' : 'Send booking link'}</Text>
+            </TouchableOpacity>
+          ) : null}
 
           {phoneDigits && !canText ? (
             <Text testID="client-landline" style={[styles.sub, { color: colors.mutedForeground }]}>This number is a landline, so it can't receive texts.</Text>
           ) : null}
           {client.allergies ? (
             <View style={[styles.alert, { backgroundColor: colors.accent }]} testID="client-allergies">
-              <Feather name="alert-triangle" size={16} color={colors.accentForeground} />
+              <Feather name="alert-triangle" size={18} color={colors.accentForeground} />
               <Text style={[styles.alertText, { color: colors.accentForeground }]}>Allergies: {client.allergies}</Text>
             </View>
           ) : null}
@@ -323,12 +358,12 @@ export default function ClientProfileScreen() {
 
           {error ? <Text style={[styles.error, { color: colors.destructive }]}>{error}</Text> : null}
 
-          <Text style={[styles.section, { color: colors.foreground }]}>Upcoming</Text>
+          <SectionTitle style={[styles.section]}>Upcoming</SectionTitle>
           <View style={[styles.box, card]}>
             {upcoming.length ? upcoming.map(visitRow) : <Text style={[styles.empty, { color: colors.mutedForeground }]}>Nothing booked.</Text>}
           </View>
 
-          <Text style={[styles.section, { color: colors.foreground }]}>Past visits</Text>
+          <SectionTitle style={[styles.section]}>Past visits</SectionTitle>
           <View style={[styles.box, card]}>
             {past.length ? (showAllPast ? past : past.slice(0, 5)).map(visitRow) : <Text style={[styles.empty, { color: colors.mutedForeground }]}>No visits yet.</Text>}
             {past.length > 5 ? (
@@ -340,7 +375,7 @@ export default function ClientProfileScreen() {
           <View style={{ marginTop: 22 }}><ClientPhotos clientId={clientId} avatarUrl={client.avatarUrl} onProfilePhoto={(url) => void setProfilePhoto(url)} onRemoved={() => { void load(); void refreshBookings(); }} /></View>
 
           <View style={styles.sectionLine}>
-            <Text style={[styles.section, { color: colors.foreground }]}>Notes</Text>
+            <SectionTitle style={[styles.section]}>Notes</SectionTitle>
             <TouchableOpacity testID="client-notes-all" onPress={() => router.push({ pathname: '/notes', params: { customerId: String(clientId), clientName: name } })}><Text style={[styles.link, { color: colors.primary }]}>Add or see all</Text></TouchableOpacity>
           </View>
           <View style={[styles.box, card]}>
@@ -351,14 +386,14 @@ export default function ClientProfileScreen() {
                   <Text style={[styles.rowSub, { color: colors.mutedForeground }]}>{n.pinned ? 'Pinned · ' : ''}{dateLabel(n.createdAt)}</Text>
                 </View>
                 <TouchableOpacity testID={`client-note-pin-${n.id}`} accessibilityLabel={n.pinned ? 'Unpin note' : 'Pin note'} onPress={() => void togglePin(n)} style={styles.pin}>
-                  <Feather name="bookmark" size={17} color={n.pinned ? colors.primary : colors.mutedForeground} />
+                  <Feather name="bookmark" size={19} color={n.pinned ? colors.primary : colors.mutedForeground} />
                 </TouchableOpacity>
               </View>
             )) : <Text style={[styles.empty, { color: colors.mutedForeground }]}>No notes yet.</Text>}
           </View>
 
           <View style={styles.sectionLine}>
-            <Text style={[styles.section, { color: colors.foreground }]}>Details</Text>
+            <SectionTitle style={[styles.section]}>Details</SectionTitle>
           </View>
             <View style={[styles.box, card]}>
               {[
@@ -379,14 +414,14 @@ export default function ClientProfileScreen() {
             </View>
 
           <View style={styles.sectionLine}>
-            <Text style={[styles.section, { color: colors.foreground }]}>Tags</Text>
+            <SectionTitle style={[styles.section]}>Tags</SectionTitle>
             {!addingTag ? <TouchableOpacity testID="client-tag-add" onPress={() => setAddingTag(true)}><Text style={[styles.link, { color: colors.primary }]}>Add tag</Text></TouchableOpacity> : null}
           </View>
           <View style={[styles.box, card, { padding: 12 }]}>
             <View style={styles.badges}>
               {client.tags.length ? client.tags.map((t) => (
                 <TouchableOpacity key={t.tagId} testID={`client-tag-remove-${t.tagId}`} accessibilityLabel={`Remove tag ${t.tag.tagName}`} onPress={() => void removeTag(t.tagId)} style={[styles.chip, { borderColor: colors.border }]}>
-                  <Text style={[styles.badgeText, { color: colors.foreground }]}>{t.tag.tagName}</Text><Feather name="x" size={13} color={colors.mutedForeground} />
+                  <Text style={[styles.badgeText, { color: colors.foreground }]}>{t.tag.tagName}</Text><Feather name="x" size={15} color={colors.mutedForeground} />
                 </TouchableOpacity>
               )) : <Text style={[styles.empty, { color: colors.mutedForeground, padding: 0 }]}>No tags.</Text>}
             </View>
@@ -408,7 +443,7 @@ export default function ClientProfileScreen() {
             ) : null}
           </View>
 
-          <Text style={[styles.section, { color: colors.foreground }]}>Texts this client gets</Text>
+          <SectionTitle style={[styles.section]}>Texts this client gets</SectionTitle>
           <View style={[styles.box, card]}>
             {([
               ['smsMarketingOptIn', 'Marketing texts', 'Offers, win-back and rebooking reminders'],
@@ -434,43 +469,43 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   header: { height: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12 },
   headerButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
+  headerTitle: { fontSize: 18, fontFamily: 'Inter_600SemiBold' },
   content: { paddingHorizontal: 20, paddingTop: 6 },
   avatar: { width: 78, height: 78, borderRadius: 39, alignItems: 'center', justifyContent: 'center', alignSelf: 'center' },
-  avatarText: { fontSize: 23, fontFamily: 'Inter_600SemiBold' },
-  name: { fontSize: 23, textAlign: 'center', fontFamily: 'Inter_600SemiBold', marginTop: 14 },
-  sub: { fontSize: 12, textAlign: 'center', fontFamily: 'Inter_400Regular', marginTop: 4 },
+  avatarText: { fontSize: 24, fontFamily: 'Inter_600SemiBold' },
+  name: { fontSize: 24, textAlign: 'center', fontFamily: 'Inter_600SemiBold', marginTop: 14 },
+  sub: { fontSize: 15, textAlign: 'center', fontFamily: 'Inter_400Regular', marginTop: 4 },
   badges: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6, marginTop: 10 },
   badge: { borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4 },
-  badgeText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
+  badgeText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderRadius: 14, paddingHorizontal: 10, minHeight: 30 },
   quickActions: { flexDirection: 'row', justifyContent: 'center', gap: 19, marginTop: 18 },
   quickAction: { width: 52, alignItems: 'center', gap: 6 },
   quickIcon: { width: 37, height: 37, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
-  quickLabel: { fontSize: 10, fontFamily: 'Inter_500Medium' },
+  quickLabel: { fontSize: 13, fontFamily: 'Inter_500Medium' },
   bookButton: { height: 48, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 18 },
   alert: { flexDirection: 'row', alignItems: 'flex-start', gap: 9, borderRadius: 14, padding: 13, marginTop: 14 },
-  alertText: { flex: 1, fontSize: 13, lineHeight: 18, fontFamily: 'Inter_600SemiBold' },
+  alertText: { flex: 1, fontSize: 16, lineHeight: 22, fontFamily: 'Inter_600SemiBold' },
   stats: { flexDirection: 'row', flexWrap: 'wrap', gap: 9, marginTop: 16 },
-  stat: { width: '48%', flexGrow: 1, borderWidth: 1, borderRadius: 14, padding: 12 },
-  statValue: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
-  statLabel: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 3 },
-  section: { fontSize: 16, fontFamily: 'Inter_600SemiBold', marginTop: 26, marginBottom: 10 },
+  stat: { width: '48%', flexGrow: 1, borderWidth: 1, borderRadius: 14, padding: 12, ...cardShadow },
+  statValue: { fontSize: 18, fontFamily: 'Inter_600SemiBold' },
+  statLabel: { fontSize: 14, fontFamily: 'Inter_400Regular', marginTop: 3 },
+  section: { marginTop: 26, marginBottom: 12 },
   sectionLine: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
-  box: { borderWidth: 1, borderRadius: 15, overflow: 'hidden' },
+  box: { borderWidth: 1, borderRadius: 15, overflow: 'hidden', ...cardShadow },
   visitRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
-  rowTitle: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  rowSub: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 3 },
-  empty: { fontSize: 12, fontFamily: 'Inter_400Regular', padding: 14 },
+  rowTitle: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
+  rowSub: { fontSize: 14, fontFamily: 'Inter_400Regular', marginTop: 3 },
+  empty: { fontSize: 15, fontFamily: 'Inter_400Regular', padding: 14 },
   more: { alignItems: 'center', paddingVertical: 12 },
-  link: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  link: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
   noteRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
-  noteText: { fontSize: 13, lineHeight: 18, fontFamily: 'Inter_400Regular' },
+  noteText: { fontSize: 16, lineHeight: 22, fontFamily: 'Inter_400Regular' },
   pin: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   detailRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingHorizontal: 14, minHeight: 50, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth },
-  input: { borderWidth: 1, borderRadius: 12, height: 46, paddingHorizontal: 12, fontSize: 13, fontFamily: 'Inter_400Regular', marginBottom: 9 },
+  input: { borderWidth: 1, borderRadius: 12, height: 46, paddingHorizontal: 12, fontSize: 16, fontFamily: 'Inter_400Regular', marginBottom: 9 },
   button: { height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
-  buttonText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  buttonText: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
   tagButtons: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 },
-  error: { fontSize: 13, fontFamily: 'Inter_500Medium', marginTop: 12 },
+  error: { fontSize: 16, fontFamily: 'Inter_500Medium', marginTop: 12 },
 });

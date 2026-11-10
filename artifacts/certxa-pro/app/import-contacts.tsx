@@ -14,6 +14,8 @@ import { useBookingData } from '@/contexts/BookingContext';
 import { api } from '@/lib/live-api';
 import { HelpTitle } from '@/components/HelpTitle';
 
+import { AppBackground } from '@/components/look/AppBackground';
+import { look } from '@/components/look/tokens';
 type Person = { id: string; name: string; phone: string; email: string | null };
 const digits = (p: string) => p.replace(/\D/g, '').replace(/^1(?=\d{10}$)/, '');
 
@@ -67,7 +69,8 @@ export default function ImportContactsScreen() {
 
   const topInset = Platform.OS === 'web' ? 67 : insets.top;
   return (
-    <View style={[styles.root, { backgroundColor: colors.background, paddingTop: topInset }]} testID="import-contacts">
+    <View style={[styles.root, { backgroundColor: look.pageTop, paddingTop: topInset }]} testID="import-contacts">
+      <AppBackground />
       <View style={styles.nav}>
         <TouchableOpacity onPress={() => router.back()} style={styles.navSide} accessibilityLabel="Back"><Feather name="arrow-left" size={24} color={colors.foreground} /></TouchableOpacity>
         <HelpTitle help="import-contacts" style={[styles.navTitle, { color: colors.foreground }]}>Import contacts</HelpTitle>
@@ -120,13 +123,13 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   nav: { height: 56, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   navSide: { width: 44, height: 44, justifyContent: 'center' },
-  navTitle: { fontSize: 18, fontFamily: 'Inter_500Medium' },
+  navTitle: { fontSize: 20, fontFamily: 'Inter_500Medium' },
   center: { padding: 24, gap: 16, alignItems: 'center' },
-  muted: { fontSize: 13, lineHeight: 18, fontFamily: 'Inter_400Regular' },
-  input: { borderWidth: 1, borderRadius: 14, height: 48, paddingHorizontal: 14, fontSize: 15, fontFamily: 'Inter_400Regular' },
+  muted: { fontSize: 16, lineHeight: 22, fontFamily: 'Inter_400Regular' },
+  input: { borderWidth: 1, borderRadius: 14, height: 48, paddingHorizontal: 14, fontSize: 17, fontFamily: 'Inter_400Regular' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
-  rowTitle: { fontSize: 15, fontFamily: 'Inter_500Medium' },
+  rowTitle: { fontSize: 17, fontFamily: 'Inter_500Medium' },
   footer: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 20, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
   button: { height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  buttonText: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
+  buttonText: { fontSize: 18, fontFamily: 'Inter_600SemiBold' },
 });

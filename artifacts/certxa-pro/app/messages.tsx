@@ -12,6 +12,8 @@ import { useColors } from '@/hooks/useColors';
 import { api, ApiError } from '@/lib/live-api';
 import { HelpTitle } from '@/components/HelpTitle';
 
+import { AppBackground } from '@/components/look/AppBackground';
+import { look, cardShadow } from '@/components/look/tokens';
 type Conversation = { clientPhone: string; clientName: string | null; lastMessage: string; lastMessageAt: string; unreadCount: number; direction: string };
 type Message = { id: number; body: string; direction: 'inbound' | 'outbound' | string; createdAt: string };
 
@@ -69,7 +71,8 @@ export default function MessagesScreen() {
   const topInset = Platform.OS === 'web' ? 67 : insets.top;
   const back = () => (open && !params.phone ? setOpen(null) : router.back());
   return (
-    <KeyboardAvoidingView style={[styles.root, { backgroundColor: colors.background, paddingTop: topInset }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined} testID="messages-screen">
+    <KeyboardAvoidingView style={[styles.root, { backgroundColor: look.pageTop, paddingTop: topInset }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined} testID="messages-screen">
+      <AppBackground />
       <View style={styles.nav}>
         <TouchableOpacity onPress={back} style={styles.navSide} accessibilityLabel="Back" testID="messages-back"><Feather name="arrow-left" size={24} color={colors.foreground} /></TouchableOpacity>
         <HelpTitle help="messages" style={[styles.navTitle, { color: colors.foreground }]} numberOfLines={1}>{open ? open.name || formatPhone(open.phone) : 'Messages'}</HelpTitle>
@@ -117,7 +120,7 @@ export default function MessagesScreen() {
               style={[styles.input, { borderColor: colors.border, backgroundColor: colors.card, color: colors.foreground }]} testID="messages-reply" />
             <TouchableOpacity onPress={() => void send()} disabled={!reply.trim() || sending} accessibilityLabel="Send" testID="messages-send"
               style={[styles.send, { backgroundColor: reply.trim() && !sending ? colors.primary : colors.muted }]}>
-              {sending ? <ActivityIndicator color={colors.primaryForeground} /> : <Feather name="send" size={18} color={reply.trim() ? colors.primaryForeground : colors.mutedForeground} />}
+              {sending ? <ActivityIndicator color={colors.primaryForeground} /> : <Feather name="send" size={20} color={reply.trim() ? colors.primaryForeground : colors.mutedForeground} />}
             </TouchableOpacity>
           </View>
         </>
@@ -130,18 +133,18 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   nav: { height: 56, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   navSide: { width: 44, height: 44, justifyContent: 'center' },
-  navTitle: { flex: 1, textAlign: 'center', fontSize: 18, fontFamily: 'Inter_500Medium' },
+  navTitle: { flex: 1, textAlign: 'center', fontSize: 20, fontFamily: 'Inter_500Medium' },
   content: { paddingHorizontal: 16, paddingBottom: 24, paddingTop: 6 },
-  listBox: { borderWidth: 1, borderRadius: 14, overflow: 'hidden' },
+  listBox: { borderWidth: 1, borderRadius: 14, overflow: 'hidden', ...cardShadow },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12 },
-  rowTitle: { fontSize: 15 },
-  muted: { fontSize: 13, lineHeight: 18, fontFamily: 'Inter_400Regular' },
+  rowTitle: { fontSize: 17 },
+  muted: { fontSize: 16, lineHeight: 22, fontFamily: 'Inter_400Regular' },
   badge: { minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center' },
-  badgeText: { color: '#FFFFFF', fontSize: 11, fontFamily: 'Inter_700Bold' },
+  badgeText: { color: '#FFFFFF', fontSize: 14, fontFamily: 'Inter_700Bold' },
   bubble: { maxWidth: '80%', borderRadius: 16, paddingHorizontal: 12, paddingVertical: 8 },
-  bubbleText: { fontSize: 15, lineHeight: 20, fontFamily: 'Inter_400Regular' },
-  bubbleTime: { fontSize: 10, marginTop: 3, opacity: 0.75, fontFamily: 'Inter_400Regular' },
+  bubbleText: { fontSize: 17, lineHeight: 23, fontFamily: 'Inter_400Regular' },
+  bubbleTime: { fontSize: 13, marginTop: 3, opacity: 0.75, fontFamily: 'Inter_400Regular' },
   composer: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, paddingHorizontal: 12, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth },
-  input: { flex: 1, borderWidth: 1, borderRadius: 20, minHeight: 42, maxHeight: 120, paddingHorizontal: 14, paddingTop: 11, paddingBottom: 11, fontSize: 15, fontFamily: 'Inter_400Regular' },
+  input: { flex: 1, borderWidth: 1, borderRadius: 20, minHeight: 42, maxHeight: 120, paddingHorizontal: 14, paddingTop: 11, paddingBottom: 11, fontSize: 17, fontFamily: 'Inter_400Regular' },
   send: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
 });

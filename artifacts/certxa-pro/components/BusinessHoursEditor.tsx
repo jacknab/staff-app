@@ -33,7 +33,7 @@ export function BusinessHoursEditor({ hours, onChange, testPrefix = 'signup' }: 
           <View key={dow} style={styles.dayRow}>
             <TouchableOpacity accessibilityRole="checkbox" accessibilityState={{ checked: !day.isClosed }} accessibilityLabel={`Open on ${DAY_NAMES[dow]}`}
               onPress={() => update(dow, { isClosed: !day.isClosed })} style={[styles.dayCheck, { backgroundColor: day.isClosed ? colors.card : colors.foreground, borderColor: day.isClosed ? colors.border : colors.foreground }]} testID={`${testPrefix}-day-${dow}`}>
-              {!day.isClosed ? <Feather name="check" size={18} color={colors.background} /> : null}
+              {!day.isClosed ? <Feather name="check" size={20} color={colors.background} /> : null}
             </TouchableOpacity>
             <TouchableOpacity onPress={() => setEditDay(dow)} style={styles.dayBody} testID={`${testPrefix}-day-edit-${dow}`}>
               <View style={{ flex: 1 }}>
@@ -103,17 +103,17 @@ const styles = StyleSheet.create({
   dayRow: { flexDirection: 'row', alignItems: 'center', gap: 18, minHeight: 78 },
   dayCheck: { width: 28, height: 28, borderRadius: 6, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   dayBody: { flex: 1, flexDirection: 'row', alignItems: 'center', minHeight: 70 },
-  dayName: { fontSize: 19, fontFamily: 'Inter_500Medium' },
-  dayTimes: { fontSize: 17, fontFamily: 'Inter_400Regular', marginTop: 6 },
+  dayName: { fontSize: 21, fontFamily: 'Inter_500Medium' },
+  dayTimes: { fontSize: 19, fontFamily: 'Inter_400Regular', marginTop: 6 },
   sheetBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' },
   sheet: { borderTopLeftRadius: 22, borderTopRightRadius: 22, paddingHorizontal: 24, paddingTop: 10 },
   handle: { alignSelf: 'center', width: 40, height: 5, borderRadius: 3, marginBottom: 14 },
-  sheetTitle: { fontSize: 19, fontFamily: 'Inter_600SemiBold', textAlign: 'center', marginBottom: 14 },
+  sheetTitle: { fontSize: 21, fontFamily: 'Inter_600SemiBold', textAlign: 'center', marginBottom: 14 },
   segment: { flexDirection: 'row', borderRadius: 28, padding: 3, marginBottom: 12 },
   segmentItem: { flex: 1, borderRadius: 26, borderWidth: 1.5, borderColor: 'transparent', alignItems: 'center', paddingVertical: 8 },
-  segmentText: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
-  segmentTime: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
-  error: { fontSize: 13, lineHeight: 18, fontFamily: 'Inter_500Medium', textAlign: 'center', marginTop: 4 },
+  segmentText: { fontSize: 18, fontFamily: 'Inter_600SemiBold' },
+  segmentTime: { fontSize: 15, fontFamily: 'Inter_400Regular', marginTop: 2 },
+  error: { fontSize: 16, lineHeight: 22, fontFamily: 'Inter_500Medium', textAlign: 'center', marginTop: 4 },
   button: { height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
-  buttonText: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
+  buttonText: { fontSize: 19, fontFamily: 'Inter_600SemiBold' },
 });

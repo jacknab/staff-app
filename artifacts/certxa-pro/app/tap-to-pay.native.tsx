@@ -17,6 +17,8 @@ import { api } from '@/lib/live-api';
 import { getStoredToken, getTerminalLocation } from '@/lib/certxa-api';
 import { HelpTitle } from '@/components/HelpTitle';
 
+import { AppBackground } from '@/components/look/AppBackground';
+import { look, cardShadow } from '@/components/look/tokens';
 const ENABLED_KEY = 'certxa.tapToPay.enabled';
 type State = 'idle' | 'connecting' | 'ready' | 'error';
 
@@ -92,7 +94,8 @@ export default function TapToPayScreen() {
   const status = ready ? 'Ready' : busy ? 'Connecting…' : state === 'error' ? message : enabledBefore ? 'Turned on for this iPhone' : 'Not turned on yet';
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+    <View style={[styles.root, { backgroundColor: look.pageTop, paddingTop: insets.top }]}>
+      <AppBackground />
       <StatusBar barStyle="dark-content" />
       <View style={styles.header}>
         <TouchableOpacity testID="tap-to-pay-back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/settings'))}
@@ -107,7 +110,7 @@ export default function TapToPayScreen() {
         <View testID="tap-to-pay-card" style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.cardTop}>
             <HelpTitle help="tap-to-pay" style={[styles.cardTitle, { color: colors.foreground }]}>Tap to Pay on iPhone</HelpTitle>
-            {busy ? <ActivityIndicator size="small" color={colors.primary} /> : ready || (enabledBefore && state === 'idle') ? <Feather name="check-circle" size={18} color={colors.primary} /> : null}
+            {busy ? <ActivityIndicator size="small" color={colors.primary} /> : ready || (enabledBefore && state === 'idle') ? <Feather name="check-circle" size={20} color={colors.primary} /> : null}
           </View>
           <Text testID="tap-to-pay-status" style={[styles.status, { color: state === 'error' ? colors.destructive : colors.mutedForeground }]}>{status}</Text>
         </View>
@@ -135,12 +138,12 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: 14, paddingVertical: 6 },
   back: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
   content: { paddingHorizontal: 18, paddingTop: 12, paddingBottom: 40, gap: 16 },
-  intro: { fontSize: 14, lineHeight: 20, textAlign: 'center', fontFamily: 'Inter_400Regular', paddingHorizontal: 8 },
-  card: { borderWidth: 1, borderRadius: 18, padding: 18, gap: 6 },
+  intro: { fontSize: 17, lineHeight: 24, textAlign: 'center', fontFamily: 'Inter_400Regular', paddingHorizontal: 8 },
+  card: { borderWidth: 1, borderRadius: 18, padding: 18, gap: 6, ...cardShadow },
   cardTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  cardTitle: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
-  status: { fontSize: 13, fontFamily: 'Inter_400Regular' },
+  cardTitle: { fontSize: 18, fontFamily: 'Inter_600SemiBold' },
+  status: { fontSize: 16, fontFamily: 'Inter_400Regular' },
   button: { height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
-  buttonText: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
-  help: { fontSize: 12, lineHeight: 18, fontFamily: 'Inter_400Regular' },
+  buttonText: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
+  help: { fontSize: 15, lineHeight: 22, fontFamily: 'Inter_400Regular' },
 });

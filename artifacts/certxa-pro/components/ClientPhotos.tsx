@@ -106,14 +106,14 @@ export function ClientPhotos({ clientId, avatarUrl, onProfilePhoto, onRemoved }:
 
 const styles = StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
-  title: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
+  title: { fontSize: 18, fontFamily: 'Inter_600SemiBold' },
   addLink: { minHeight: 36, justifyContent: 'center' },
-  addText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  empty: { fontSize: 13, lineHeight: 18, fontFamily: 'Inter_400Regular' },
+  addText: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
+  empty: { fontSize: 16, lineHeight: 22, fontFamily: 'Inter_400Regular' },
   thumb: { width: 104, height: 130, borderRadius: 12 },
-  caption: { fontSize: 11, fontFamily: 'Inter_500Medium', marginTop: 4 },
+  caption: { fontSize: 14, fontFamily: 'Inter_500Medium', marginTop: 4 },
   viewer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', alignItems: 'center', justifyContent: 'center' },
   viewerBar: { flexDirection: 'row', alignSelf: 'stretch', paddingHorizontal: 8, marginTop: 24 },
   viewerButton: { flex: 1, alignItems: 'center', gap: 4, paddingVertical: 10, paddingHorizontal: 4 },
-  viewerText: { color: '#FFFFFF', fontSize: 12, textAlign: 'center', fontFamily: 'Inter_500Medium' },
+  viewerText: { color: '#FFFFFF', fontSize: 15, textAlign: 'center', fontFamily: 'Inter_500Medium' },
 });

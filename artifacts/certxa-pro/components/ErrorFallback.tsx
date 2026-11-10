@@ -190,7 +190,7 @@ const styles = StyleSheet.create({
     lineHeight: 40,
   },
   message: {
-    fontSize: 16,
+    fontSize: 18,
     textAlign: 'center',
     lineHeight: 24,
   },
@@ -222,7 +222,7 @@ const styles = StyleSheet.create({
   buttonText: {
     fontWeight: '600',
     textAlign: 'center',
-    fontSize: 16,
+    fontSize: 18,
   },
   modalOverlay: {
     flex: 1,
@@ -245,7 +245,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '600',
   },
   closeButton: {
@@ -267,7 +267,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   errorText: {
-    fontSize: 12,
+    fontSize: 15,
     lineHeight: 18,
     width: '100%',
   },

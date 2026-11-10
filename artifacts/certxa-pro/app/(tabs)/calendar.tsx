@@ -13,6 +13,8 @@ import { listBookingRequests } from '@/lib/bookingRequests';
 import { api } from '@/lib/live-api';
 import { HelpTitle } from '@/components/HelpTitle';
 
+import { AppBackground } from '@/components/look/AppBackground';
+import { look } from '@/components/look/tokens';
 type TimeBlock = { id: number; startsAt: string; endsAt: string; allDay: boolean; note: string | null };
 
 type ViewMode = 'Month' | 'Week' | 'Day';
@@ -382,7 +384,8 @@ export default function CalendarScreen() {
   const nowTop = timelineTop(zonedMinutes(now, timeZone), timelineStart);
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.background, paddingTop: topInset }]}>
+    <View style={[styles.root, { backgroundColor: look.pageTop, paddingTop: topInset }]}>
+      <AppBackground />
       <StatusBar barStyle="dark-content" />
       {/* Fixed header: it never scrolls. */}
       <View style={styles.fixedHeader}>
@@ -391,7 +394,7 @@ export default function CalendarScreen() {
         {openRequests > 0 ? (
           <TouchableOpacity testID="calendar-requests-banner" onPress={() => router.push('/requests')} style={[styles.requestsBanner, { backgroundColor: colors.card, borderColor: colors.primary }]}>
             <Text style={[styles.requestsText, { color: colors.foreground }]}>{openRequests === 1 ? '1 booking request is waiting for you' : `${openRequests} booking requests are waiting for you`}</Text>
-            <Feather name="chevron-right" size={17} color={colors.foreground} />
+            <Feather name="chevron-right" size={19} color={colors.foreground} />
           </TouchableOpacity>
         ) : null}
         <View style={styles.header}>
@@ -453,7 +456,7 @@ export default function CalendarScreen() {
             </View>
           </>
         )}
-        {error ? <View style={[styles.syncNotice, { backgroundColor: colors.secondary }]}><Feather name="info" size={14} color={colors.primary} /><Text style={[styles.syncText, { color: colors.secondaryForeground }]}>Could not load your calendar from Certxa. Tap refresh to try again.</Text></View> : null}
+        {error ? <View style={[styles.syncNotice, { backgroundColor: colors.secondary }]}><Feather name="info" size={16} color={colors.primary} /><Text style={[styles.syncText, { color: colors.secondaryForeground }]}>Could not load your calendar from Certxa. Tap refresh to try again.</Text></View> : null}
       </View>
 
       {/* Scrolling body. */}
@@ -497,7 +500,7 @@ export default function CalendarScreen() {
                     {dayAppointments.length > 0 ? dayAppointments.slice(0, 3).map((item, index) => <View key={item.id} style={[styles.miniEvent, { backgroundColor: BOOKING_COLORS[index % BOOKING_COLORS.length] }]}><Text numberOfLines={1} style={styles.miniEventText}>{item.time} · {item.name}</Text></View>) : <Text style={[styles.noEvents, { color: colors.mutedForeground }]}>Open schedule</Text>}
                     {dayAppointments.length > 3 ? <Text style={[styles.noEvents, { color: colors.mutedForeground }]}>{`+${dayAppointments.length - 3} more`}</Text> : null}
                   </View>
-                  <Feather name="chevron-right" size={17} color={colors.mutedForeground} />
+                  <Feather name="chevron-right" size={19} color={colors.mutedForeground} />
                 </TouchableOpacity>
               );
             })}
@@ -560,7 +563,7 @@ export default function CalendarScreen() {
               </View>
             </View>
           </ScrollView>
-          {appointments.length === 0 && !loading && <View pointerEvents="none" style={styles.timelineEmpty}><Feather name="sun" size={18} color="#A9ACC0" /><Text style={styles.timelineEmptyText}>Your schedule is open</Text></View>}
+          {appointments.length === 0 && !loading && <View pointerEvents="none" style={styles.timelineEmpty}><Feather name="sun" size={20} color="#A9ACC0" /><Text style={styles.timelineEmptyText}>Your schedule is open</Text></View>}
         </View>
       )}
       <Modal transparent animationType="fade" visible={Boolean(pendingDrop)} onRequestClose={() => !savingDrop && setPendingDrop(null)}>
@@ -585,7 +588,7 @@ export default function CalendarScreen() {
             {dropError ? <Text style={[styles.dropError, { color: colors.destructive }]}>{dropError}</Text> : null}
             <TouchableOpacity disabled={savingDrop} onPress={() => void confirmDrop()} style={[styles.confirmDropButton, { backgroundColor: colors.primary, opacity: savingDrop ? 0.65 : 1 }]}>
               <Text style={[styles.confirmDropText, { color: colors.primaryForeground }]}>{savingDrop ? 'Saving…' : 'Reschedule appointment'}</Text>
-              <Feather name="arrow-right" size={17} color={colors.primaryForeground} />
+              <Feather name="arrow-right" size={19} color={colors.primaryForeground} />
             </TouchableOpacity>
             <TouchableOpacity disabled={savingDrop} onPress={() => setPendingDrop(null)} style={styles.cancelDropButton}>
               <Text style={[styles.cancelDropText, { color: colors.mutedForeground }]}>Cancel</Text>
@@ -599,11 +602,11 @@ export default function CalendarScreen() {
 
 const styles = StyleSheet.create({
   timeBlock: { position: 'absolute', left: 4, right: 4, borderRadius: 10, borderWidth: 1, borderStyle: 'dashed', paddingHorizontal: 10, paddingTop: 4 },
-  timeBlockText: { fontSize: 12, fontFamily: 'Inter_500Medium' },
+  timeBlockText: { fontSize: 15, fontFamily: 'Inter_500Medium' },
   root: { flex: 1 },
   fixedHeader: { paddingHorizontal: 18, paddingTop: 4 },
   requestsBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1.5, borderRadius: 12, paddingHorizontal: 13, paddingVertical: 11, marginBottom: 10 },
-  requestsText: { flex: 1, fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  requestsText: { flex: 1, fontSize: 16, fontFamily: 'Inter_600SemiBold' },
   body: { flex: 1 },
   bodyContent: { paddingHorizontal: 18, paddingBottom: 112 },
   dayBody: { marginHorizontal: 18, borderWidth: 1, borderBottomWidth: 0, borderTopLeftRadius: 14, borderTopRightRadius: 14, overflow: 'hidden' },
@@ -613,68 +616,68 @@ const styles = StyleSheet.create({
   addButton: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   segmentedControl: { flexDirection: 'row', borderWidth: 1, borderRadius: 9, padding: 2, flexShrink: 1 },
   segment: { minWidth: 48, paddingVertical: 8, paddingHorizontal: 7, borderRadius: 7, alignItems: 'center' },
-  segmentText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
-  todayHint: { fontSize: 12, fontFamily: 'Inter_500Medium', marginRight: 2 },
+  segmentText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  todayHint: { fontSize: 15, fontFamily: 'Inter_500Medium', marginRight: 2 },
   dateHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   chevronButton: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
-  pageTitle: { fontSize: 18, fontFamily: 'Inter_500Medium', textAlign: 'center', paddingVertical: 8 },
-  monthTitle: { fontSize: 20, fontFamily: 'Inter_600SemiBold', letterSpacing: -0.35 },
+  pageTitle: { fontSize: 38, fontFamily: 'Inter_700Bold', letterSpacing: -0.8, paddingTop: 6, paddingBottom: 10 },
+  monthTitle: { fontSize: 22, fontFamily: 'Inter_600SemiBold', letterSpacing: -0.35 },
   weekStrip: { flexDirection: 'row', justifyContent: 'space-between', paddingBottom: 10 },
   dayCell: { width: 42, alignItems: 'center', paddingVertical: 6, borderRadius: 14, gap: 5 },
-  dayName: { fontSize: 10, fontFamily: 'Inter_600SemiBold' },
-  dayNumber: { fontSize: 15, fontFamily: 'Inter_700Bold' },
+  dayName: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  dayNumber: { fontSize: 17, fontFamily: 'Inter_700Bold' },
   dayDot: { width: 4, height: 4, borderRadius: 2 },
   monthGrid: { borderWidth: 1, borderRadius: 18, padding: 11, overflow: 'hidden' },
   weekdayRow: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 5 },
-  weekdayLabel: { width: '14.28%', textAlign: 'center', fontSize: 10, fontFamily: 'Inter_700Bold' },
+  weekdayLabel: { width: '14.28%', textAlign: 'center', fontSize: 13, fontFamily: 'Inter_700Bold' },
   monthCells: { flexDirection: 'row', flexWrap: 'wrap' },
   monthCell: { width: '14.28%', height: 58, alignItems: 'center', paddingTop: 7 },
   monthNumber: { width: 29, height: 29, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-  monthNumberText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  monthNumberText: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
   monthDot: { width: 4, height: 4, borderRadius: 2, marginTop: 5 },
   weekAgenda: { gap: 9 },
   weekDayRow: { minHeight: 69, borderWidth: 1, borderRadius: 16, padding: 11, flexDirection: 'row', alignItems: 'center', gap: 11 },
   weekDayLabel: { width: 44, alignItems: 'center' },
-  weekDayName: { fontSize: 10, fontFamily: 'Inter_600SemiBold' },
-  weekDayNumber: { fontSize: 19, fontFamily: 'Inter_700Bold', marginTop: 2 },
+  weekDayName: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  weekDayNumber: { fontSize: 21, fontFamily: 'Inter_700Bold', marginTop: 2 },
   weekDayEvents: { flex: 1, gap: 4 },
   miniEvent: { borderRadius: 6, paddingVertical: 4, paddingHorizontal: 7 },
-  miniEventText: { color: '#1E2240', fontSize: 10, fontFamily: 'Inter_600SemiBold' },
-  noEvents: { fontSize: 12, fontFamily: 'Inter_400Regular' },
+  miniEventText: { color: '#1E2240', fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  noEvents: { fontSize: 15, fontFamily: 'Inter_400Regular' },
   scheduleMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-  scheduleHint: { fontSize: 10, fontFamily: 'Inter_500Medium' },
-  scheduleCount: { fontSize: 12, fontFamily: 'Inter_500Medium' },
+  scheduleHint: { fontSize: 13, fontFamily: 'Inter_500Medium' },
+  scheduleCount: { fontSize: 15, fontFamily: 'Inter_500Medium' },
   syncNotice: { flexDirection: 'row', alignItems: 'center', gap: 7, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 10 },
-  syncText: { fontSize: 10, fontFamily: 'Inter_500Medium', flex: 1 },
+  syncText: { fontSize: 13, fontFamily: 'Inter_500Medium', flex: 1 },
   timeline: { flexDirection: 'row' },
-  timelineLabels: { width: 74 },
-  timelineLabel: { height: HOUR_HEIGHT, paddingTop: 2, paddingRight: 9, textAlign: 'right', color: '#3D4160', fontSize: 13, fontFamily: 'Inter_700Bold' },
+  timelineLabels: { width: 88 },
+  timelineLabel: { height: HOUR_HEIGHT, paddingTop: 2, paddingRight: 9, textAlign: 'right', color: '#3D4160', fontSize: 15, fontFamily: 'Inter_700Bold' },
   timelineTrack: { flex: 1, position: 'relative' },
   timelineLine: { height: 1, left: 0, right: 0, position: 'absolute' },
   timelineHalfLine: { height: StyleSheet.hairlineWidth, left: 0, right: 0, position: 'absolute', opacity: 0.6 },
   timelineAppointment: { position: 'absolute', borderRadius: 8, borderWidth: 2, borderColor: '#FFFFFF', paddingHorizontal: 9, paddingVertical: 3, justifyContent: 'center', overflow: 'hidden' },
   timelineAppointmentDragging: { shadowColor: '#2E1065', shadowOpacity: 0.2, shadowRadius: 10, shadowOffset: { width: 0, height: 6 }, elevation: 6 },
-  timelineClient: { color: '#1E2240', fontSize: 12, lineHeight: 15, fontFamily: 'Inter_700Bold' },
-  timelineService: { color: '#1E2240', fontSize: 11, lineHeight: 14, fontFamily: 'Inter_600SemiBold', marginTop: 2 },
-  timelineDuration: { color: '#5B5F78', fontSize: 10, lineHeight: 13, fontFamily: 'Inter_500Medium', marginTop: 2 },
+  timelineClient: { color: '#1E2240', fontSize: 15, lineHeight: 19, fontFamily: 'Inter_700Bold' },
+  timelineService: { color: '#1E2240', fontSize: 14, lineHeight: 18, fontFamily: 'Inter_600SemiBold', marginTop: 2 },
+  timelineDuration: { color: '#5B5F78', fontSize: 13, lineHeight: 17, fontFamily: 'Inter_500Medium', marginTop: 2 },
   timelineEmpty: { position: 'absolute', top: 120, left: 0, right: 0, alignItems: 'center', gap: 8 },
-  timelineEmptyText: { color: '#A9ACC0', fontSize: 12, fontFamily: 'Inter_500Medium' },
+  timelineEmptyText: { color: '#A9ACC0', fontSize: 15, fontFamily: 'Inter_500Medium' },
   currentTime: { position: 'absolute', left: 0, right: 0, height: 2 },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(17, 21, 46, 0.42)', justifyContent: 'center', padding: 20 },
   rescheduleModal: { borderRadius: 22, padding: 20, shadowColor: '#2E1065', shadowOpacity: 0.18, shadowRadius: 20, shadowOffset: { width: 0, height: 8 }, elevation: 8 },
   modalIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: '#ECE5FD', alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
-  modalTitle: { fontSize: 21, fontFamily: 'Inter_600SemiBold', letterSpacing: -0.3 },
-  modalSubtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 5 },
+  modalTitle: { fontSize: 22, fontFamily: 'Inter_600SemiBold', letterSpacing: -0.3 },
+  modalSubtitle: { fontSize: 15, fontFamily: 'Inter_400Regular', marginTop: 5 },
   newTimeCard: { borderWidth: 1, borderRadius: 14, padding: 13, marginTop: 18, marginBottom: 16 },
-  newTimeLabel: { fontSize: 9, letterSpacing: 1, fontFamily: 'Inter_700Bold' },
-  newTimeValue: { fontSize: 20, fontFamily: 'Inter_600SemiBold', marginTop: 3 },
+  newTimeLabel: { fontSize: 12, letterSpacing: 1, fontFamily: 'Inter_700Bold' },
+  newTimeValue: { fontSize: 22, fontFamily: 'Inter_600SemiBold', marginTop: 3 },
   notifyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingVertical: 5 },
   notifyCopy: { flex: 1 },
-  notifyTitle: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  notifySubtitle: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 3 },
-  dropError: { fontSize: 11, fontFamily: 'Inter_500Medium', marginTop: 10 },
+  notifyTitle: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
+  notifySubtitle: { fontSize: 14, fontFamily: 'Inter_400Regular', marginTop: 3 },
+  dropError: { fontSize: 14, fontFamily: 'Inter_500Medium', marginTop: 10 },
   confirmDropButton: { minHeight: 48, borderRadius: 13, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 19 },
-  confirmDropText: { fontSize: 13, fontFamily: 'Inter_700Bold' },
+  confirmDropText: { fontSize: 16, fontFamily: 'Inter_700Bold' },
   cancelDropButton: { minHeight: 40, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
-  cancelDropText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  cancelDropText: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
 });

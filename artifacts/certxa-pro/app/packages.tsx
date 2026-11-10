@@ -14,6 +14,8 @@ import { SelectField } from '@/components/SelectField';
 import { HelpTitle } from '@/components/HelpTitle';
 import { api, ApiError } from '@/lib/live-api';
 
+import { AppBackground } from '@/components/look/AppBackground';
+import { look, cardShadow } from '@/components/look/tokens';
 type Pack = { id: number; name: string; description: string | null; serviceId: number; serviceName: string; visits: number; priceCents: number; isActive: boolean; regularCents: number; savingsCents: number };
 type Sold = { id: number; name: string; clientId: number; clientName: string; visitsTotal: number; visitsLeft: number };
 type Shop = { giftCardsOn: boolean; cardsReady: boolean; packages: Pack[]; sold: Sold[] };
@@ -62,7 +64,8 @@ export default function PackagesScreen() {
   const chosen = services.find((s) => s.id === serviceId);
   const regular = chosen ? Math.round(Number(chosen.priceValue ?? 0) * 100) * (Number(visits) || 0) : 0;
   return (
-    <View style={[styles.root, { backgroundColor: colors.background, paddingTop: topInset }]} testID="packages">
+    <View style={[styles.root, { backgroundColor: look.pageTop, paddingTop: topInset }]} testID="packages">
+      <AppBackground />
       <View style={styles.nav}>
         <TouchableOpacity onPress={() => (adding ? setAdding(false) : router.back())} style={styles.navSide} accessibilityLabel="Back"><Feather name="arrow-left" size={24} color={colors.foreground} /></TouchableOpacity>
         <HelpTitle help="packages" style={[styles.navTitle, { color: colors.foreground }]}>{adding ? 'New package' : 'Packages'}</HelpTitle>
@@ -112,7 +115,7 @@ export default function PackagesScreen() {
                         <Text style={[styles.rowTitle, { color: colors.foreground }]}>{s.clientName}</Text>
                         <Text style={[styles.muted, { color: colors.mutedForeground }]}>{s.name} · {s.visitsLeft} of {s.visitsTotal} visits left</Text>
                       </View>
-                      <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+                      <Feather name="chevron-right" size={20} color={colors.mutedForeground} />
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -129,17 +132,17 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   nav: { height: 56, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   navSide: { width: 44, height: 44, justifyContent: 'center' },
-  navTitle: { fontSize: 18, fontFamily: 'Inter_500Medium' },
+  navTitle: { fontSize: 20, fontFamily: 'Inter_500Medium' },
   content: { paddingHorizontal: 20, paddingBottom: 60, gap: 12, paddingTop: 6 },
-  muted: { fontSize: 13, lineHeight: 18, fontFamily: 'Inter_400Regular' },
-  section: { fontSize: 16, fontFamily: 'Inter_600SemiBold', marginTop: 10 },
-  input: { borderWidth: 1, borderRadius: 14, height: 54, paddingHorizontal: 16, fontSize: 16, fontFamily: 'Inter_400Regular' },
+  muted: { fontSize: 16, lineHeight: 22, fontFamily: 'Inter_400Regular' },
+  section: { fontSize: 18, fontFamily: 'Inter_600SemiBold', marginTop: 10 },
+  input: { borderWidth: 1, borderRadius: 14, height: 54, paddingHorizontal: 16, fontSize: 18, fontFamily: 'Inter_400Regular' },
   area: { height: 96, paddingTop: 14, textAlignVertical: 'top' },
   pair: { flexDirection: 'row', gap: 10 },
   half: { flex: 1 },
   button: { height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  buttonText: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
-  list: { borderWidth: 1, borderRadius: 14, overflow: 'hidden' },
+  buttonText: { fontSize: 18, fontFamily: 'Inter_600SemiBold' },
+  list: { borderWidth: 1, borderRadius: 14, overflow: 'hidden', ...cardShadow },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12 },
-  rowTitle: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
+  rowTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
 });

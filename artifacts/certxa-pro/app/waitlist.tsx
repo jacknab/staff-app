@@ -15,6 +15,8 @@ import { businessToday } from '@/lib/businessTime';
 import { api, ApiError } from '@/lib/live-api';
 import { HelpTitle } from '@/components/HelpTitle';
 
+import { AppBackground } from '@/components/look/AppBackground';
+import { look, cardShadow } from '@/components/look/tokens';
 type Entry = { id: number; customerName: string; customerPhone: string | null; customerId: number | null; serviceId: number | null;
   preferredDate: string | null; preferredTimeStart: string | null; preferredTimeEnd: string | null; notes: string | null; status: string };
 const WHEN = [
@@ -75,7 +77,8 @@ export default function WaitlistScreen() {
   const topInset = Platform.OS === 'web' ? 67 : insets.top;
   const box = { borderColor: colors.border, backgroundColor: colors.card };
   return (
-    <View style={[styles.root, { backgroundColor: colors.background, paddingTop: topInset }]} testID="waitlist">
+    <View style={[styles.root, { backgroundColor: look.pageTop, paddingTop: topInset }]} testID="waitlist">
+      <AppBackground />
       <View style={styles.nav}>
         <TouchableOpacity onPress={() => (adding ? setAdding(false) : router.back())} style={styles.navSide} accessibilityLabel="Back"><Feather name="arrow-left" size={24} color={colors.foreground} /></TouchableOpacity>
         <HelpTitle help="waitlist" style={[styles.navTitle, { color: colors.foreground }]}>{adding ? 'Add to waitlist' : 'Waitlist'}</HelpTitle>
@@ -118,7 +121,7 @@ export default function WaitlistScreen() {
                       </Text>
                       {e.notes ? <Text style={[styles.muted, { color: colors.mutedForeground }]} numberOfLines={1}>{e.notes}</Text> : null}
                     </View>
-                    <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+                    <Feather name="chevron-right" size={20} color={colors.mutedForeground} />
                   </TouchableOpacity>
                 );
               })}
@@ -133,16 +136,16 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   nav: { height: 56, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   navSide: { width: 44, height: 44, justifyContent: 'center' },
-  navTitle: { fontSize: 18, fontFamily: 'Inter_500Medium' },
+  navTitle: { fontSize: 20, fontFamily: 'Inter_500Medium' },
   content: { paddingHorizontal: 20, paddingBottom: 60, gap: 12, paddingTop: 6 },
-  muted: { fontSize: 13, lineHeight: 18, fontFamily: 'Inter_400Regular' },
+  muted: { fontSize: 16, lineHeight: 22, fontFamily: 'Inter_400Regular' },
   dayRow: { borderWidth: 1, borderRadius: 14, minHeight: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 6 },
   arrow: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  dayText: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
-  input: { borderWidth: 1, borderRadius: 14, height: 54, paddingHorizontal: 16, fontSize: 16, fontFamily: 'Inter_400Regular' },
+  dayText: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
+  input: { borderWidth: 1, borderRadius: 14, height: 54, paddingHorizontal: 16, fontSize: 18, fontFamily: 'Inter_400Regular' },
   button: { height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  buttonText: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
-  list: { borderWidth: 1, borderRadius: 14, overflow: 'hidden' },
+  buttonText: { fontSize: 18, fontFamily: 'Inter_600SemiBold' },
+  list: { borderWidth: 1, borderRadius: 14, overflow: 'hidden', ...cardShadow },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12 },
-  rowTitle: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
+  rowTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
 });

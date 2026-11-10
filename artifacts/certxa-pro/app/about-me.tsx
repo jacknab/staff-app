@@ -13,6 +13,8 @@ import { useColors } from '@/hooks/useColors';
 import { api, ApiError } from '@/lib/live-api';
 import { HelpTitle } from '@/components/HelpTitle';
 
+import { AppBackground } from '@/components/look/AppBackground';
+import { look } from '@/components/look/tokens';
 const LIMIT = 600;
 
 export default function AboutMeScreen() {
@@ -58,7 +60,8 @@ export default function AboutMeScreen() {
   const topInset = Platform.OS === 'web' ? 67 : insets.top;
   const box = { borderColor: colors.border, backgroundColor: colors.card };
   return (
-    <View style={[styles.root, { backgroundColor: colors.background, paddingTop: topInset }]} testID="about-me">
+    <View style={[styles.root, { backgroundColor: look.pageTop, paddingTop: topInset }]} testID="about-me">
+      <AppBackground />
       <View style={styles.nav}>
         <TouchableOpacity onPress={() => router.back()} style={styles.navSide} accessibilityLabel="Back"><Feather name="arrow-left" size={24} color={colors.foreground} /></TouchableOpacity>
         <HelpTitle help="about-me" style={[styles.navTitle, { color: colors.foreground }]}>About you</HelpTitle>
@@ -77,7 +80,7 @@ export default function AboutMeScreen() {
           </View>
 
           <TouchableOpacity testID="about-ai" onPress={() => router.push({ pathname: '/ai', params: { start: 'about' } })} style={[styles.button, { backgroundColor: colors.primary }]}>
-            <Feather name="message-circle" size={17} color={colors.primaryForeground} />
+            <Feather name="message-circle" size={19} color={colors.primaryForeground} />
             <Text style={[styles.buttonText, { color: colors.primaryForeground }]}>Write it with AI</Text>
           </TouchableOpacity>
           <Text style={[styles.muted, { color: colors.mutedForeground, textAlign: 'center' }]}>Answer a few questions and Business AI writes it for you. Nothing changes until you tap Confirm.</Text>
@@ -100,15 +103,16 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   nav: { height: 56, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   navSide: { width: 44, height: 44, justifyContent: 'center' },
-  navTitle: { fontSize: 18, fontFamily: 'Inter_500Medium' },
+  navTitle: { fontSize: 20, fontFamily: 'Inter_500Medium' },
   content: { paddingHorizontal: 20, gap: 12, paddingTop: 4 },
-  muted: { fontSize: 13, lineHeight: 18, fontFamily: 'Inter_400Regular' },
-  photo: { width: 124, height: 124, borderRadius: 62, borderWidth: 1, alignSelf: 'center', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginTop: 6 },
+  muted: { fontSize: 16, lineHeight: 22, fontFamily: 'Inter_400Regular' },
+  // A box with rounded corners, as on the website (owner, 2026-11-07), not a circle.
+  photo: { width: 140, height: 140, borderRadius: 18, borderWidth: 1, alignSelf: 'center', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginTop: 6 },
   photoImage: { width: '100%', height: '100%' },
   photoLinks: { flexDirection: 'row', justifyContent: 'center', gap: 20 },
-  link: { fontSize: 14, fontFamily: 'Inter_500Medium' },
+  link: { fontSize: 17, fontFamily: 'Inter_500Medium' },
   button: { height: 52, borderRadius: 16, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
-  buttonText: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
-  input: { borderWidth: 1, borderRadius: 14, minHeight: 170, padding: 14, fontSize: 15, lineHeight: 21, fontFamily: 'Inter_400Regular' },
-  counter: { fontSize: 12, textAlign: 'right', fontFamily: 'Inter_400Regular' },
+  buttonText: { fontSize: 18, fontFamily: 'Inter_600SemiBold' },
+  input: { borderWidth: 1, borderRadius: 14, minHeight: 170, padding: 14, fontSize: 17, lineHeight: 24, fontFamily: 'Inter_400Regular' },
+  counter: { fontSize: 15, textAlign: 'right', fontFamily: 'Inter_400Regular' },
 });

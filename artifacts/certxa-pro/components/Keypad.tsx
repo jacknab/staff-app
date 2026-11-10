@@ -35,5 +35,5 @@ const styles = StyleSheet.create({
   key: { width: 80, height: 80, borderRadius: 40, alignItems: 'center', justifyContent: 'center' },
   digit: { fontSize: 36, fontWeight: '400', lineHeight: 42 },
   star: { fontSize: 44, lineHeight: 48, marginTop: 10 },
-  letters: { fontSize: 10, fontWeight: '700', letterSpacing: 1, marginTop: -3 },
+  letters: { fontSize: 13, fontWeight: '700', letterSpacing: 1, marginTop: -3 },
 });

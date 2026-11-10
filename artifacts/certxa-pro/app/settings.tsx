@@ -22,6 +22,7 @@ import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { ActivityIndicator, Alert, Linking, ScrollView, Share, StatusBar, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as WebBrowser from 'expo-web-browser';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/contexts/AuthContext';
 import { BusinessHoursEditor } from '@/components/BusinessHoursEditor';
@@ -32,6 +33,9 @@ import { api } from '@/lib/live-api';
 import { CERTXA_API_BASE_URL, certxaRequest, getStoredToken, login as checkPassword, registerTerminalReader } from '@/lib/certxa-api';
 import { HelpTitle } from '@/components/HelpTitle';
 
+import { AppBackground } from '@/components/look/AppBackground';
+import { SectionHeader, SectionTitle } from '@/components/look/SectionHeader';
+import { look, cardShadow } from '@/components/look/tokens';
 type Screen = 'menu' | 'business' | 'location' | 'places' | 'hours' | 'rules' | 'approval' | 'policy' | 'blocked' | 'phone' | 'website' | 'stripe' | 'readers' | 'deposits' | 'tax' | 'account';
 type Store = { id: number; name?: string | null; phone?: string | null; email?: string | null; category?: string | null; address?: string | null; city?: string | null; state?: string | null; postcode?: string | null; bookingSlug?: string | null; timezone?: string | null };
 type Hours = { dayOfWeek: number; openTime: string; closeTime: string; isClosed: boolean };
@@ -40,8 +44,8 @@ type FeatherName = ComponentProps<typeof Feather>['name'];
 const BUSINESS_TYPES = ['Nail Salon', 'Hair Salon', 'Barbershop', 'Lash and Brows', 'Esthetician', 'Makeup', 'Massage', 'Wax', 'Tattoo and Piercing', 'Pet Grooming', 'Other'];
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const TITLES: Record<Screen, string> = {
-  menu: 'Settings', business: 'Business details', location: 'Location', places: 'Where you see clients', hours: 'Business hours', rules: 'Booking rules', policy: 'Cancellation policy',
-  approval: 'Booking approval', blocked: 'Blocked clients', phone: 'Business Phone', website: 'Website', stripe: 'Stripe account', readers: 'Connect card reader', deposits: 'Deposits', tax: 'Sales tax', account: 'Account',
+  menu: 'Settings', business: 'Business details', location: 'Location', places: 'Where you see clients', hours: 'Hours', rules: 'Online booking', policy: 'Cancellation policy',
+  approval: 'Booking approval', blocked: 'Blocked clients', phone: 'Business Phone', website: 'Website', stripe: 'Stripe account', readers: 'Connect card reader', deposits: 'Deposits', tax: 'Checkout', account: 'Account',
 };
 
 function errorText(cause: unknown, fallback: string) { return cause instanceof Error && cause.message ? cause.message : fallback; }
@@ -114,7 +118,7 @@ export default function SettingsScreen() {
           allowOnlineCancellation: policies.allowOnlineCancellation !== false, cancellationHoursCutoff: Number(policies.cancellationHoursCutoff ?? 24),
           cancellationPolicyText: policies.cancellationPolicyText ?? '', cancellationPolicyRequired: !!policies.cancellationPolicyRequired,
           feePercent: policies.cancellationFeeValue != null ? String(Number(policies.cancellationFeeValue)) : '',
-          bookingWindowHours: Number(calendar?.bookingWindowHours ?? 0), timeSlotInterval: Number(calendar?.timeSlotInterval ?? 15), bufferMinutes: Number(calendar?.bufferMinutes ?? 0),
+          bookingWindowHours: Math.max(1, Number(calendar?.bookingWindowHours ?? 1) || 1), timeSlotInterval: Number(calendar?.timeSlotInterval ?? 15), bufferMinutes: Number(calendar?.bufferMinutes ?? 0), paddedMinutes: Number(calendar?.paddedMinutes ?? 0),
         });
       } else if (next === 'blocked') setDraft({ list: await api.get<any[]>('/api/booking-ban-list'), phone: '', reason: '' });
       else if (next === 'phone') {
@@ -133,7 +137,13 @@ export default function SettingsScreen() {
         const overview = await api.get<{ user?: { phone?: string | null } }>('/api/manage/overview');
         setDraft({ mobile: overview?.user?.phone ?? '', mobileNow: overview?.user?.phone ?? '', code: '', codeSent: false });
       }
-      else if (next === 'tax') { const tax = await api.get<Record<string, any>>(`/api/pos-settings/${current.id}`); setDraft({ percent: String(Number((Number(tax.salesTaxRate ?? 0) * 100).toFixed(3))), services: !!tax.taxServicesTaxable, products: tax.taxProductsTaxable !== false }); }
+      else if (next === 'tax') {
+        // Checkout (owner, 2026-11-09; after GlossGenius's Checkout settings): sales tax, and the tip options clients see.
+        const [tax, tips] = await Promise.all([api.get<Record<string, any>>(`/api/pos-settings/${current.id}`), api.get<{ presets?: number[] }>('/api/tip-presets').catch(() => null)]);
+        const presets = Array.isArray(tips?.presets) && tips!.presets.length ? tips!.presets : [18, 20, 25];
+        setDraft({ percent: String(Number((Number(tax.salesTaxRate ?? 0) * 100).toFixed(3))), services: !!tax.taxServicesTaxable, products: tax.taxProductsTaxable !== false,
+          tips: Array.from({ length: 4 }, (_, i) => (presets[i] != null ? String(presets[i]) : '')) });
+      }
     } catch (cause) { setError(errorText(cause, 'Could not load this from Certxa.')); }
     finally { setLoading(false); }
   }, [loadStore, store]);
@@ -161,7 +171,7 @@ export default function SettingsScreen() {
       if (!Number.isFinite(fee) || fee > 500) throw new Error('Enter a travel fee from $0 to $500.');
       const saved = await api.put<Record<string, any>>('/api/work-places', {
         ownPlace: draft.ownPlace, addressPrivate: !!draft.addressPrivate, houseCalls: !!draft.houseCalls, houseCallRadiusMiles: Number(draft.houseCallRadiusMiles),
-        houseCallFee: fee, houseCallTravelMinutes: Number(draft.houseCallTravelMinutes), houseCallAlarmMinutes: Number(draft.houseCallAlarmMinutes ?? 0),
+        houseCallFee: fee, houseCallTravelMinutes: Number(draft.houseCallTravelMinutes), houseCallAlarmMinutes: Number(draft.houseCallAlarmMinutes ?? 0), houseCallSetupMinutes: Number(draft.houseCallSetupMinutes ?? 15), houseCallPackupMinutes: Number(draft.houseCallPackupMinutes ?? 15),
       });
       setDraft({ ...saved, houseCallFee: String(saved.houseCallFee ?? 0) });
     });
@@ -209,9 +219,9 @@ export default function SettingsScreen() {
     if (screen === 'rules') return run(async () => {
       await api.put('/api/booking-policies', {
         onlineBookingMode: draft.onlineBookingMode, advanceBookingEnabled: draft.advanceBookingEnabled, advanceBookingMonths: draft.advanceBookingMonths,
-        allowOnlineCancellation: draft.allowOnlineCancellation, cancellationHoursCutoff: draft.cancellationHoursCutoff,
+        allowOnlineCancellation: draft.allowOnlineCancellation,
       });
-      await api.put('/api/calendar-settings', { bookingWindowHours: draft.bookingWindowHours, timeSlotInterval: draft.timeSlotInterval, bufferMinutes: draft.bufferMinutes });
+      await api.put('/api/calendar-settings', { bookingWindowHours: draft.bookingWindowHours, timeSlotInterval: draft.timeSlotInterval, paddedMinutes: draft.paddedMinutes });
     });
     if (screen === 'policy') return run(async () => {
       if (draft.cancellationPolicyRequired && !String(draft.cancellationPolicyText).trim()) throw new Error('Write the policy before requiring clients to accept it.');
@@ -219,12 +229,18 @@ export default function SettingsScreen() {
       const fee = String(draft.feePercent ?? '').trim() === '' ? 0 : Number(String(draft.feePercent).replace(/[^0-9.]/g, ''));
       if (!(fee >= 0 && fee <= 100)) throw new Error('Enter a fee from 0 to 100 percent.');
       await api.put('/api/booking-policies', { cancellationPolicyText: draft.cancellationPolicyText, cancellationPolicyRequired: draft.cancellationPolicyRequired,
+        cancellationHoursCutoff: draft.cancellationHoursCutoff,
         cancellationFeeType: fee > 0 ? 'percentage' : null, cancellationFeeValue: fee > 0 ? fee : null });
     });
     if (screen === 'tax') return run(async () => {
       const percent = Number(String(draft.percent).replace(/[^0-9.]/g, ''));
       if (!Number.isFinite(percent) || percent < 0 || percent > 30) throw new Error('Enter a tax rate between 0 and 30 percent.');
+      const tips = (draft.tips as string[] | undefined ?? []).map((t) => t.trim()).filter(Boolean).map(Number);
+      if (tips.length === 0) throw new Error('Enter at least one tip option.');
+      if (tips.some((t) => !Number.isInteger(t) || t < 1 || t > 100)) throw new Error('Tip options are whole percentages from 1 to 100.');
       await api.patch(`/api/pos-settings/${store.id}`, { salesTaxRate: (percent / 100).toFixed(4), taxServicesTaxable: draft.services, taxProductsTaxable: draft.products });
+      const saved = await api.put<{ presets: number[] }>('/api/tip-presets', { presets: tips });
+      setDraft((d) => ({ ...d, tips: Array.from({ length: 4 }, (_, i) => (saved.presets[i] != null ? String(saved.presets[i]) : '')) }));
     });
   };
 
@@ -307,12 +323,13 @@ export default function SettingsScreen() {
   // ── small building blocks ─────────────────────────────────────────────────
   const Row = ({ icon, title, hint, to }: { icon: FeatherName; title: string; hint: string; to: Screen }) => (
     <TouchableOpacity testID={`settings-${to}`} onPress={() => void open(to)} style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      <View style={[styles.rowIcon, { backgroundColor: colors.secondary }]}><Feather name={icon} size={16} color={colors.primary} /></View>
-      <View style={{ flex: 1 }}><Text style={[styles.rowTitle, { color: colors.foreground }]}>{title}</Text><Text numberOfLines={1} style={[styles.rowHint, { color: colors.mutedForeground }]}>{hint}</Text></View>
-      <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+      <View style={[styles.rowIcon, { backgroundColor: colors.secondary }]}><Feather name={icon} size={26} color={colors.primary} /></View>
+      <View style={{ flex: 1 }}><Text style={[styles.rowTitle, { color: colors.foreground }]}>{title}</Text><Text numberOfLines={2} style={[styles.rowHint, { color: colors.mutedForeground }]}>{hint}</Text></View>
+      <Feather name="chevron-right" size={20} color={colors.mutedForeground} />
     </TouchableOpacity>
   );
-  const Group = ({ title, children }: { title: string; children: ReactNode }) => (<View style={styles.group}><Text style={[styles.groupTitle, { color: colors.mutedForeground }]}>{title}</Text>{children}</View>);
+  // Sections in the More design (owner, 2026-11-09): a violet bar and a title-case heading.
+  const Group = ({ title, children }: { title: string; children: ReactNode }) => (<View style={styles.group}><SectionHeader title={title} />{children}</View>);
   const Label = ({ children }: { children: ReactNode }) => <Text style={[styles.label, { color: colors.foreground }]}>{children}</Text>;
   const Help = ({ children }: { children: ReactNode }) => <Text style={[styles.help, { color: colors.mutedForeground }]}>{children}</Text>;
   const field = (key: string, placeholder: string, extra: Partial<ComponentProps<typeof TextInput>> = {}) => (
@@ -341,49 +358,70 @@ export default function SettingsScreen() {
   const website = slug ? `https://${slug}.certxa.com` : '';
   const address = [store?.address, store?.city, store?.state].filter(Boolean).join(', ');
 
+  const [openingBilling, setOpeningBilling] = useState(false);
+  const openBilling = async () => {
+    setOpeningBilling(true);
+    try {
+      const { url } = await api.post<{ url: string }>('/api/solo/billing/web-link');
+      await WebBrowser.openBrowserAsync(url);
+    } catch (cause) {
+      Alert.alert('Billing', cause instanceof Error ? cause.message : 'Could not open the billing page. Please try again.');
+    } finally {
+      setOpeningBilling(false);
+    }
+  };
+
   const body = () => {
     if (screen === 'menu') return (
       <>
-        <Group title="MY BUSINESS">
+        <Group title="My Business">
           <Row icon="briefcase" title="Business details" hint={store?.name || 'Name, type, phone, e-mail'} to="business" />
           <Row icon="map-pin" title="Location" hint={address || 'Your business address'} to="location" />
           <Row icon="navigation" title="Where you see clients" hint="Your place, house calls, or both" to="places" />
-          <Row icon="clock" title="Business hours" hint="Your time zone, and the days and times you are open" to="hours" />
+          <Row icon="clock" title="Hours" hint="Business hours and your time zone" to="hours" />
           {/* Catalog moved here from More (owner, 2026-11-03). */}
           <TouchableOpacity testID="settings-catalog" onPress={() => router.push('/catalog')} style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={[styles.rowIcon, { backgroundColor: colors.secondary }]}><Feather name="scissors" size={16} color={colors.primary} /></View>
-            <View style={{ flex: 1 }}><Text style={[styles.rowTitle, { color: colors.foreground }]}>Catalog</Text><Text numberOfLines={1} style={[styles.rowHint, { color: colors.mutedForeground }]}>Categories, services, add-ons, packages, deals, products</Text></View>
-            <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+            <View style={[styles.rowIcon, { backgroundColor: colors.secondary }]}><Feather name="scissors" size={26} color={colors.primary} /></View>
+            <View style={{ flex: 1 }}><Text style={[styles.rowTitle, { color: colors.foreground }]}>Catalog</Text><Text numberOfLines={2} style={[styles.rowHint, { color: colors.mutedForeground }]}>Categories, services, add-ons, packages, products</Text></View>
+            <Feather name="chevron-right" size={20} color={colors.mutedForeground} />
           </TouchableOpacity>
         </Group>
-        <Group title="ONLINE BOOKING">
-          <Row icon="sliders" title="Booking rules" hint="Who can book, notice, start times, cancelling" to="rules" />
+        <Group title="Bookings">
+          <Row icon="sliders" title="Online booking" hint="Who can book, notice, start times, how far ahead" to="rules" />
           <Row icon="check-square" title="Booking approval" hint="Accept bookings automatically, or review each one" to="approval" />
-          <Row icon="file-text" title="Cancellation policy" hint="What clients agree to when they book" to="policy" />
+          <Row icon="file-text" title="Cancellation policy" hint="Your policy, cancellation notice and no-show fee" to="policy" />
           <Row icon="slash" title="Blocked clients" hint="Phone numbers that cannot book online" to="blocked" />
         </Group>
-        <Group title="WEBSITE"><Row icon="globe" title="Website" hint={website.replace('https://', '') || 'Your booking website'} to="website" /></Group>
-        <Group title="CLIENT MESSAGES">
+        <Group title="Website"><Row icon="globe" title="Website" hint={website.replace('https://', '') || 'Your booking website'} to="website" /></Group>
+        <Group title="Client Messages">
           {/* Its own screen, like the website's Settings › Client Notifications (app/notifications.tsx). */}
           <TouchableOpacity testID="settings-notifications" onPress={() => router.push('/notifications')} style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={[styles.rowIcon, { backgroundColor: colors.secondary }]}><Feather name="bell" size={16} color={colors.primary} /></View>
-            <View style={{ flex: 1 }}><Text style={[styles.rowTitle, { color: colors.foreground }]}>Client notifications</Text><Text numberOfLines={1} style={[styles.rowHint, { color: colors.mutedForeground }]}>Reminders, confirmations and review requests</Text></View>
-            <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+            <View style={[styles.rowIcon, { backgroundColor: colors.secondary }]}><Feather name="bell" size={26} color={colors.primary} /></View>
+            <View style={{ flex: 1 }}><Text style={[styles.rowTitle, { color: colors.foreground }]}>Client notifications</Text><Text numberOfLines={2} style={[styles.rowHint, { color: colors.mutedForeground }]}>Reminders, confirmations and review requests</Text></View>
+            <Feather name="chevron-right" size={20} color={colors.mutedForeground} />
           </TouchableOpacity>
         </Group>
-        <Group title="BUSINESS PHONE"><Row icon="phone" title="Business Phone" hint="When your phone rings, and numbers you've blocked" to="phone" /></Group>
-        <Group title="PAYMENTS">
+        <Group title="Business Phone"><Row icon="phone" title="Business Phone" hint="When your phone rings, and numbers you've blocked" to="phone" /></Group>
+        <Group title="Payments">
           <Row icon="credit-card" title="Stripe account" hint="Where your card payments are paid out" to="stripe" />
           <TouchableOpacity testID="settings-tap-to-pay" onPress={() => router.push('/tap-to-pay')} style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={[styles.rowIcon, { backgroundColor: colors.secondary }]}><Feather name="smartphone" size={16} color={colors.primary} /></View>
-            <View style={{ flex: 1 }}><Text style={[styles.rowTitle, { color: colors.foreground }]}>Enable Tap to Pay on iPhone</Text><Text numberOfLines={1} style={[styles.rowHint, { color: colors.mutedForeground }]}>Take cards with just this iPhone</Text></View>
-            <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+            <View style={[styles.rowIcon, { backgroundColor: colors.secondary }]}><Feather name="smartphone" size={26} color={colors.primary} /></View>
+            <View style={{ flex: 1 }}><Text style={[styles.rowTitle, { color: colors.foreground }]}>Enable Tap to Pay on iPhone</Text><Text numberOfLines={2} style={[styles.rowHint, { color: colors.mutedForeground }]}>Take cards with just this iPhone</Text></View>
+            <Feather name="chevron-right" size={20} color={colors.mutedForeground} />
           </TouchableOpacity>
           <Row icon="radio" title="Connect card reader" hint="Register and view Stripe M2 readers" to="readers" />
           <Row icon="dollar-sign" title="Deposits" hint="Ask clients for a deposit when they book" to="deposits" />
-          <Row icon="percent" title="Sales tax" hint="Tax added at checkout" to="tax" />
+          <Row icon="percent" title="Checkout" hint="Sales tax and the tip choices clients see" to="tax" />
         </Group>
-        <Group title="ACCOUNT"><Row icon="user" title="Account" hint={user?.email ?? 'Password, sign out, delete account'} to="account" /></Group>
+        <Group title="Account">
+          <Row icon="user" title="Account" hint={user?.email ?? 'Password, sign out, delete account'} to="account" />
+          {/* The website's billing page, already signed in through a one-time link (owner, 2026-11-05). */}
+          <TouchableOpacity testID="settings-billing" disabled={openingBilling} onPress={() => void openBilling()} style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={[styles.rowIcon, { backgroundColor: colors.secondary }]}><Feather name="file-text" size={26} color={colors.primary} /></View>
+            <View style={{ flex: 1 }}><Text style={[styles.rowTitle, { color: colors.foreground }]}>Billing</Text><Text numberOfLines={2} style={[styles.rowHint, { color: colors.mutedForeground }]}>Your plan, payments and invoices on certxa.com</Text></View>
+            {openingBilling ? <ActivityIndicator size="small" color={colors.mutedForeground} /> : <Feather name="external-link" size={18} color={colors.mutedForeground} />}
+          </TouchableOpacity>
+        </Group>
       </>
     );
     if (screen === 'business') return (<>
@@ -413,9 +451,15 @@ export default function SettingsScreen() {
         <Help>Driving miles from your business address. Clients further away can't book a house call online.</Help>
         <Label>Travel fee</Label>{field('houseCallFee', '0', { keyboardType: 'decimal-pad' })}
         <Help>Added to every house call. Leave it at 0 for no fee.</Help>
-        <Label>Travel time</Label>
+        <Label>Setup time</Label>
+        {withCurrent('houseCallSetupMinutes', [0, 10, 15, 20, 30, 45], (minutes) => minutes ? `${minutes} min` : 'None')}
+        <Help>Getting your things in and set up at the client's, so you can start on time.</Help>
+        <Label>Pack-up time</Label>
+        {withCurrent('houseCallPackupMinutes', [0, 10, 15, 20, 30, 45], (minutes) => minutes ? `${minutes} min` : 'None')}
+        <Help>Packing up after each house call, before you drive to the next one.</Help>
+        <Label>Backup drive time</Label>
         {withCurrent('houseCallTravelMinutes', [0, 10, 15, 30, 45], (minutes) => minutes ? `${minutes} min` : 'None')}
-        <Help>Kept free on your calendar before and after each house call.</Help>
+        <Help>Your drive between clients is worked out from their addresses. This is only used if a drive can't be worked out.</Help>
         <Label>House-call alarm</Label>
         {withCurrent('houseCallAlarmMinutes', [0, 30, 45, 60, 90, 120, 180], (minutes) => (!minutes ? 'Off' : minutes < 60 ? `${minutes} min before` : `${minutes / 60} ${minutes === 60 ? 'hour' : 'hours'} before`))}
         <Help>Your phone sounds this long before each house call. Allow time to load your car, drive there and set up, so you can start on time.</Help>
@@ -432,10 +476,11 @@ export default function SettingsScreen() {
       <Label>Time zone</Label>
       {choices('timezone', [...US_TIME_ZONES, ...(US_TIME_ZONES.some((zone) => zone.value === draft.timezone) || !draft.timezone ? [] : [{ value: String(draft.timezone), label: timeZoneName(String(draft.timezone)) }])])}
       <Help>Your calendar, your booking page and the messages clients get all use this time zone.</Help>
-      <Label>Hours</Label>
+      <Label>Business hours</Label>
       {/* The sign-up design (owner, 2026-11-03): a check box per day, tap a day for the time wheel. */}
       <BusinessHoursEditor hours={(draft.hours as Hours[] | undefined) ?? []} onChange={(next) => set('hours', next)} testPrefix="hours" />
-      <Help>Clients can only book online inside these hours.</Help>{saveButton()}
+      <Help>Your website shows these hours, and clients can book any time inside them.</Help>
+      {saveButton()}
     </>);
     if (screen === 'deposits') return (<>
       <Label>Deposit when clients book online</Label>
@@ -447,7 +492,7 @@ export default function SettingsScreen() {
         {draft.depositType !== 'full' ? field('depositValue', draft.depositType === 'percentage' ? 'Percent, e.g. 20' : 'Dollars, e.g. 25', { keyboardType: 'decimal-pad' }) : null}
         {draft.houseCalls ? toggle('includeTravelFee', 'Include the house-call travel fee', 'On: the fee is part of what the client pays when they book. Off: they pay it at the visit.') : null}
         <Help>{draft.approval === 'manual'
-          ? 'You review each booking first, so the deposit is asked for after you approve: the client gets a text with a payment link and has 24 hours to pay. The time is only confirmed once it is paid; if not, it is released and the client is told.'
+          ? 'You review each booking first, so the deposit is asked for after you approve: the client gets a text with a payment link and has 30 minutes to pay. The time is only confirmed once it is paid; if not, it is released and the client is told.'
           : 'Clients pay by card on your booking page as they book. If they leave without paying, the time is held for an hour and they get a text with a link to pay.'}</Help>
         <Help>{draft.depositType === 'full' ? 'Nothing is left to pay at the visit: tap Mark as done when you finish.' : 'The deposit comes off the price at checkout.'} Payments go to your Stripe account.</Help>
         {!draft.cardsReady ? <>
@@ -461,10 +506,10 @@ export default function SettingsScreen() {
       <Help>Booking approval is part of the Solo plan.</Help>
     ) : (<>
       <Label>New online bookings</Label>
-      {choices('bookingApproval', [{ value: 'auto', label: 'Accept automatically' }, { value: 'manual', label: 'Review each one first' }])}
+      {choices('bookingApproval', [{ value: 'auto', label: 'Approve automatically' }, { value: 'manual', label: 'Review each one first' }])}
       <Help>{draft.bookingApproval === 'manual'
         ? 'Clients send a request. You approve it, offer other times, or decline it. The time is only booked once you approve.'
-        : 'Clients book straight into your calendar.'}</Help>
+        : 'Every online booking goes straight into your calendar, no approval needed.'}</Help>
       {draft.bookingApproval === 'manual' ? <>
         <Label>Answer requests within</Label>
         {withCurrent('bookingRequestExpiryHours', [12, 24, 48, 72], (value) => (value % 24 === 0 ? `${value / 24} ${value === 24 ? 'day' : 'days'}` : `${value} hours`))}
@@ -476,24 +521,45 @@ export default function SettingsScreen() {
       {saveButton()}
     </>);
     if (screen === 'rules') return (<>
-      <Label>Who can book online</Label>{choices('onlineBookingMode', [{ value: 'all', label: 'Everyone' }, { value: 'existing', label: 'Existing clients' }, { value: 'off', label: 'Nobody' }])}
-      <Label>Minimum notice</Label>{withCurrent('bookingWindowHours', [0, 1, 2, 3], (value) => (value === 0 ? 'None' : `${value} hr`))}
-      <Help>How soon before an appointment a client can still book it.</Help>
-      <Label>How far ahead</Label>{choices('advanceBookingEnabled', [{ value: false, label: 'No limit' }, { value: true, label: 'Limit it' }])}
-      {draft.advanceBookingEnabled ? withCurrent('advanceBookingMonths', [1, 3, 6, 12], (value) => `${value} mo`) : null}
-      <Label>Appointment start times</Label>{withCurrent('timeSlotInterval', [15, 30, 60], (value) => `Every ${value} min`)}
-      <Label>Gap between appointments</Label>{withCurrent('bufferMinutes', [0, 5, 10, 15], (value) => (value === 0 ? 'None' : `${value} min`))}
-      <Label>Cancelling online</Label>{toggle('allowOnlineCancellation', 'Clients can cancel online')}
-      {draft.allowOnlineCancellation ? <>{withCurrent('cancellationHoursCutoff', [12, 24, 48], (value) => `${value} hr before`)}<Help>After this point the client has to contact you to cancel.</Help></> : null}
+      {/* Online booking (owner, 2026-11-09; organised after GlossGenius's Online Booking settings, in our own words):
+          who can book, booking controls, how far ahead, cancelling. */}
+      <SectionTitle style={styles.section}>Who can book</SectionTitle>
+      {choices('onlineBookingMode', [{ value: 'all', label: 'All clients' }, { value: 'existing', label: 'Existing clients only' }, { value: 'off', label: 'Off' }])}
+      <Help>{draft.onlineBookingMode === 'existing' ? 'Only clients already in your client list can book online. New clients still see your website, but are asked to contact you.'
+        : draft.onlineBookingMode === 'off' ? 'Clients still see your website, but can\'t book online. You can still book them yourself.'
+        : 'New and existing clients can book you online.'}</Help>
+
+      <SectionTitle style={styles.section}>Booking controls</SectionTitle>
+      {/* Owner, 2026-11-09: no "None" (a client could book a time that's already starting); 1 to 24 hours. */}
+      <Label>Minimum notice</Label>{withCurrent('bookingWindowHours', Array.from({ length: 24 }, (_, i) => i + 1), (value) => `${value} ${value === 1 ? 'hour' : 'hours'}`)}
+      <Help>How far ahead clients must book online. With 2 hours, a client booking at 1 PM can choose 3 PM or later. You can still book any time yourself.</Help>
+      <Label>Booking increments</Label>{withCurrent('timeSlotInterval', [15, 30, 60], (value) => `Every ${value} min`)}
+      <Help>The start times clients can pick online. Every 15 min offers 9:00, 9:15, 9:30 and so on; every 30 min offers 9:00, 9:30, 10:00.</Help>
+      {/* Gap between appointments removed (owner, 2026-11-09): Padded time does that job for a solo pro. */}
+      {/* Padded time (owner, 2026-11-09): extra time saved on the end of every booking, online and in the app. */}
+      <Label>Padded time</Label>{withCurrent('paddedMinutes', [0, 15, 30, 45, 60], (value) => (value === 0 ? 'Off' : `${value} min`))}
+      <Help>Extra time added to the end of every booking, so you can offer extras. The times clients see include it.</Help>
+
+      <SectionTitle style={styles.section}>Advance booking</SectionTitle>
+      {toggle('advanceBookingEnabled', 'Limit how far ahead clients can book', 'Clients can only book online up to the time you choose, counted from today.')}
+      {draft.advanceBookingEnabled ? withCurrent('advanceBookingMonths', [1, 3, 6, 12], (value) => `Up to ${value} ${value === 1 ? 'month' : 'months'} ahead`) : null}
+
+      <SectionTitle style={styles.section}>Cancelling</SectionTitle>
+      {toggle('allowOnlineCancellation', 'Allow online cancellation', 'Clients can cancel their appointment online, up to your cancellation notice (Settings › Cancellation policy). After that, they have to contact you.')}
       {saveButton()}
     </>);
     if (screen === 'policy') return (<>
       <Label>Your cancellation policy</Label>
-      {field('cancellationPolicyText', 'For example: Please give 24 hours notice to cancel or reschedule.', { multiline: true, style: [styles.input, styles.textArea, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }] })}
-      {toggle('cancellationPolicyRequired', 'Clients must accept it to book', 'They tick a box agreeing to the policy before booking online.')}
+      {field('cancellationPolicyText', 'For example: I charge 30% of the visit for no-shows or cancellations within 24 hours of the appointment.', { multiline: true, style: [styles.input, styles.textArea, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }] })}
+      <Help>Shown on the About tab of your website, and when clients book.</Help>
+      {toggle('cancellationPolicyRequired', 'Clients must accept it to book', 'Clients tick a box saying they\'ve read your policy before they can book online.')}
+      {/* Moved from Booking rules (owner, 2026-11-09): this one number decides online cancelling, the late-cancel fee
+          and whether a deposit is refunded. */}
+      <Label>Cancellation notice</Label>{withCurrent('cancellationHoursCutoff', [12, 24, 48], (value) => `${value} hours before`)}
+      <Help>Cancelling later than this is a late cancellation: the late-cancel fee can apply and a deposit is kept. Clients can cancel online only before it.</Help>
       <Label>No-show and late-cancel fee</Label>
       {field('feePercent', 'Percent of the booking, e.g. 50 (empty = no fee)', { keyboardType: 'decimal-pad' })}
-      <Help>Charged to the client's card on file, only when you tap Charge fee on a no-show or cancelled booking. Ask for a card on file in Settings › Deposits.</Help>
+      <Help>Protects your time from no-shows. Most pros set 20–30% of the appointment price. It's charged to the client's card on file, only when you tap Charge fee on a no-show or cancelled booking. Ask for a card on file in Settings › Deposits.</Help>
       {saveButton()}
     </>);
     if (screen === 'blocked') return (<>
@@ -572,6 +638,11 @@ export default function SettingsScreen() {
       </>);
     }
     if (screen === 'website') return (<>
+      {/* AI Website Builder (owner, 2026-11-09; app/website-designer.tsx): ideas first, the full site next. */}
+      <TouchableOpacity testID="settings-ai-designer" onPress={() => router.push('/website-designer')} style={[styles.save, { backgroundColor: colors.primary, marginTop: 4 }]}>
+        <Text style={[styles.saveText, { color: colors.primaryForeground }]}>Design my website with AI</Text>
+      </TouchableOpacity>
+      <Help>Six ideas based on your business. Mark what you love, and the designer builds from that. Uses AI credits; every account starts with 200 free.</Help>
       <Label>Your website and booking address</Label>
       <View style={[styles.toggleRow, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.rowTitle, { flex: 1, color: colors.foreground }]}>{website.replace('https://', '') || 'Not set up yet'}</Text></View>
       {website ? <>
@@ -608,9 +679,21 @@ export default function SettingsScreen() {
       ))}
     </>);
     if (screen === 'tax') return (<>
+      <SectionTitle style={styles.section}>Sales tax</SectionTitle>
+      <Help>Tax rules differ by place, so check with your tax adviser before changing these.</Help>
       <Label>Sales tax rate (%)</Label>{field('percent', '0', { keyboardType: 'decimal-pad' })}
       {toggle('services', 'Charge tax on services')}{toggle('products', 'Charge tax on products')}
-      <Help>Tax rules differ by place. Check with your tax adviser before changing this.</Help>{saveButton()}
+      <SectionTitle style={styles.section}>Tips</SectionTitle>
+      <Help>The tip choices clients see at checkout, as a percentage of the visit. They can still enter their own amount or choose no tip.</Help>
+      {(draft.tips as string[] | undefined ?? []).map((value, i) => (
+        <View key={i}>
+          <Label>{`Tip ${i + 1} (%)`}</Label>
+          <TextInput testID={`settings-tip-${i}`} value={value} onChangeText={(v) => set('tips', (draft.tips as string[]).map((t, j) => (j === i ? v.replace(/[^0-9]/g, '').slice(0, 3) : t)))}
+            placeholder={i === 0 ? '20' : 'Optional'} placeholderTextColor={colors.mutedForeground} keyboardType="number-pad"
+            style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
+        </View>
+      ))}
+      {saveButton()}
     </>);
     return (<>
       <View style={[styles.toggleRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={{ flex: 1 }}><Text style={[styles.rowHint, { color: colors.mutedForeground, marginTop: 0 }]}>Signed in as</Text><Text style={[styles.rowTitle, { color: colors.foreground }]}>{user?.email ?? 'Your Certxa account'}</Text></View></View>
@@ -636,7 +719,8 @@ export default function SettingsScreen() {
   };
 
   return (
-    <KeyboardAvoidingView style={[styles.root, { backgroundColor: colors.background, paddingTop: insets.top }]} behavior="padding" keyboardVerticalOffset={0}>
+    <KeyboardAvoidingView style={[styles.root, { backgroundColor: look.pageTop, paddingTop: insets.top }]} behavior="padding" keyboardVerticalOffset={0}>
+      <AppBackground />
       <StatusBar barStyle="dark-content" />
       <View style={styles.header}>
         <TouchableOpacity testID="settings-back" accessibilityLabel="Back" onPress={() => (screen === 'menu' ? router.back() : void open('menu'))} style={styles.headerButton}><Feather name="arrow-left" size={21} color={colors.foreground} /></TouchableOpacity>
@@ -645,8 +729,8 @@ export default function SettingsScreen() {
       </View>
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         {loading ? <ActivityIndicator style={{ marginTop: 40 }} color={colors.primary} /> : error && Object.keys(draft).length === 0 && screen !== 'menu' && screen !== 'website' && screen !== 'account' ? null : body()}
-        {error ? <View style={[styles.banner, { backgroundColor: colors.accent }]}><Feather name="alert-circle" size={15} color={colors.accentForeground} /><Text style={[styles.bannerText, { color: colors.accentForeground }]}>{error}</Text></View> : null}
-        {notice ? <View style={[styles.banner, { backgroundColor: colors.secondary }]}><Feather name="check" size={15} color={colors.primary} /><Text style={[styles.bannerText, { color: colors.primary }]}>{notice}</Text></View> : null}
+        {error ? <View style={[styles.banner, { backgroundColor: colors.accent }]}><Feather name="alert-circle" size={17} color={colors.accentForeground} /><Text style={[styles.bannerText, { color: colors.accentForeground }]}>{error}</Text></View> : null}
+        {notice ? <View style={[styles.banner, { backgroundColor: colors.secondary }]}><Feather name="check" size={17} color={colors.primary} /><Text style={[styles.bannerText, { color: colors.primary }]}>{notice}</Text></View> : null}
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -656,27 +740,28 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   header: { minHeight: 52, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerButton: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
+  headerTitle: { fontSize: 18, fontFamily: 'Inter_600SemiBold' },
   content: { paddingHorizontal: 20, paddingTop: 8 },
-  group: { marginBottom: 20, gap: 8 },
-  groupTitle: { fontSize: 10, letterSpacing: 1.2, fontFamily: 'Inter_700Bold', marginBottom: 2 },
-  row: { borderWidth: 1, borderRadius: 15, minHeight: 60, paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 11 },
-  rowIcon: { width: 34, height: 34, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
-  rowTitle: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  rowHint: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 3 },
-  label: { fontSize: 12, fontFamily: 'Inter_600SemiBold', marginTop: 18, marginBottom: 8 },
-  help: { fontSize: 11, lineHeight: 16, fontFamily: 'Inter_400Regular', marginTop: 8 },
-  input: { minHeight: 46, borderWidth: 1, borderRadius: 13, paddingHorizontal: 12, fontSize: 14, fontFamily: 'Inter_400Regular', marginBottom: 8 },
+  group: { marginBottom: 4, gap: 10 },
+  section: { marginTop: 24, marginBottom: 4 },
+  groupTitle: { fontSize: 13, letterSpacing: 1.2, fontFamily: 'Inter_700Bold', marginBottom: 2 },
+  row: { borderWidth: 1, borderRadius: 18, minHeight: 74, paddingHorizontal: 14, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 14, ...cardShadow },
+  rowIcon: { width: 54, height: 54, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  rowTitle: { fontSize: 18, fontFamily: 'Inter_600SemiBold' },
+  rowHint: { fontSize: 15, lineHeight: 20, fontFamily: 'Inter_400Regular', marginTop: 3 },
+  label: { fontSize: 15, fontFamily: 'Inter_600SemiBold', marginTop: 18, marginBottom: 8 },
+  help: { fontSize: 14, lineHeight: 20, fontFamily: 'Inter_400Regular', marginTop: 8 },
+  input: { minHeight: 46, borderWidth: 1, borderRadius: 13, paddingHorizontal: 12, fontSize: 17, fontFamily: 'Inter_400Regular', marginBottom: 8 },
   textArea: { minHeight: 120, paddingTop: 12, textAlignVertical: 'top' },
   pair: { flexDirection: 'row', gap: 10 },
   toggleRow: { borderWidth: 1, borderRadius: 15, minHeight: 54, paddingHorizontal: 13, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { minHeight: 38, borderWidth: 1, borderRadius: 12, paddingHorizontal: 13, alignItems: 'center', justifyContent: 'center' },
-  chipText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  chipText: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
   save: { minHeight: 49, borderRadius: 15, alignItems: 'center', justifyContent: 'center', marginTop: 18 },
-  saveText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  link: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  saveText: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
+  link: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
   linkButton: { minHeight: 44, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
   banner: { marginTop: 16, borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  bannerText: { flex: 1, fontSize: 12, lineHeight: 17, fontFamily: 'Inter_500Medium' },
+  bannerText: { flex: 1, fontSize: 15, lineHeight: 21, fontFamily: 'Inter_500Medium' },
 });

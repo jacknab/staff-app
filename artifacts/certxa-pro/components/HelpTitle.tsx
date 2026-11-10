@@ -4,7 +4,7 @@
  *   <HelpTitle help="calendar" style={…}>Calendar</HelpTitle>   in place of the title's <Text>
  *   <HelpHost />                                                  once, in app/_layout.tsx
  */
-import { useSyncExternalStore, type ReactNode } from 'react';
+import { useEffect, useRef, useSyncExternalStore, type ReactNode } from 'react';
 import { Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View, type StyleProp, type TextStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -22,9 +22,23 @@ export function openHelp(id: string) {
   setOpen(page);
 }
 
+/** How long a hold takes to open help (React Native's own long press is 500 ms). */
+const HOLD_MS = 500;
+
 export function HelpTitle({ help, style, numberOfLines, children }: { help: string; style?: StyleProp<TextStyle>; numberOfLines?: number; children: ReactNode }) {
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stop = () => { if (timer.current) clearTimeout(timer.current); timer.current = null; };
+  useEffect(() => stop, []);
+  // In the browser (pro.certxa.com) a title's onLongPress is ignored by React Native Web, so the hold is timed here
+  // from the touch/mouse going down until it lifts or moves away.
+  const webHold = Platform.OS === 'web' ? {
+    onStartShouldSetResponder: () => true,
+    onResponderGrant: () => { stop(); timer.current = setTimeout(() => { timer.current = null; openHelp(help); }, HOLD_MS); },
+    onResponderRelease: stop,
+    onResponderTerminate: stop,
+  } : { onLongPress: () => openHelp(help) };
   return (
-    <Text style={style} numberOfLines={numberOfLines} onLongPress={() => openHelp(help)}
+    <Text style={style} numberOfLines={numberOfLines} {...webHold}
       accessibilityHint="Hold for help with this page" suppressHighlighting>
       {children}
     </Text>
@@ -84,19 +98,19 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   nav: { height: 52, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   navSide: { width: 44, height: 44, justifyContent: 'center' },
-  navTitle: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
+  navTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
   content: { paddingHorizontal: 22, paddingTop: 4 },
   title: { fontSize: 28, fontFamily: 'Inter_600SemiBold', letterSpacing: -0.4 },
-  intro: { fontSize: 16, lineHeight: 23, fontFamily: 'Inter_400Regular', marginTop: 8 },
+  intro: { fontSize: 18, lineHeight: 26, fontFamily: 'Inter_400Regular', marginTop: 8 },
   section: { marginTop: 26, gap: 10 },
-  heading: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
+  heading: { fontSize: 19, fontFamily: 'Inter_600SemiBold' },
   point: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
   bullet: { width: 6, height: 6, borderRadius: 3, marginTop: 9 },
-  pointText: { flex: 1, fontSize: 16, lineHeight: 23, fontFamily: 'Inter_400Regular' },
+  pointText: { flex: 1, fontSize: 18, lineHeight: 26, fontFamily: 'Inter_400Regular' },
   example: { gap: 6, marginTop: 6 },
   bubble: { maxWidth: '86%', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10 },
   mine: { alignSelf: 'flex-end', borderBottomRightRadius: 6 },
   theirs: { alignSelf: 'flex-start', borderWidth: 1, borderBottomLeftRadius: 6 },
-  bubbleText: { fontSize: 15, lineHeight: 21, fontFamily: 'Inter_400Regular' },
-  tip: { fontSize: 13, textAlign: 'center', marginTop: 34, fontFamily: 'Inter_400Regular' },
+  bubbleText: { fontSize: 17, lineHeight: 24, fontFamily: 'Inter_400Regular' },
+  tip: { fontSize: 16, textAlign: 'center', marginTop: 34, fontFamily: 'Inter_400Regular' },
 });

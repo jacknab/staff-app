@@ -14,6 +14,8 @@ import { useColors } from '@/hooks/useColors';
 import { api, ApiError } from '@/lib/live-api';
 import { HelpTitle } from '@/components/HelpTitle';
 
+import { AppBackground } from '@/components/look/AppBackground';
+import { look } from '@/components/look/tokens';
 type Pack = { id: string; credits: number; priceCents: number };
 type Summary = { credits: number; unlimited: boolean; packs: Pack[]; card: { brand: string | null; last4: string | null } | null };
 
@@ -84,7 +86,8 @@ export default function CreditsScreen() {
 
   const topInset = Platform.OS === 'web' ? 67 : insets.top;
   return (
-    <View style={[styles.root, { backgroundColor: colors.background, paddingTop: topInset }]} testID="credits-screen">
+    <View style={[styles.root, { backgroundColor: look.pageTop, paddingTop: topInset }]} testID="credits-screen">
+      <AppBackground />
       <View style={styles.nav}>
         <TouchableOpacity onPress={() => router.back()} style={styles.navSide} accessibilityLabel="Back" testID="credits-back">
           <Feather name="arrow-left" size={24} color={colors.foreground} />
@@ -135,16 +138,16 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   nav: { height: 56, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   navSide: { width: 44, height: 44, justifyContent: 'center' },
-  navTitle: { fontSize: 20, fontFamily: 'Inter_500Medium' },
+  navTitle: { fontSize: 22, fontFamily: 'Inter_500Medium' },
   content: { paddingHorizontal: 24, paddingBottom: 60 },
   balance: { alignItems: 'center', paddingVertical: 28, gap: 8 },
   balanceRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   balanceNumber: { fontSize: 54, fontFamily: 'Inter_600SemiBold', letterSpacing: -1 },
-  balanceLabel: { fontSize: 17, fontFamily: 'Inter_500Medium' },
-  section: { fontSize: 18, fontFamily: 'Inter_600SemiBold', marginTop: 14, marginBottom: 14 },
+  balanceLabel: { fontSize: 19, fontFamily: 'Inter_500Medium' },
+  section: { fontSize: 20, fontFamily: 'Inter_600SemiBold', marginTop: 14, marginBottom: 14 },
   pack: { flexDirection: 'row', alignItems: 'center', gap: 14, borderWidth: 1, borderRadius: 14, minHeight: 72, paddingHorizontal: 14, marginBottom: 14 },
-  packName: { flex: 1, fontSize: 18, fontFamily: 'Inter_500Medium' },
+  packName: { flex: 1, fontSize: 20, fontFamily: 'Inter_500Medium' },
   price: { borderRadius: 16, paddingHorizontal: 12, paddingVertical: 5 },
-  priceText: { color: '#FFFFFF', fontSize: 16, fontFamily: 'Inter_600SemiBold' },
-  note: { fontSize: 13, lineHeight: 19, fontFamily: 'Inter_400Regular', marginTop: 4 },
+  priceText: { color: '#FFFFFF', fontSize: 18, fontFamily: 'Inter_600SemiBold' },
+  note: { fontSize: 16, lineHeight: 23, fontFamily: 'Inter_400Regular', marginTop: 4 },
 });

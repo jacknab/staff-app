@@ -14,14 +14,15 @@
 
 // Certxa Payments look (owner, 2026-11-03): deep navy text, violet primary, lavender-white background, Stripe-indigo
 // accent. Replaced the earlier teal/green palette.
+// 2026-11-09 (owner): navy-indigo text, lavender page and soft violet borders from the More design (components/look).
 const colors = {
   light: {
-    text: '#11152E',
+    text: '#1C1650',
     tint: '#7C3AED',
-    background: '#F7F5FD',
-    foreground: '#11152E',
+    background: '#F4F0FE',
+    foreground: '#1C1650',
     card: '#FFFFFF',
-    cardForeground: '#11152E',
+    cardForeground: '#1C1650',
     primary: '#7C3AED',
     primaryForeground: '#FFFFFF',
     secondary: '#F0EAFE',
@@ -32,8 +33,8 @@ const colors = {
     accentForeground: '#4F46E5',
     destructive: '#D92D20',
     destructiveForeground: '#FFFFFF',
-    border: '#E6E2F1',
-    input: '#E6E2F1',
+    border: '#ECE6F9',
+    input: '#E4DCF6',
   },
   radius: 16,
 };
