@@ -1,11 +1,12 @@
 /**
- * Card payment setup ("Get paid"): the business's Stripe account, opened in Stripe's own hosted setup inside
- * the app. Certxa earns from every card payment, so a business that hasn't finished this can't take cards
+ * Card payment setup ("Get paid"): the business's Stripe account, set up on Certxa's own page with Stripe's
+ * embedded onboarding, the same form as the website (owner, 2026-11-10), opened in the in-app browser. Certxa earns from every card payment, so a business that hasn't finished this can't take cards
  * with Tap to Pay or the M2 reader.
  *
- * The server makes the account on first use, pre-filled with what Certxa knows, and returns a one-time link
- * (POST /api/payments/stripe/onboarding-link). Stripe sends the browser back through certxa.com, which opens
- * certxa-pro://payments-setup, which closes the in-app browser here.
+ * POST /api/payments/stripe/app-setup-link gives a one-time link to certxa.com/pro-payments-setup, signed in for that
+ * page only (server: routes/proPaymentsSetup.ts). The account is made on first use, pre-filled with what Certxa
+ * knows. When the owner is done the page opens certxa-pro://payments-setup, which closes the in-app browser here.
+ * A server without that link yet gets Stripe's hosted setup (POST /api/payments/stripe/onboarding-link) as before.
  */
 import * as WebBrowser from 'expo-web-browser';
 import { api } from '@/lib/live-api';
@@ -38,6 +39,11 @@ export async function getPaymentStatus(fresh = false): Promise<PaymentStatus> {
  * returns the fresh status. A link Stripe reports as expired is replaced with a new one, up to twice.
  */
 export async function runPaymentsSetup(): Promise<PaymentStatus> {
+  const embedded = await api.post<{ url: string }>('/api/payments/stripe/app-setup-link').catch(() => null);
+  if (embedded?.url) {
+    await WebBrowser.openAuthSessionAsync(embedded.url, RETURN_URL);
+    return getPaymentStatus(true);
+  }
   for (let attempt = 0; attempt < 3; attempt++) {
     const { url } = await api.post<{ url: string }>('/api/payments/stripe/onboarding-link');
     const result = await WebBrowser.openAuthSessionAsync(url, RETURN_URL);

@@ -572,7 +572,7 @@ export const HELP: Record<string, HelpPage> = {
   'payments-intro': {
     title: 'Set up payments',
     intro: 'Taking cards goes through your own Stripe account, so the money goes straight to you.',
-    sections: [{ heading: 'How it works', points: ['Set up payments with Stripe opens Stripe’s form: answer its questions about you, your business and your bank.', 'Your business address needs to be complete first; you’ll be asked for it if it isn’t.', 'When it says You’re all set, you can take cards in the app and deposits on your website.'] }],
+    sections: [{ heading: 'How it works', points: ['Set up payments with Stripe opens Certxa’s payment setup page with Stripe’s secure form: answer its questions about you, your business and your bank. When you finish or close it, you’re back in the app.', 'Your business address needs to be complete first; you’ll be asked for it if it isn’t.', 'When it says You’re all set, you can take cards in the app and deposits on your website.'] }],
   },
   'about-me': {
     title: 'About you',
@@ -600,7 +600,7 @@ export const HELP: Record<string, HelpPage> = {
     intro: 'Setting up card payments: the M2 card reader, and Tap to Pay on iPhone.',
     sections: [{ heading: 'How it works', points: [
       'Where do you work?: Stripe needs your address first. If you work from home or only do house calls, clients never see your street address.',
-      'Set up payments opens Stripe’s own secure form for your details and bank account (about five minutes).',
+      'Set up payments opens Certxa’s payment setup page with Stripe’s secure form, for your details and bank account (about five minutes). When you finish or close it, you’re back in the app.',
       'Once it’s done, open an appointment and tap Check Out to take cards. Payouts go to your bank.',
       'If Stripe needs more details, Continue setup picks up where you left off.',
     ] }],
