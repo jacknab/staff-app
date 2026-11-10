@@ -14,9 +14,11 @@ import { BusinessHoursEditor, DAY_NAMES, type DayHours } from '@/components/Busi
 import { AppBackground } from '@/components/look/AppBackground';
 import { look, cardShadow } from '@/components/look/tokens';
 import { HelpTitle } from '@/components/HelpTitle';
+import { WhyWeAsk } from '@/components/WhyWeAsk';
+import { BUSINESS_STRUCTURES, WHY, dateOfBirthIso, isCompany } from '@/lib/stripe-details';
 // The same list as Settings > Business details. Certxa loads a starter list of services for the types it has one for.
 const BUSINESS_TYPES = ['Nail Salon', 'Hair Salon', 'Barbershop', 'Lash and Brows', 'Esthetician', 'Makeup', 'Massage', 'Wax', 'Tattoo and Piercing', 'Pet Grooming', 'Other'];
-const STEPS = 5;
+const STEPS = 6;
 
 function deviceTimezone() {
   try { return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined; } catch { return undefined; }
@@ -24,7 +26,9 @@ function deviceTimezone() {
 
 /**
  * Sign-up, one question per step (owner, 2026-11-03): 1 you and your business, 2 where you offer your services,
- * 3 your business hours (a day opens a sheet with a time wheel), 4 your login, 5 your mobile number, proved by a
+ * 3 your business hours (a day opens a sheet with a time wheel), 4 the details Stripe needs for card payments (date of
+ * birth, home address, business structure and EIN, each with "Why we ask"; owner, 2026-11-10: handed to Stripe so its
+ * form doesn't ask again), 5 your login, 6 your mobile number, proved by a
  * texted code (a mobile line no Certxa account has ever had: lib/proPhoneVerification.ts on the server). A progress
  * bar and "n / 5" at the top, one Next button at the bottom that is grey until the step is answered. Light colours
  * throughout.
@@ -49,6 +53,18 @@ export default function SignupScreen() {
   const [zip, setZip] = useState('');
   // The days and times clients can book (the same default as before: Monday to Saturday, 9 to 6).
   const [hours, setHours] = useState<DayHours[]>(() => DAY_NAMES.map((_, dayOfWeek) => ({ dayOfWeek, openTime: '09:00', closeTime: '18:00', isClosed: dayOfWeek === 0 })));
+  // Step 4, for Stripe: date of birth, home address (a home studio's is the business address), business structure.
+  const [dobMonth, setDobMonth] = useState('');
+  const [dobDay, setDobDay] = useState('');
+  const [dobYear, setDobYear] = useState('');
+  const [homeSame, setHomeSame] = useState(false);
+  const [homeStreet, setHomeStreet] = useState('');
+  const [homeCity, setHomeCity] = useState('');
+  const [homeState, setHomeState] = useState('');
+  const [homeZip, setHomeZip] = useState('');
+  const [structure, setStructure] = useState('');
+  const [legalName, setLegalName] = useState('');
+  const [ein, setEin] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
@@ -63,11 +79,17 @@ export default function SignupScreen() {
 
   const phoneDigits = phone.replace(/\D/g, '').replace(/^1(?=\d{10}$)/, '');
   const addressReady = Boolean(street.trim() && city.trim() && /^[A-Za-z]{2}$/.test(state.trim()) && /^\d{5}$/.test(zip.trim()));
+  const dateOfBirth = dateOfBirthIso(dobMonth, dobDay, dobYear);
+  // A home studio's address is the home address; with a business location it can be "the same".
+  const homeIsBusiness = hasPlace && (placeIsHome || homeSame);
+  const homeReady = homeIsBusiness || Boolean(homeStreet.trim() && homeCity.trim() && /^[A-Za-z]{2}$/.test(homeState.trim()) && /^\d{5}$/.test(homeZip.trim()));
+  const einDigits = ein.replace(/\D/g, '');
   const ready =
     step === 1 ? Boolean(firstName.trim() && lastName.trim() && businessName.trim().length >= 2 && businessType)
     : step === 2 ? (houseCalls || hasPlace) && (!hasPlace || addressReady)
     : step === 3 ? hours.some((day) => !day.isClosed)
-    : step === 4 ? Boolean(email.trim().includes('@') && password.length >= 8)
+    : step === 4 ? Boolean(dateOfBirth && homeReady && structure && (!isCompany(structure) || einDigits.length === 0 || einDigits.length === 9))
+    : step === 5 ? Boolean(email.trim().includes('@') && password.length >= 8)
     : codeSent ? code.length === 6 : phoneDigits.length === 10;
 
   const otherNumber = () => { setCodeSent(false); setCode(''); setPhoneToken(null); setError(''); };
@@ -123,6 +145,16 @@ export default function SignupScreen() {
           if (store) await api.patch(`/api/stores/${store.id}`, { address: street.trim(), city: city.trim(), state: state.trim().toUpperCase(), postcode: zip.trim() });
         } catch { /* asked again before card payments */ }
       }
+      // The details for Stripe (step 4), kept for when card payments are set up. Never blocks the sign-up: Stripe's
+      // form asks for anything missing.
+      try {
+        await api.put('/api/payments/stripe/owner-details', {
+          dateOfBirth, legalEntityType: structure,
+          homeSameAsBusiness: homeIsBusiness,
+          ...(homeIsBusiness ? {} : { homeAddress: homeStreet.trim(), homeCity: homeCity.trim(), homeState: homeState.trim().toUpperCase(), homePostcode: homeZip.trim() }),
+          ...(isCompany(structure) ? { legalName: legalName.trim() || businessName.trim(), ein: einDigits } : {}),
+        });
+      } catch { /* Stripe's form asks instead */ }
       // The business hours chosen here (the account starts with Monday to Saturday, 9 to 6). Never blocks the sign-up.
       try {
         const stores = await api.get<{ id: number }[]>('/api/stores');
@@ -224,6 +256,61 @@ export default function SignupScreen() {
             </View>
           </>
         ) : step === 4 ? (
+          <>
+            <HelpTitle help="signup" style={[styles.title, { color: colors.foreground }]}>A few details for card payments</HelpTitle>
+            <Text style={[styles.optionHint, { color: colors.mutedForeground, marginTop: 12 }]}>Stripe processes your card payments. We pass these to Stripe so you only enter them once.</Text>
+            <View style={styles.form}>
+              <Text style={[styles.sectionLabel, { color: colors.foreground }]}>Date of birth</Text>
+              <View style={styles.pair}>
+                <TextInput keyboardType="number-pad" maxLength={2} onChangeText={(v) => setDobMonth(v.replace(/\D/g, ''))} placeholder="MM" placeholderTextColor={colors.mutedForeground} style={[styles.input, field, inputText, { flex: 1, minWidth: 0 }]} testID="signup-dob-month" value={dobMonth} />
+                <TextInput keyboardType="number-pad" maxLength={2} onChangeText={(v) => setDobDay(v.replace(/\D/g, ''))} placeholder="DD" placeholderTextColor={colors.mutedForeground} style={[styles.input, field, inputText, { flex: 1, minWidth: 0 }]} testID="signup-dob-day" value={dobDay} />
+                <TextInput keyboardType="number-pad" maxLength={4} onChangeText={(v) => setDobYear(v.replace(/\D/g, ''))} placeholder="YYYY" placeholderTextColor={colors.mutedForeground} style={[styles.input, field, inputText, { flex: 1.4, minWidth: 0 }]} testID="signup-dob-year" value={dobYear} />
+              </View>
+              <WhyWeAsk testID="signup-why-dob">{WHY.dateOfBirth}</WhyWeAsk>
+
+              <Text style={[styles.sectionLabel, { color: colors.foreground }]}>Home address</Text>
+              {hasPlace && placeIsHome ? (
+                <Text style={[styles.optionHint, { color: colors.mutedForeground }]}>Your home studio address: {street.trim()}, {city.trim()}.</Text>
+              ) : (
+                <>
+                  {hasPlace ? (
+                    <TouchableOpacity accessibilityRole="checkbox" accessibilityState={{ checked: homeSame }} onPress={() => setHomeSame(!homeSame)} style={styles.checkRow} testID="signup-home-same">
+                      <Feather name={homeSame ? 'check-square' : 'square'} size={20} color={homeSame ? colors.foreground : colors.mutedForeground} />
+                      <Text style={[styles.checkText, { color: colors.foreground }]}>Same as my business address</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                  {!homeSame || !hasPlace ? (
+                    <>
+                      <TextInput autoComplete="street-address" onChangeText={setHomeStreet} placeholder="Street address" placeholderTextColor={colors.mutedForeground} style={[styles.input, field, inputText]} testID="signup-home-address" value={homeStreet} />
+                      <View style={styles.pair}>
+                        <TextInput autoComplete="postal-address-locality" onChangeText={setHomeCity} placeholder="City" placeholderTextColor={colors.mutedForeground} style={[styles.input, field, inputText, { flex: 2, minWidth: 0 }]} testID="signup-home-city" value={homeCity} />
+                        <TextInput autoCapitalize="characters" maxLength={2} onChangeText={setHomeState} placeholder="State" placeholderTextColor={colors.mutedForeground} style={[styles.input, field, inputText, { flex: 1, minWidth: 0 }]} testID="signup-home-state" value={homeState} />
+                        <TextInput keyboardType="number-pad" maxLength={5} autoComplete="postal-code" onChangeText={setHomeZip} placeholder="ZIP" placeholderTextColor={colors.mutedForeground} style={[styles.input, field, inputText, { flex: 1.3, minWidth: 0 }]} testID="signup-home-zip" value={homeZip} />
+                      </View>
+                    </>
+                  ) : null}
+                </>
+              )}
+              <WhyWeAsk testID="signup-why-home">{WHY.homeAddress}</WhyWeAsk>
+
+              <Text style={[styles.sectionLabel, { color: colors.foreground }]}>How is your business set up?</Text>
+              <SelectField testID="signup-structure" title="How is your business set up?" placeholder="Choose one" value={structure || null}
+                options={BUSINESS_STRUCTURES} onChange={setStructure} />
+              <WhyWeAsk testID="signup-why-structure">{WHY.structure}</WhyWeAsk>
+
+              {isCompany(structure) ? (
+                <>
+                  <Text style={[styles.sectionLabel, { color: colors.foreground }]}>Legal business name</Text>
+                  <TextInput autoCapitalize="words" onChangeText={setLegalName} placeholder={businessName.trim() || 'As registered'} placeholderTextColor={colors.mutedForeground} style={[styles.input, field, inputText]} testID="signup-legal-name" value={legalName} />
+                  <WhyWeAsk testID="signup-why-legal-name">{WHY.legalName}</WhyWeAsk>
+                  <Text style={[styles.sectionLabel, { color: colors.foreground }]}>EIN (federal tax ID)</Text>
+                  <TextInput keyboardType="number-pad" maxLength={10} onChangeText={(v) => { const d = v.replace(/\D/g, '').slice(0, 9); setEin(d.length > 2 ? `${d.slice(0, 2)}-${d.slice(2)}` : d); }} placeholder="12-3456789 (optional)" placeholderTextColor={colors.mutedForeground} style={[styles.input, field, inputText]} testID="signup-ein" value={ein} />
+                  <WhyWeAsk testID="signup-why-ein">{WHY.ein}</WhyWeAsk>
+                </>
+              ) : null}
+            </View>
+          </>
+        ) : step === 5 ? (
           <>
             <HelpTitle help="signup" style={[styles.title, { color: colors.foreground }]}>Create your login</HelpTitle>
             <View style={styles.form}>

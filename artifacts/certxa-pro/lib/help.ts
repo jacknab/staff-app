@@ -28,6 +28,7 @@ export const HELP: Record<string, HelpPage> = {
         'Tell us about your business: your first and last name, your business name and the type of business.',
         'Where do you offer your services?: turn on Business location (your own place) and/or House call. With a business location, enter its address; tick "This is my home studio" to keep it private, so clients see only your city until they book.',
         'What are your business hours?: the days and times clients can book you online.',
+        'A few details for card payments: your date of birth, your home address (a home studio’s address is used as it is; otherwise tick Same as my business address or type it), and how your business is set up (Just me for a sole proprietor, or your LLC or corporation with its legal name and EIN). Stripe, who processes card payments, needs these; Certxa passes them on when you set up payments, so Stripe’s form doesn’t ask again. Tap Why we ask under any of them for the reason. Clients never see them.',
         'Create your login: the email and password you’ll sign in with (8 characters or more).',
         'What’s your mobile number?: a mobile number (not a landline) gets a text with a code. Enter the code to finish. One number can be used for one account.',
       ] },
@@ -600,9 +601,11 @@ export const HELP: Record<string, HelpPage> = {
     intro: 'Setting up card payments: the M2 card reader, and Tap to Pay on iPhone.',
     sections: [{ heading: 'How it works', points: [
       'Where do you work?: Stripe needs your address first. If you work from home or only do house calls, clients never see your street address.',
+      'Confirm it’s you: the last 4 digits of your Social Security number (and your date of birth if you didn’t give it at sign-up). Certxa sends them straight to Stripe and never saves the digits, so Stripe’s form doesn’t ask for them. Why we ask says why each is needed. Continue sends them and opens the setup; Later leaves the page.',
       'Set up payments opens Certxa’s payment setup page with Stripe’s secure form, for your details and bank account (about five minutes). When you finish or close it, you’re back in the app.',
       'Once it’s done, open an appointment and tap Check Out to take cards. Payouts go to your bank.',
       'If Stripe needs more details, Continue setup picks up where you left off.',
+      'Stripe can also ask for more after you’ve finished (a detail that didn’t check out, a document). Then a thin yellow banner shows at the top of every screen, you get a notification and an e-mail (once a day at most), and this page says what’s needed. Tap the banner to open Stripe’s form. If it isn’t done in time, Stripe pauses card payments or payouts until it is.',
     ] }],
   },
   'tap-to-pay': {

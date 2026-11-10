@@ -24,6 +24,7 @@ import { setInboxLive } from '@/lib/inboxLive';
 import { prepareVoice, registerBusinessPhone } from '@/lib/voice';
 import { CallScreen } from '@/components/CallScreen';
 import { HelpHost } from '@/components/HelpTitle';
+import { PaymentsAttentionFrame } from '@/components/PaymentsAttentionBanner';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { CertxaTerminalProvider } from '@/components/CertxaTerminalProvider';
 
@@ -81,6 +82,8 @@ function PushBridge() {
       else if (data.type === 'plus_text') router.push({ pathname: '/messages', params: { phone: String((data as { phone?: string }).phone ?? ''), name: String((data as { name?: string }).name ?? '') } });
       // Plus started or ended: More shows the plan cards as they now apply.
       else if (data.type === 'plan') router.push('/more');
+      // Stripe asked for more details: Get paid opens its form.
+      else if (data.type === 'payments_attention') router.push('/get-paid');
       else if (data.type === 'shop') router.push((data as { to?: string }).to === 'packages' ? '/packages' : '/gift-cards');
       else if (data.type === 'business_phone') router.push((data as { tab?: string }).tab === 'texts' ? '/phone-texts' : '/phone');
       else router.push('/calendar');
@@ -107,6 +110,8 @@ function RootLayoutNav() {
   if (!isAuthenticated && pathname !== '/login' && pathname !== '/signup') return <Redirect href="/login" />;
 
   return (
+    // Stripe asking for more details: a thin banner above every screen.
+    <PaymentsAttentionFrame>
     <Stack screenOptions={{ headerBackTitle: 'Back' }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="booking" options={{ headerShown: false, presentation: 'card' }} />
@@ -149,6 +154,7 @@ function RootLayoutNav() {
       <Stack.Screen name="requests" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="request/[id]" options={{ headerShown: false, presentation: 'card' }} />
     </Stack>
+    </PaymentsAttentionFrame>
   );
 }
 

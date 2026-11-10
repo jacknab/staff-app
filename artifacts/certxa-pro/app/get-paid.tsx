@@ -1,7 +1,9 @@
 /**
  * "Get paid": set up card payments (Tap to Pay on iPhone and the Stripe M2 reader) without leaving the app.
- * Shown right after sign-up, and from the reminders on the home and checkout screens and from Settings.
- * The setup itself is Stripe's own hosted form (lib/payments-setup.ts).
+ * Shown right after sign-up, and from the reminders on the home and checkout screens, from Settings and from the
+ * "Stripe needs something" banner. Before the setup form opens it asks the last 4 of the SSN (and the date of birth if
+ * sign-up didn't get it), sent straight to Stripe (owner, 2026-11-10). The setup itself is Stripe's form on a
+ * Certxa page (lib/payments-setup.ts).
  */
 import { useCallback, useEffect, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -9,7 +11,9 @@ import { ActivityIndicator, Platform, ScrollView, StyleSheet, Text, TextInput, T
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
-import { canTakeCards, getPaymentStatus, runPaymentsSetup, type PaymentStatus } from '@/lib/payments-setup';
+import { canTakeCards, getOwnerDetails, getPaymentStatus, runPaymentsSetup, sendIdentity, type PaymentStatus } from '@/lib/payments-setup';
+import { WHY, dateOfBirthIso } from '@/lib/stripe-details';
+import { WhyWeAsk } from '@/components/WhyWeAsk';
 import { api } from '@/lib/live-api';
 import { useBookingData } from '@/contexts/BookingContext';
 import { validTimeZone } from '@/lib/businessTime';
@@ -24,7 +28,7 @@ type Store = Partial<Address> & { id: number };
 const addressComplete = (a: Partial<Address> | null | undefined) =>
   Boolean(a?.address?.trim() && a.city?.trim() && /^[A-Za-z]{2}$/.test(a.state?.trim() ?? '') && /^\d{5}$/.test(a.postcode?.trim() ?? ''));
 
-type Stage = 'loading' | 'intro' | 'address' | 'working' | 'more' | 'ready' | 'error';
+type Stage = 'loading' | 'intro' | 'address' | 'identity' | 'working' | 'more' | 'ready' | 'error';
 
 export default function GetPaidScreen() {
   const { setTimeZone, refresh: refreshCalendar } = useBookingData();
@@ -40,7 +44,16 @@ export default function GetPaidScreen() {
   // A home studio's address, or a house-calls-only professional's base address, is never shown to clients.
   const [ownPlace, setOwnPlace] = useState<'salon' | 'home' | 'none'>('salon');
 
-  const show = (status: PaymentStatus) => setStage(canTakeCards(status) ? 'ready' : status.connected ? 'more' : 'intro');
+  const [status, setStatus] = useState<PaymentStatus | null>(null);
+  // The identity step: the last 4 of the SSN, and the date of birth when Certxa doesn't have it.
+  const [askDob, setAskDob] = useState(false);
+  const [ssn, setSsn] = useState('');
+  const [dob, setDob] = useState({ month: '', day: '', year: '' });
+
+  const show = (next: PaymentStatus) => {
+    setStatus(next);
+    setStage(next.attention?.needed ? 'more' : canTakeCards(next) ? 'ready' : next.connected ? 'more' : 'intro');
+  };
 
   useEffect(() => {
     getPaymentStatus().then(show).catch(() => setStage('intro'));
@@ -77,8 +90,34 @@ export default function GetPaidScreen() {
       }
     }
     if (current && !addressComplete(current)) { setError(''); setStage('address'); return; }
-    void openStripe();
-  }, [store, openStripe]);
+    await identityOrStripe();
+  }, [store, openStripe, status]);
+
+  // Before the form is first finished: the SSN digits once (Stripe's form doesn't ask again), then Stripe.
+  const identityOrStripe = useCallback(async () => {
+    if (!status?.detailsSubmitted) {
+      const details = await getOwnerDetails().catch(() => null);
+      if (details && !details.ssnSent) { setAskDob(!details.hasDateOfBirth); setError(''); setStage('identity'); return; }
+    }
+    await openStripe();
+  }, [status, openStripe]);
+
+  const saveIdentity = useCallback(async () => {
+    const digits = ssn.replace(/\D/g, '');
+    const dateOfBirth = askDob ? dateOfBirthIso(dob.month, dob.day, dob.year) : null;
+    if (askDob && !dateOfBirth) { setError('Enter your date of birth as month, day and year.'); return; }
+    if (digits.length !== 4) { setError('Enter the last 4 digits of your Social Security number.'); return; }
+    setError('');
+    setStage('working');
+    try {
+      await sendIdentity({ ssnLast4: digits, ...(dateOfBirth ? { dateOfBirth } : {}) });
+      setSsn('');
+      await openStripe();
+    } catch (cause: any) {
+      setError(cause?.message ?? 'We couldn’t send that to Stripe. Check your connection and try again.');
+      setStage('identity');
+    }
+  }, [ssn, askDob, dob, openStripe]);
 
   const saveAddress = useCallback(async () => {
     const next = { address: draft.address.trim(), city: draft.city.trim(), state: draft.state.trim().toUpperCase(), postcode: draft.postcode.trim() };
@@ -91,12 +130,12 @@ export default function GetPaidScreen() {
       setStore(updated);
       // Certxa sets the time zone from the address; the calendar follows it.
       if (updated.timezone) { setTimeZone(validTimeZone(updated.timezone)); void refreshCalendar(); }
-      await openStripe();
+      await identityOrStripe();
     } catch (cause: any) {
       setError(cause?.message ?? 'We couldn’t save your address. Check your connection and try again.');
       setStage('address');
     }
-  }, [draft, store, openStripe]);
+  }, [draft, store, identityOrStripe]);
 
   const leave = () => (from === 'signup' || !router.canGoBack() ? router.replace('/(tabs)') : router.back());
   const topInset = Platform.OS === 'web' ? 67 : insets.top;
@@ -162,6 +201,34 @@ export default function GetPaidScreen() {
             {secondary(from === 'signup' ? 'Not now' : 'Later', leave, 'get-paid-address-later')}
           </View>
         </>
+      ) : stage === 'identity' ? (
+        <>
+          <HelpTitle help="get-paid" style={[styles.title, text]}>Confirm it’s you</HelpTitle>
+          <Text style={[styles.body, muted]}>Stripe asks for these to confirm your identity before it pays you out. We send them straight to Stripe, so its form won’t ask again.</Text>
+          <View style={styles.form}>
+            {askDob ? (
+              <View>
+                <Text style={[styles.label, text]}>Date of birth</Text>
+                <View style={styles.pair}>
+                  {([['month', 'MM', 2, 1], ['day', 'DD', 2, 1], ['year', 'YYYY', 4, 1.4]] as const).map(([key, placeholder, max, flex]) => (
+                    <TextInput key={key} keyboardType="number-pad" maxLength={max} onChangeText={(v) => setDob((d) => ({ ...d, [key]: v.replace(/\D/g, '') }))} placeholder={placeholder} placeholderTextColor={colors.mutedForeground} style={[styles.input, { flex, minWidth: 0, backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} testID={`get-paid-dob-${key}`} value={dob[key]} />
+                  ))}
+                </View>
+                <WhyWeAsk testID="get-paid-why-dob">{WHY.dateOfBirth}</WhyWeAsk>
+              </View>
+            ) : null}
+            <View>
+              <Text style={[styles.label, text]}>Last 4 digits of your Social Security number</Text>
+              <TextInput keyboardType="number-pad" maxLength={4} secureTextEntry autoComplete="off" onChangeText={(v) => setSsn(v.replace(/\D/g, ''))} placeholder="••••" placeholderTextColor={colors.mutedForeground} style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} testID="get-paid-ssn" value={ssn} />
+              <WhyWeAsk testID="get-paid-why-ssn">{WHY.ssn}</WhyWeAsk>
+            </View>
+          </View>
+          {error ? <Text style={[styles.error, { color: colors.destructive }]}>{error}</Text> : null}
+          <View style={styles.actions}>
+            {primary('Continue', () => void saveIdentity(), 'get-paid-save-identity')}
+            {secondary(from === 'signup' ? 'Not now' : 'Later', leave, 'get-paid-identity-later')}
+          </View>
+        </>
       ) : stage === 'ready' ? (
         <>
           <HelpTitle help="get-paid" style={[styles.title, text]}>You’re ready to take cards</HelpTitle>
@@ -174,7 +241,11 @@ export default function GetPaidScreen() {
       ) : stage === 'more' ? (
         <>
           <HelpTitle help="get-paid" style={[styles.title, text]}>Stripe needs a few more details</HelpTitle>
-          <Text style={[styles.body, muted]}>Finish setting up with Stripe to start taking cards. It picks up where you left off.</Text>
+          <Text style={[styles.body, muted]}>{status?.attention?.needed
+            ? status.attention.paused
+              ? 'Stripe has paused card payments or payouts until it gets the details it asked for. It takes a few minutes in the same Stripe form.'
+              : 'Stripe asked for more details to keep your card payments on. It takes a few minutes in the same Stripe form.'
+            : 'Finish setting up with Stripe to start taking cards. It picks up where you left off.'}</Text>
           <View style={styles.actions}>
             {primary('Continue setup', () => void start(), 'get-paid-continue')}
             {secondary(from === 'signup' ? 'Not now' : 'Later', leave, 'get-paid-later')}

@@ -16,7 +16,25 @@ export type PaymentStatus = {
   chargesEnabled?: boolean;
   payoutsEnabled?: boolean;
   detailsSubmitted?: boolean;
+  /** Stripe asking for more after setup (server: lib/paymentsAttention.ts): the banner on every page. */
+  attention?: { needed: boolean; paused: boolean; deadline: string | null };
 };
+
+/** What Certxa already has for Stripe (never the values): GET /api/payments/stripe/owner-details. */
+export type OwnerDetailsSummary = { hasDateOfBirth: boolean; hasHomeAddress: boolean; legalEntityType: string | null; isCompany: boolean; hasEin: boolean; ssnSent: boolean };
+
+export const getOwnerDetails = () => api.get<OwnerDetailsSummary>('/api/payments/stripe/owner-details');
+
+/**
+ * The last 4 digits of the SSN (and the date of birth, if Certxa doesn't have it), sent straight to Stripe. Certxa
+ * never saves the SSN digits.
+ */
+export const sendIdentity = (body: { ssnLast4: string; dateOfBirth?: string }) => api.post('/api/payments/stripe/identity', body);
+
+// Anything that changes the payment status (setup finished) tells the banner to look again.
+const listeners = new Set<() => void>();
+export function onPaymentStatusChange(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; }
+const changed = () => listeners.forEach((listener) => listener());
 
 const RETURN_URL = 'certxa-pro://payments-setup';
 
@@ -42,7 +60,9 @@ export async function runPaymentsSetup(): Promise<PaymentStatus> {
   const embedded = await api.post<{ url: string }>('/api/payments/stripe/app-setup-link').catch(() => null);
   if (embedded?.url) {
     await WebBrowser.openAuthSessionAsync(embedded.url, RETURN_URL);
-    return getPaymentStatus(true);
+    const status = await getPaymentStatus(true);
+    changed();
+    return status;
   }
   for (let attempt = 0; attempt < 3; attempt++) {
     const { url } = await api.post<{ url: string }>('/api/payments/stripe/onboarding-link');
@@ -50,5 +70,7 @@ export async function runPaymentsSetup(): Promise<PaymentStatus> {
     const expired = result.type === 'success' && result.url.includes('result=refresh');
     if (!expired) break;
   }
-  return getPaymentStatus(true);
+  const status = await getPaymentStatus(true);
+  changed();
+  return status;
 }
