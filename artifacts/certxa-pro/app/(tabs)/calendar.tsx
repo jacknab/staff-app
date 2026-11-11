@@ -35,7 +35,9 @@ const DEFAULT_START = 6 * 60;
 const LONG_PRESS_MS = 300;
 /** Room under the timeline so its last hour can scroll clear of the tab bar. */
 const TIMELINE_BOTTOM_PADDING = 110;
-const HOUR_HEIGHT = 64;
+// Room for a label at every quarter hour (owner, 2026-11-11: 11am, 15, 30, 45 down the side).
+const HOUR_HEIGHT = 88;
+const QUARTER = HOUR_HEIGHT / 4;
 const SNAP_MINUTES = 5;
 
 function dateKey(date: Date) {
@@ -460,7 +462,6 @@ export default function CalendarScreen() {
               <Text style={[styles.scheduleCount, { color: colors.mutedForeground }]}>
                 {selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })} · {appointments.length} {appointments.length === 1 ? 'appointment' : 'appointments'}
               </Text>
-              {appointments.length > 0 ? <Text style={[styles.scheduleHint, { color: colors.mutedForeground }]}>Hold a booking to move it</Text> : null}
             </View>
           </>
         )}
@@ -571,12 +572,16 @@ export default function CalendarScreen() {
             contentContainerStyle={{ paddingBottom: TIMELINE_BOTTOM_PADDING }}
           >
             <View style={[styles.timeline, { height: timelineHeight }]}>
-              <View style={[styles.timelineLabels, { backgroundColor: colors.muted }]}>
-                {timelineHours.map((time) => <Text key={time} style={styles.timelineLabel}>{formatClock(time)}</Text>)}
+              <View style={[styles.timelineLabels, { backgroundColor: colors.card }]}>
+                {/* A label on every quarter-hour line: the hour as "11am", then 15, 30, 45. */}
+                {timelineHours.flatMap((time, index) => [0, 1, 2, 3].map((q) => (
+                  <Text key={`${time}-${q}`} style={[styles.timelineLabel, q === 0 ? styles.timelineHourLabel : { color: colors.mutedForeground }, { top: Math.max(0, (index * 4 + q) * QUARTER - 9) }]}>
+                    {q === 0 ? `${time / 60 % 12 || 12}${time / 60 >= 12 ? 'pm' : 'am'}` : String(q * 15)}
+                  </Text>
+                )))}
               </View>
               <View style={[styles.timelineTrack, { backgroundColor: colors.card }]}>
-                {timelineHours.map((time, index) => <View key={time} style={[styles.timelineLine, { top: index * HOUR_HEIGHT, backgroundColor: colors.border }]} />)}
-                {timelineHours.map((time, index) => <View key={`half-${time}`} style={[styles.timelineHalfLine, { top: index * HOUR_HEIGHT + HOUR_HEIGHT / 2, backgroundColor: colors.border }]} />)}
+                {timelineHours.flatMap((time, index) => [0, 1, 2, 3].map((q) => <View key={`${time}-${q}`} style={[styles.timelineLine, { top: (index * 4 + q) * QUARTER, backgroundColor: colors.border }]} />))}
                 {blocks.map((b) => {
                   // The part of the block on this day, in business minutes.
                   const dayStart = zonedMoment(selectedDate, 0, timeZone).getTime();
@@ -726,16 +731,15 @@ const styles = StyleSheet.create({
   noEvents: { fontSize: 15, fontFamily: 'Inter_400Regular' },
   // The hint drops under the date when both don't fit (they ran together on a phone, 2026-11-11).
   scheduleMeta: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', columnGap: 12, rowGap: 2, marginBottom: 8 },
-  scheduleHint: { fontSize: 13, fontFamily: 'Inter_500Medium' },
   scheduleCount: { fontSize: 15, fontFamily: 'Inter_500Medium' },
   syncNotice: { flexDirection: 'row', alignItems: 'center', gap: 7, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 10 },
   syncText: { fontSize: 13, fontFamily: 'Inter_500Medium', flex: 1 },
   timeline: { flexDirection: 'row' },
-  timelineLabels: { width: 88 },
-  timelineLabel: { height: HOUR_HEIGHT, paddingTop: 2, paddingRight: 9, textAlign: 'right', color: '#3D4160', fontSize: 15, fontFamily: 'Inter_700Bold' },
+  timelineLabels: { width: 60, position: 'relative' },
+  timelineLabel: { position: 'absolute', left: 0, right: 0, height: 18, lineHeight: 18, paddingRight: 10, textAlign: 'right', fontSize: 14, fontFamily: 'Inter_400Regular' },
+  timelineHourLabel: { color: '#3D4160', fontSize: 15, fontFamily: 'Inter_500Medium' },
   timelineTrack: { flex: 1, position: 'relative' },
   timelineLine: { height: 1, left: 0, right: 0, position: 'absolute' },
-  timelineHalfLine: { height: StyleSheet.hairlineWidth, left: 0, right: 0, position: 'absolute', opacity: 0.6 },
   timelineAppointment: { position: 'absolute', borderRadius: 8, borderWidth: 2, borderColor: '#FFFFFF', paddingHorizontal: 9, paddingVertical: 3, justifyContent: 'center', overflow: 'hidden' },
   timelineAppointmentDragging: { shadowColor: '#2E1065', shadowOpacity: 0.2, shadowRadius: 10, shadowOffset: { width: 0, height: 6 }, elevation: 6 },
   timelineClient: { color: '#1E2240', fontSize: 15, lineHeight: 19, fontFamily: 'Inter_700Bold' },
