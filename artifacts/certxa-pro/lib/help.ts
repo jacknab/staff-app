@@ -306,33 +306,6 @@ export const HELP: Record<string, HelpPage> = {
       'Packages: prepaid visits clients buy on your website, like 6 manicures for one price.',
     ] }],
   },
-  'website-designer': {
-    title: 'Website designer',
-    intro: 'Design your booking website with AI, from what Certxa and the web know about your business. Each step shows its price in AI credits; every account starts with 200 free, and a step that fails gives its credits back.',
-    sections: [
-      { heading: 'Here’s your business as I know it', points: [
-        'What Certxa already has: your services and prices, hours, team, reviews and photos.',
-        'Worth adding first: what’s missing that would make your site stronger, and where to add it.',
-      ] },
-      { heading: 'Look me up online', points: [
-        'The designer looks you up the way a client would: your Google listing, salons nearby, your old website and other sites.',
-        'What I found: cards with what was found (where you are, what guests say, your old site…), each naming its source.',
-        'I need you for a moment: where sources disagree (like two phone numbers), pick the right one, type it, or Skip for now. A phone number you pick becomes your business phone. Change opens an answer again.',
-      ] },
-      { heading: 'Ideas', points: [
-        'Show me 6 ideas sketches six different directions for your site.',
-        'Mark each Love it or Not this. Say what you love or what isn’t working, and tick what it’s about: Colours, Letters, Layout or Words.',
-        'More ideas makes six new ones from what you said.',
-      ] },
-      { heading: 'Your site', points: [
-        'Build my site builds the whole site from the ideas you loved. Your services, prices, booking, hours and reviews always come from your Certxa details.',
-        'Preview my site opens it; only you can see the preview.',
-        'Put it online makes it your website at your link. Use my old design switches back at any time.',
-        'Describe a change: type what you want (“make it pink”, “add a short FAQ about parking”) and the designer makes a new version. A change that isn’t needed costs nothing.',
-        'Versions: every version you’ve made. Preview any of them, or Put online to go back to one.',
-      ] },
-    ],
-  },
   inbox: {
     title: 'Inbox',
     intro: 'Messages clients send you from your website.',
@@ -675,7 +648,7 @@ export const HELP: Record<string, HelpPage> = {
     sections: [{ heading: 'Sections', points: [
       'My Business: Business details, Location, Where you see clients, Hours and Catalog.',
       'Bookings: Online booking, Booking approval, Cancellation policy and Blocked clients.',
-      'Website: your link, design, look, and the AI website designer.',
+      'Website: your link, design and look.',
       'Google: Google Business Profile — connect it to show and reply to your Google reviews, or follow the steps to create one.',
       'Client Messages: Client notifications and Business Phone.',
       'Payments: Stripe account, Connect card reader, Deposits, Checkout (tax and tips) and Enable Tap to Pay on iPhone.',
@@ -717,7 +690,7 @@ export const HELP: Record<string, HelpPage> = {
   'settings.policy': { title: 'Cancellation policy', intro: 'What clients agree to when they book.', sections: [{ heading: 'What you can set', points: ['Your cancellation policy: the text shown on your website and when clients book. Clients must accept it to book makes them tick a box.', 'Cancellation notice: cancelling later than this is a late cancellation (the fee can apply and a deposit is kept). Clients can cancel online only before it.', 'No-show and late-cancel fee: a percent of the booking, charged to the card the client saved when booking. Ask for a card in Deposits.'] }] },
   'settings.blocked': { title: 'Blocked clients', intro: 'Phone numbers that can’t book online.', sections: [{ heading: 'How it works', points: ['Block a phone number: enter it, add a reason if you like, and tap Block this number. Remove unblocks it.', 'You can still book them yourself.', 'Blocking someone from calling is separate: Settings › Business Phone.'] }] },
   'settings.phone': { title: 'Business Phone settings', intro: 'Your number, your calling rules and blocked callers.', sections: [{ heading: 'What you can do', points: ['Ring my phone: During business hours, or Any time. When it doesn’t ring, or a call isn’t answered in 25 seconds, the caller is told you can’t take the call and you get a missed call.', 'Block a client or number: they hear a busy signal and you aren’t told.', 'Your plan: Cancel Business Phone (your number works to the end of the paid month, then it’s released), Keep my number to undo that, or Pay $10 now after a failed payment.', 'Change number ($5): your old number is released and can’t be had back.', 'On Plus, your clients call and text you on Certxa’s Plus number.'] }] },
-  'settings.website': { title: 'Website', intro: 'Your booking website.', sections: [{ heading: 'What’s here', points: ['Design my website with AI: six ideas made for your business, then a site built from the ones you love (uses AI credits).', 'Your website and booking address: Share my booking link sends it anywhere; Open my website shows it.', 'About you: the text and photo on your About tab.', 'Edit my link, design and look: change your address, design, colour, photos and social links.'] }] },
+  'settings.website': { title: 'Website', intro: 'Your booking website.', sections: [{ heading: 'What’s here', points: ['Your website and booking address: Share my booking link sends it anywhere; Open my website shows it.', 'About you: the text and photo on your About tab.', 'Edit my link, design and look: change your address, design, colour, photos and social links.'] }] },
   'settings.stripe': { title: 'Stripe account', intro: 'Where your card payments are paid out.', sections: [{ heading: 'What you see', points: ['Connected: the Stripe account your payments go to.', 'Card payments: Ready, or Not ready yet. Payouts to your bank: on Stripe’s schedule.', 'Finish payment setup appears when Stripe needs more details; Set up payments starts it when nothing is connected.'] }] },
   'settings.readers': { title: 'Connect card reader', intro: 'Adding a Stripe M2 card reader.', sections: [{ heading: 'How it works', points: ['Turn the reader on, enter the registration code it shows and tap Register a new Stripe M2.', 'Your readers lists the ones registered; checkout then offers them.'] }] },
   'settings.deposits': {

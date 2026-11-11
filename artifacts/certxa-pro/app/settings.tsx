@@ -646,11 +646,6 @@ export default function SettingsScreen() {
       </>);
     }
     if (screen === 'website') return (<>
-      {/* AI Website Builder (owner, 2026-11-09; app/website-designer.tsx): ideas first, the full site next. */}
-      <TouchableOpacity testID="settings-ai-designer" onPress={() => router.push('/website-designer')} style={[styles.save, { backgroundColor: colors.primary, marginTop: 4 }]}>
-        <Text style={[styles.saveText, { color: colors.primaryForeground }]}>Design my website with AI</Text>
-      </TouchableOpacity>
-      <Help>Six ideas based on your business. Mark what you love, and the designer builds from that. Uses AI credits; every account starts with 200 free.</Help>
       <Label>Your website and booking address</Label>
       <View style={[styles.toggleRow, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.rowTitle, { flex: 1, color: colors.foreground }]}>{website.replace('https://', '') || 'Not set up yet'}</Text></View>
       {website ? <>
