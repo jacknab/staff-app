@@ -475,8 +475,8 @@ export const HELP: Record<string, HelpPage> = {
     intro: 'A phone number for your business, so your own number stays private ($10/month).',
     sections: [
       { heading: 'Getting a number', points: [
-        'Enter an area code to see numbers; Show 5 other numbers shows more.',
-        'Tap a number and pay to make it yours. It’s charged to your card each month until you cancel.',
+        'Pay $10/month first: the first month is charged to your card on file, then every month until you cancel.',
+        'Then choose your number: enter an area code to see numbers; Show 5 other numbers shows more. Tap one to make it yours. If it was just taken, your paid month stays and you choose another.',
       ] },
       { heading: 'Calls', points: [
         'Your business number is at the top. Calls to it ring this iPhone like a normal call, with the client’s name.',

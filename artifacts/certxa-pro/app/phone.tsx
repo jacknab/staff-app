@@ -1,8 +1,8 @@
 /**
  * Business Phone (owner, 2026-11-04): a phone number for the business, on Certxa's Twilio account.
- * Setup: five local numbers to choose from (the circle arrows show five others); tapping one charges the first month
- * of the $10/month to the card on file, buys the number and wires it up (GET /api/pro/phone/available, POST
- * /api/pro/phone/claim). After that: the number, a dialer, texts received, and
+ * Setup: Business Phone is paid first (owner, 2026-11-11): the first month of the $10/month is charged to the card on
+ * file (POST /api/pro/phone/subscribe); only then are five local numbers shown (the circle arrows show five others),
+ * and tapping one buys it with that paid month and wires it up (GET /api/pro/phone/available, POST /api/pro/phone/claim). After that: the number, a dialer, texts received, and
  * recent calls. When it rings and blocked numbers are in Settings › Business Phone.
  * Changing the number (?change=1, from Settings after its warning) uses the same picker: $5 is charged to the card on
  * file, the new number is bought and wired, and the old one is released (POST /api/pro/phone/change). A missed call is tapped to call back. Calls work on iPhone (lib/voice.ts).
@@ -36,6 +36,9 @@ export default function PhoneScreen() {
   const router = useRouter();
   const [changing, setChanging] = useState(useLocalSearchParams<{ change?: string }>().change === '1');
   const [line, setLine] = useState<Line | null | undefined>(undefined);
+  /** No number yet: whether the first month is paid, so the numbers can be shown. */
+  const [prepaid, setPrepaid] = useState<boolean | undefined>(undefined);
+  const [paying, setPaying] = useState(false);
   const [calls, setCalls] = useState<CallRow[]>([]);
   const [textCount, setTextCount] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
@@ -54,6 +57,7 @@ export default function PhoneScreen() {
     try {
       const l = await api.get<Line | null>('/api/pro/phone');
       setLine(l);
+      if (!l) setPrepaid((await api.get<{ prepaid?: boolean }>('/api/pro/phone/pricing')).prepaid === true);
       if (l) {
         const [c, t] = await Promise.all([api.get<CallRow[]>('/api/pro/phone/calls'), api.get<unknown[]>('/api/pro/phone/texts')]);
         setCalls(c); setTextCount(t.length);
@@ -76,7 +80,7 @@ export default function PhoneScreen() {
       setError(cause instanceof ApiError ? cause.message : 'Numbers could not be loaded. Try again.');
     } finally { setSearching(false); }
   }, []);
-  useEffect(() => { if ((line === null || (line && changing)) && offers === null) void search('', false); }, [line, changing, offers, search]);
+  useEffect(() => { if (((line === null && prepaid) || (line && changing)) && offers === null) void search('', false); }, [line, prepaid, changing, offers, search]);
 
   /** The card on file for a charge, or null; with none, offer certxa.com's Add a card page first. */
   const cardFor = async (why: string): Promise<{ card: Card; monthlyCents: number; changeFeeCents: number } | null> => {
@@ -119,14 +123,31 @@ export default function PhoneScreen() {
     ]);
   };
 
-  /** Getting a number: $10/month, the first month charged now to the card on file. */
-  const subscribe = async (offer: Offer) => {
+  /** Getting Business Phone: $10/month, the first month charged now to the card on file, before the numbers show. */
+  const pay = async () => {
     const got = await cardFor('Business Phone is $10/month.');
     if (!got) return;
     const price = `$${(got.monthlyCents / 100).toFixed(0)}`;
-    Alert.alert(`Make ${offer.display} your business number?`, `Business Phone is ${price}/month. ${price} will be charged today to ${cardName(got.card)}, then every month. Cancel any time in Settings.`, [
+    Alert.alert(`Get Business Phone for ${price}/month?`, `${price} will be charged today to ${cardName(got.card)}, then every month. Then you choose your number. Cancel any time in Settings.`, [
       { text: 'Not now', style: 'cancel' },
       { text: `Pay ${price}`, onPress: async () => {
+        setPaying(true); setError('');
+        try {
+          const key = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+          await api.post('/api/pro/phone/subscribe', { idempotencyKey: key });
+          setPrepaid(true);
+        } catch (cause) {
+          setError(cause instanceof ApiError ? cause.message : 'The payment could not be made. Try again.');
+        } finally { setPaying(false); }
+      } },
+    ]);
+  };
+
+  /** Choosing the number, with the month already paid. */
+  const subscribe = async (offer: Offer) => {
+    Alert.alert(`Make ${offer.display} your business number?`, undefined, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Choose', onPress: async () => {
         setClaiming(offer.phoneNumber); setError('');
         try {
           const key = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -159,11 +180,21 @@ export default function PhoneScreen() {
         <View style={styles.navSide} />
       </View>
 
-      {line === undefined ? <ActivityIndicator style={{ marginTop: 60 }} color={colors.mutedForeground} />
-        : line === null || changing ? (
+      {line === undefined || (line === null && prepaid === undefined) ? <ActivityIndicator style={{ marginTop: 60 }} color={colors.mutedForeground} />
+        : line === null && !prepaid ? (
+          <ScrollView contentContainerStyle={styles.content}>
+            <HelpTitle help="phone" style={[styles.title, { color: colors.foreground }]}>Get Business Phone</HelpTitle>
+            <Text style={[styles.muted, { color: colors.mutedForeground }]}>A phone number for your business. Clients call and text this number, and your calls out show it, so your own number stays private.</Text>
+            <Text style={[styles.muted, { color: colors.mutedForeground }]}>Business Phone is $10/month. After you pay, you choose your number.</Text>
+            <TouchableOpacity onPress={() => void pay().catch(() => setError('Something went wrong. Try again.'))} disabled={paying} style={[styles.button, { backgroundColor: colors.primary }]} testID="phone-pay">
+              {paying ? <ActivityIndicator color={colors.primaryForeground} /> : <Text style={[styles.buttonText, { color: colors.primaryForeground }]}>Pay $10/month</Text>}
+            </TouchableOpacity>
+            {error ? <Text style={[styles.muted, { color: colors.destructive }]}>{error}</Text> : null}
+          </ScrollView>
+        ) : line === null || changing ? (
           <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
             <HelpTitle help="phone" style={[styles.title, { color: colors.foreground }]}>{changing ? 'Choose your new number' : 'Choose your business number'}</HelpTitle>
-            <Text style={[styles.muted, { color: colors.mutedForeground }]}>{changing && line ? `Your new number replaces ${pretty(line.phoneNumber)}. Changing costs $5.` : 'Clients call and text this number, and your calls out show it, so your own number stays private. Business Phone is $10/month.'}</Text>
+            <Text style={[styles.muted, { color: colors.mutedForeground }]}>{changing && line ? `Your new number replaces ${pretty(line.phoneNumber)}. Changing costs $5.` : 'Your first month is paid. Choose the number clients will call and text.'}</Text>
             <TextInput value={areaCode} onChangeText={(t) => { const code = t.replace(/\D/g, '').slice(0, 3); setAreaCode(code); if (code.length === 3) void search(code, false); }}
               keyboardType="number-pad" maxLength={3} placeholder="Area code" placeholderTextColor={colors.mutedForeground}
               style={[styles.input, box, { color: colors.foreground }]} testID="phone-area-code" />
