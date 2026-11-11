@@ -585,6 +585,8 @@ export default function CheckoutScreen() {
               </View>
               {receiptNote ? <Text style={[styles.setupText, { color: colors.primary }]}>{receiptNote}</Text> : null}
             </View> : null}
+            {/* Quick Notes for the visit just paid (owner, 2026-11-11; app/quick-notes.tsx). */}
+            {!isQuickSale && Number(appointmentId) > 0 ? <TouchableOpacity testID="checkout-quick-notes" onPress={() => router.push({ pathname: '/quick-notes' as any, params: { appointmentId: String(appointmentId) } })} style={[styles.primaryButton, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, marginBottom: 10 }]}><Feather name="edit-3" size={19} color={colors.foreground} /><Text style={[styles.primaryButtonText, { color: colors.foreground }]}>Quick Notes</Text></TouchableOpacity> : null}
             <TouchableOpacity testID="new-checkout" onPress={resetCheckout} style={[styles.primaryButton, { backgroundColor: colors.primary }]}><Text style={[styles.primaryButtonText, { color: colors.primaryForeground }]}>{isQuickSale ? 'New sale' : 'New checkout'}</Text></TouchableOpacity>
           </View>
         ) : (

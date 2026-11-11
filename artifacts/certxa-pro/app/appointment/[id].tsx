@@ -301,6 +301,8 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
       }
       setPaidHere(Math.max(0, amountCents)); setPaidRecorded(true);
       setStatus('paid');
+      // Checked out: Quick Notes next, for a visit with a client (owner, 2026-11-11; app/quick-notes.tsx).
+      if (!isPreview && Number(params.customerId) > 0) router.push({ pathname: '/quick-notes' as any, params: { appointmentId: String(appointmentId) } });
     } catch (cause) {
       setError(cause instanceof ApiError ? cause.message : 'Could not mark appointment as paid.');
     } finally {

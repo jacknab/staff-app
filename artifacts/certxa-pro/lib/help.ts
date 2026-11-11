@@ -465,6 +465,11 @@ export const HELP: Record<string, HelpPage> = {
     intro: 'Notes about this client.',
     sections: [{ heading: 'How it works', points: ['Write a note and tap Save note; it’s tied to this visit.', 'Every note on the client is below, newest first. They’re on the client’s profile too.'] }],
   },
+  'quick-notes': {
+    title: 'Quick Notes',
+    intro: 'A few taps after checkout, so next time you remember how this client likes it.',
+    sections: [{ heading: 'How it works', points: ['The client and the services done are shown from the visit; you don’t enter them again.', 'Pick what fits (all optional) and add your own words if you like, then tap Save Notes. Certxa writes it as a short note.', 'The note goes into the client’s notes with the date, so you see it on their profile and from their next appointment’s Notes.', 'It opens after Mark as paid, and from Quick Notes after a card payment.'] }],
+  },
   phone: {
     title: 'Business Phone',
     intro: 'A phone number for your business, so your own number stays private ($10/month).',
