@@ -407,7 +407,7 @@ export const HELP: Record<string, HelpPage> = {
         'The card shows the business you connected and when your Google reviews were last updated.',
         'Open Reviews shows your Google reviews, where you can reply; replies are posted on Google.',
         'Update reviews now fetches your latest Google reviews right away (they also update on their own).',
-        'Your portfolio photos are shared to your Google Business Profile on their own, the ones already on your website and each new one you add, a few a day. Photos of clients you put on your website are never sent to Google. Deleting a photo before its turn keeps it off Google.',
+        'Your portfolio photos are shared to your Google Business Profile, a few a day, while Share my portfolio to Google is on in Portfolio. Photos of clients you put on your website are never sent to Google.',
         'Disconnect Google stops showing your Google reviews; your Certxa reviews show again. If Google asks you to sign in again, a button for it appears here.',
       ] },
     ],
@@ -462,6 +462,7 @@ export const HELP: Record<string, HelpPage> = {
       'Tap a photo to choose the service it shows (Service shown); clients can then tap Book this look on your website.',
       'Take off my website removes the photo.',
       'Before and after photos from a client’s profile can be shown here too, with the client’s OK.',
+      'Share my portfolio to Google shows once your Google Business Profile is connected (Settings › Google Business Profile). On, your photos go to your Google profile on their own, a few a day; off, nothing more is sent. Client photos are never sent to Google.',
     ] }],
   },
   packages: {

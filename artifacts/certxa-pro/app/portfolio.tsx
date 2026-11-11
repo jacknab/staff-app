@@ -1,11 +1,12 @@
 /**
- * Portfolio (owner, 2026-11-03): photos of the pro's work in the gallery on their own Certxa booking website (never
- * Google). Add with the camera or from the library; tap one to remove it (GET · POST · DELETE /api/portfolio). Client
+ * Portfolio (owner, 2026-11-03): photos of the pro's work in the gallery on their own Certxa booking website. With Google
+ * Business Profile connected, "Share my portfolio to Google" also sends them there, a few a day (owner, 2026-11-11;
+ * GET · PUT /api/portfolio/google); without it this page is unchanged. Add with the camera or from the library; tap one to remove it (GET · POST · DELETE /api/portfolio). Client
  * photos can also be shown here from a client's profile.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, Alert, Image, Platform, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Platform, RefreshControl, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -16,7 +17,7 @@ import { api, ApiError } from '@/lib/live-api';
 import { HelpTitle } from '@/components/HelpTitle';
 
 import { AppBackground } from '@/components/look/AppBackground';
-import { look } from '@/components/look/tokens';
+import { cardShadow, look } from '@/components/look/tokens';
 type Photo = { id: number; url: string; caption: string | null; serviceId?: number | null };
 
 export default function PortfolioScreen() {
@@ -28,12 +29,19 @@ export default function PortfolioScreen() {
   const [busy, setBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [editing, setEditing] = useState<Photo | null>(null);
+  const [google, setGoogle] = useState<{ connected: boolean; sharing: boolean } | null>(null);
   const { services } = useBookingData();
   const size = Math.floor((width - 40 - 16) / 3);
 
   const load = useCallback(async () => {
     try { setPhotos(await api.get<Photo[]>('/api/portfolio')); } catch { setPhotos([]); }
+    api.get<{ connected: boolean; sharing: boolean }>('/api/portfolio/google').then(setGoogle).catch(() => undefined);
   }, []);
+  const setSharing = async (sharing: boolean) => {
+    setGoogle((g) => (g ? { ...g, sharing } : g));
+    try { setGoogle(await api.put<{ connected: boolean; sharing: boolean }>('/api/portfolio/google', { sharing })); }
+    catch (cause) { void load(); Alert.alert('Google', cause instanceof ApiError ? cause.message : 'That could not be saved. Try again.'); }
+  };
   useEffect(() => { void load(); }, [load]);
 
   const add = async (camera: boolean) => {
@@ -77,6 +85,15 @@ export default function PortfolioScreen() {
         </TouchableOpacity>
       </View>
       <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}>
+        {!editing && google?.connected ? (
+          <View style={[styles.googleCard, cardShadow]} testID="portfolio-google">
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={[styles.googleTitle, { color: look.heading }]}>Share my portfolio to Google</Text>
+              <Text style={[styles.googleNote, { color: look.subtle }]}>New photos go to your Google Business Profile, a few a day.</Text>
+            </View>
+            <Switch testID="portfolio-google-switch" value={google.sharing} onValueChange={(v) => void setSharing(v)} trackColor={{ true: colors.primary, false: colors.border }} accessibilityLabel="Share my portfolio to Google" />
+          </View>
+        ) : null}
         {editing ? (
           <View style={{ gap: 12 }}>
             <Image source={{ uri: editing.url }} style={{ width: '100%', height: width - 40, borderRadius: 14, backgroundColor: colors.muted }} />
@@ -117,5 +134,8 @@ const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   removeRow: { height: 44, alignItems: 'center', justifyContent: 'center' },
   removeText: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
+  googleCard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderRadius: 16, backgroundColor: look.card, borderWidth: 1, borderColor: look.cardBorder },
+  googleTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
+  googleNote: { fontSize: 14, lineHeight: 19, fontFamily: 'Inter_400Regular' },
   empty: { height: 140, borderRadius: 14, borderWidth: 1.5, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', gap: 8 },
 });
