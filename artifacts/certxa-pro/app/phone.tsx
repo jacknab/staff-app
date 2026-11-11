@@ -143,6 +143,21 @@ export default function PhoneScreen() {
     ]);
   };
 
+  /** Paid but no number chosen yet: cancel and get the $10 back. */
+  const cancelPaid = () => Alert.alert('Cancel Business Phone?', 'Your $10 will be refunded to your card. It can take 5–10 days to show.', [
+    { text: 'Keep', style: 'cancel' },
+    { text: 'Cancel and refund', style: 'destructive', onPress: async () => {
+      setPaying(true); setError('');
+      try {
+        await api.post('/api/pro/phone/subscribe/cancel', {});
+        setPrepaid(false); setOffers(null);
+        Alert.alert('Refunded', 'Business Phone is cancelled and your $10 is on its way back to your card.');
+      } catch (cause) {
+        setError(cause instanceof ApiError ? cause.message : 'The refund could not be made. Try again.');
+      } finally { setPaying(false); }
+    } },
+  ]);
+
   /** Choosing the number, with the month already paid. */
   const subscribe = async (offer: Offer) => {
     Alert.alert(`Make ${offer.display} your business number?`, undefined, [
@@ -219,6 +234,11 @@ export default function PhoneScreen() {
               </View>
             ) : null}
             {error ? <Text style={[styles.muted, { color: colors.destructive }]}>{error}</Text> : null}
+            {line === null && !changing ? (
+              <TouchableOpacity onPress={cancelPaid} disabled={paying || claiming != null} style={styles.cancelPaid} testID="phone-cancel-paid">
+                {paying ? <ActivityIndicator color={colors.mutedForeground} /> : <Text style={[styles.muted, { color: colors.mutedForeground }]}>Cancel and refund my $10</Text>}
+              </TouchableOpacity>
+            ) : null}
           </ScrollView>
         ) : dialing ? (
           <View style={[styles.dialer, { paddingBottom: insets.bottom + 24 }]}>
@@ -304,6 +324,7 @@ const styles = StyleSheet.create({
   number: { fontSize: 20, fontFamily: 'Inter_600SemiBold' },
   card: { borderWidth: 1, borderRadius: 14, padding: 16, gap: 4, ...cardShadow },
   bigNumber: { fontSize: 26, fontFamily: 'Inter_600SemiBold' },
+  cancelPaid: { alignSelf: 'center', paddingVertical: 14, paddingHorizontal: 12, marginTop: 8 },
   button: { height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   buttonText: { fontSize: 18, fontFamily: 'Inter_600SemiBold' },
   dialer: { flex: 1, justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 10 },
