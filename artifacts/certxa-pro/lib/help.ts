@@ -575,7 +575,7 @@ export const HELP: Record<string, HelpPage> = {
   'payments-intro': {
     title: 'Set up payments',
     intro: 'Taking cards goes through your own Stripe account, so the money goes straight to you.',
-    sections: [{ heading: 'How it works', points: ['Set up payments with Stripe opens Certxa’s payment setup page with Stripe’s secure form: answer its questions about you, your business and your bank. When you finish or close it, you’re back in the app.', 'Your business address needs to be complete first; you’ll be asked for it if it isn’t.', 'When it says You’re all set, you can take cards in the app and deposits on your website.'] }],
+    sections: [{ heading: 'How it works', points: ['With payments set up you take cards right on your iPhone with Tap to Pay (2.7% + 70¢ a payment, Stripe’s processing fee), and you can ask for deposits and use cancellation policies.', 'Set up payments with Stripe opens Certxa’s payment setup page with Stripe’s secure form: answer its questions about you, your business and your bank. When you finish or close it, you’re back in the app.', 'Your business address needs to be complete first; you’ll be asked for it if it isn’t.', 'When it says You’re all set, you can take cards in the app and deposits on your website.'] }],
   },
   'about-me': {
     title: 'About you',
