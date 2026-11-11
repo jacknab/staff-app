@@ -642,7 +642,8 @@ const styles = StyleSheet.create({
   miniEvent: { borderRadius: 6, paddingVertical: 4, paddingHorizontal: 7 },
   miniEventText: { color: '#1E2240', fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   noEvents: { fontSize: 15, fontFamily: 'Inter_400Regular' },
-  scheduleMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  // The hint drops under the date when both don't fit (they ran together on a phone, 2026-11-11).
+  scheduleMeta: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', columnGap: 12, rowGap: 2, marginBottom: 8 },
   scheduleHint: { fontSize: 13, fontFamily: 'Inter_500Medium' },
   scheduleCount: { fontSize: 15, fontFamily: 'Inter_500Medium' },
   syncNotice: { flexDirection: 'row', alignItems: 'center', gap: 7, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 10 },
