@@ -2,10 +2,11 @@
  * Settings › Google Business Profile (owner, 2026-11-11): connect the business's Google Business Profile (Google's
  * sign-in on Certxa's page, lib/google-business.ts), or — for a pro who doesn't have one yet — a step-by-step guide to
  * creating it on Google, then connect. Once connected, its Google reviews show on the website and in Reviews.
+ * Not connected yet, it opens on a full-screen picture of what the setting is for (owner, 2026-11-11), then Get started.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Platform, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
@@ -15,7 +16,11 @@ import { look } from '@/components/look/tokens';
 import { api } from '@/lib/live-api';
 import { disconnectGoogle, getGoogleProfile, googleConnected, myStoreId, openCreateProfile, runGoogleConnect, syncGoogleReviews, type GoogleProfile } from '@/lib/google-business';
 
-type Stage = 'loading' | 'connected' | 'intro' | 'guide' | 'working' | 'error';
+type Stage = 'loading' | 'welcome' | 'connected' | 'intro' | 'guide' | 'working' | 'error';
+
+// The picture's own top and bottom colours, so the page around it matches whatever the phone's shape.
+const WELCOME_TOP = '#F4EFFD';
+const WELCOME_BOTTOM = '#ECE3FD';
 
 export default function GoogleBusinessScreen() {
   const colors = useColors();
@@ -32,15 +37,15 @@ export default function GoogleBusinessScreen() {
     try {
       const id = await myStoreId();
       setStoreId(id);
-      if (!id) { setStage('intro'); return; }
+      if (!id) { setStage('welcome'); return; }
       const stores = await api.get<{ bookingSlug?: string | null }[]>('/api/stores').catch(() => []);
       const slug = Array.isArray(stores) ? stores[0]?.bookingSlug : null;
       if (slug) setWebsite(`${slug}.certxa.com`);
       const p = await getGoogleProfile(id).catch(() => null);
       setProfile(p);
-      setStage(googleConnected(p) ? 'connected' : 'intro');
+      setStage((current) => (googleConnected(p) ? 'connected' : current === 'loading' ? 'welcome' : 'intro'));
     } catch {
-      setStage('intro');
+      setStage((current) => (current === 'loading' ? 'welcome' : 'intro'));
     }
   }, []);
   useEffect(() => { void load(); }, [load]);
@@ -94,6 +99,30 @@ export default function GoogleBusinessScreen() {
     ['Verify that it’s yours', 'Google asks you to prove you own the business — often with a short video of your business, or a code by phone, text or e-mail. It can take a few days before your profile appears on Google.'],
     ['Come back and connect', 'Once your profile is created, tap “I’ve created it — connect now” and sign in with the same Google account.'],
   ];
+
+  // What this setting is for: the picture, full screen and never stretched or cut (contain on the picture's colours).
+  if (stage === 'welcome') {
+    return (
+      <View style={{ flex: 1 }} testID="google-welcome">
+        <StatusBar barStyle="dark-content" />
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: WELCOME_TOP }]} />
+        <View style={[styles.welcomeBottom, { backgroundColor: WELCOME_BOTTOM }]} />
+        <Image source={require('@/assets/images/google-business-intro.jpg')} resizeMode="contain" style={[StyleSheet.absoluteFill, { width: '100%', height: '100%' }]}
+          accessibilityLabel="Google Business Profile: be easy to find on Google Search and Maps, build your reputation with reviews, grow your business." />
+        <TouchableOpacity accessibilityLabel="Back" onPress={() => router.back()} style={[styles.welcomeBack, { top: topInset + 4 }]} testID="google-welcome-back">
+          <Feather name="arrow-left" size={22} color="#1E1B4B" />
+        </TouchableOpacity>
+        <View style={[styles.welcomeFooter, { paddingBottom: insets.bottom + 18 }]}>
+          <TouchableOpacity onPress={() => setStage('guide')} style={[styles.button, styles.welcomePill, { backgroundColor: colors.primary }]} testID="google-welcome-setup">
+            <Text style={[styles.buttonText, { color: colors.primaryForeground }]}>Set Up Google Business Profile</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => void connect()} style={styles.welcomeLink} testID="google-welcome-connect">
+            <Text style={[styles.welcomeLinkText, { color: colors.primary }]}>Connect My Existing Profile</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: look.pageTop }}>
@@ -186,4 +215,10 @@ const styles = StyleSheet.create({
   linkButton: { minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   linkText: { fontSize: 16, fontFamily: 'Inter_500Medium', textDecorationLine: 'underline' },
   fine: { fontSize: 14, lineHeight: 20, fontFamily: 'Inter_400Regular', marginTop: 18 },
+  welcomeBottom: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '50%' },
+  welcomeBack: { position: 'absolute', left: 14, width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.7)' },
+  welcomeFooter: { position: 'absolute', left: 24, right: 24, bottom: 0 },
+  welcomePill: { borderRadius: 999 },
+  welcomeLink: { alignItems: 'center', paddingVertical: 14 },
+  welcomeLinkText: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
 });
