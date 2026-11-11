@@ -5,7 +5,7 @@ import { Feather } from '@expo/vector-icons';
 import { ActivityIndicator, Alert, InputAccessoryView, Keyboard, Linking, Modal, Platform, ScrollView, Share, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { useBookingData } from '@/contexts/BookingContext';
@@ -16,6 +16,7 @@ import { ClientAvatar } from '@/components/ClientAvatar';
 
 import { AppBackground } from '@/components/look/AppBackground';
 import { look, cardShadow } from '@/components/look/tokens';
+import { usePaymentsReady } from '@/lib/usePaymentsReady';
 /** Every quarter hour of the working day, and the booking's own time when it is between them. */
 function timeChoices(current: string): string[] {
   const label = (m: number) => `${((Math.floor(m / 60) + 11) % 12) + 1}:${String(m % 60).padStart(2, '0')} ${m < 720 ? 'AM' : 'PM'}`;
@@ -445,7 +446,9 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
     ],
   );
 
-  const checkout = () => router.push({
+  // Payments not set up: Check Out opens its Stripe page instead (owner, 2026-11-11; app/payments-checkout.tsx).
+  const paymentsReady = usePaymentsReady();
+  const checkout = () => paymentsReady === false ? router.push('/payments-checkout' as Href) : router.push({
     pathname: '/(tabs)/checkout',
     params: { appointmentId: String(appointmentId), clientName, serviceName, amountCents: String(amountCents), depositCents: String(depositPaidCents), phone: params.phone ?? '', email: params.email ?? '' },
   });

@@ -3,9 +3,10 @@ import { Platform, StyleSheet, useColorScheme, View } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { Feather } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
-import { Tabs } from 'expo-router';
+import { Tabs, useRouter, type Href } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { usePaymentsReady } from '@/lib/usePaymentsReady';
 
 function ClassicTabLayout() {
   const colors = useColors();
@@ -14,6 +15,9 @@ function ClassicTabLayout() {
   const isDark = colorScheme === 'dark';
   const isIOS = Platform.OS === 'ios';
   const isWeb = Platform.OS === 'web';
+  const router = useRouter();
+  // Payments not set up: the POS tab opens its Stripe page instead (owner, 2026-11-11; app/payments-pos.tsx).
+  const paymentsReady = usePaymentsReady();
 
   return (
     <Tabs
@@ -60,7 +64,9 @@ function ClassicTabLayout() {
           : <Feather name="users" size={21} color={color} />,
       }} />
       {/* POS (owner, 2026-10-30): a quick card payment linked to a client. It opens the checkout below. */}
-      <Tabs.Screen name="pos" options={{
+      <Tabs.Screen name="pos" listeners={{
+        tabPress: (e) => { if (paymentsReady === false) { e.preventDefault(); router.push('/payments-pos' as Href); } },
+      }} options={{
         title: 'POS',
         tabBarIcon: ({ color }) => isIOS
           ? <SymbolView name="creditcard" tintColor={color} size={23} />
