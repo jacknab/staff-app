@@ -19,6 +19,16 @@ type TimeBlock = { id: number; startsAt: string; endsAt: string; allDay: boolean
 type ViewMode = 'Month' | 'Week' | 'Day';
 
 const BOOKING_COLORS = ['#ECE5FD', '#F9E1BC', '#F3D4DE', '#DEE4F4'];
+/** The Week view's status tags, as the website's week view shows them (booking WeeklyAgendaView.tsx). */
+const WEEK_STATUS: Record<string, { bg: string; text: string; label: string }> = {
+  pending: { bg: '#EFF6FF', text: '#3B82F6', label: 'Booked' },
+  confirmed: { bg: '#ECFDF5', text: '#0D9488', label: 'Confirmed' },
+  started: { bg: '#FEFCE8', text: '#A16207', label: 'In Progress' },
+  completed: { bg: '#F3F4F6', text: '#6B7280', label: 'Done' },
+  paid: { bg: '#F3F4F6', text: '#6B7280', label: 'Paid' },
+  no_show: { bg: '#FFF1F2', text: '#E11D48', label: 'No Show' },
+  late: { bg: '#FFF7ED', text: '#C2410C', label: 'Late' },
+};
 /** A booking with no start time is drawn here (the day view itself shows all 24 hours). */
 const DEFAULT_START = 6 * 60;
 /** How long a booking has to be held before it can be dragged. */
@@ -483,23 +493,69 @@ export default function CalendarScreen() {
           </View>
         </RNScrollView>
       ) : viewMode === 'Week' ? (
-        <RNScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
-          <View style={styles.weekAgenda}>
-            {days.map((day) => {
+        // The week as the website's /calendar shows it (owner, 2026-11-11; booking WeeklyAgendaView.tsx): a summary line,
+        // then each day with its date badge and its bookings as cards (time, status, client, service).
+        <RNScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false} testID="calendar-week">
+          {(() => {
+            const total = days.reduce((sum, day) => sum + (bookingsByDay[dateKey(day)]?.length ?? 0), 0);
+            const short = (d: Date, year = false) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', ...(year ? { year: 'numeric' } : {}) });
+            return (
+              <View style={[styles.weekSummary, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Text style={[styles.weekSummaryTitle, { color: colors.foreground }]}>{short(days[0])} – {short(days[6], true)}</Text>
+                <Text style={[styles.weekSummaryCount, { color: colors.mutedForeground }]}>{total === 0 ? 'No appointments this week' : `${total} appointment${total === 1 ? '' : 's'} this week`}</Text>
+              </View>
+            );
+          })()}
+          <View style={[styles.weekList, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            {days.map((day, index) => {
               const dayAppointments = bookingsByDay[dateKey(day)] ?? [];
-              const active = dateKey(day) === selectedKey;
+              const isToday = dateKey(day) === todayKey;
+              const isPast = dateKey(day) < todayKey;
               return (
-                <TouchableOpacity key={dateKey(day)} onPress={() => selectDate(day, true)} style={[styles.weekDayRow, { borderColor: active ? colors.primary : colors.border, backgroundColor: colors.card }]}>
-                  <View style={styles.weekDayLabel}>
-                    <Text style={[styles.weekDayName, { color: colors.mutedForeground }]}>{day.toLocaleDateString('en-US', { weekday: 'short' })}</Text>
-                    <Text style={[styles.weekDayNumber, { color: active ? colors.primary : colors.foreground }]}>{day.getDate()}</Text>
-                  </View>
-                  <View style={styles.weekDayEvents}>
-                    {dayAppointments.length > 0 ? dayAppointments.slice(0, 3).map((item, index) => <View key={item.id} style={[styles.miniEvent, { backgroundColor: BOOKING_COLORS[index % BOOKING_COLORS.length] }]}><Text numberOfLines={1} style={styles.miniEventText}>{item.time} · {item.name}</Text></View>) : <Text style={[styles.noEvents, { color: colors.mutedForeground }]}>Open schedule</Text>}
-                    {dayAppointments.length > 3 ? <Text style={[styles.noEvents, { color: colors.mutedForeground }]}>{`+${dayAppointments.length - 3} more`}</Text> : null}
-                  </View>
-                  <Feather name="chevron-right" size={19} color={colors.mutedForeground} />
-                </TouchableOpacity>
+                <View key={dateKey(day)} style={[styles.weekDay, index > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
+                  <TouchableOpacity onPress={() => selectDate(day, true)} style={[styles.weekDayHeader, { backgroundColor: isToday ? `${colors.primary}0D` : isPast ? colors.muted : colors.card }]}>
+                    <View style={[styles.weekBadge, { backgroundColor: isToday ? colors.primary : colors.muted }]}>
+                      <Text style={[styles.weekBadgeDay, { color: isToday ? colors.primaryForeground : colors.mutedForeground }]}>{day.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()}</Text>
+                      <Text style={[styles.weekBadgeNumber, { color: isToday ? colors.primaryForeground : isPast ? colors.mutedForeground : colors.foreground }]}>{day.getDate()}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.weekDayTitle, { color: isToday ? colors.primary : isPast ? colors.mutedForeground : colors.foreground }]}>
+                        {isToday ? 'Today' : day.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+                      </Text>
+                      <Text style={[styles.weekDayCount, { color: colors.mutedForeground }]}>{dayAppointments.length === 0 ? 'No appointments' : `${dayAppointments.length} appointment${dayAppointments.length === 1 ? '' : 's'}`}</Text>
+                    </View>
+                    {isToday ? <View style={[styles.todayPill, { backgroundColor: colors.primary }]}><Text style={[styles.todayPillText, { color: colors.primaryForeground }]}>Today</Text></View> : null}
+                  </TouchableOpacity>
+                  {dayAppointments.length === 0 ? (
+                    <View style={styles.weekEmpty}>
+                      <View style={[styles.weekEmptyBar, { backgroundColor: colors.border }]} />
+                      <Text style={[styles.weekEmptyText, { color: colors.mutedForeground }]}>No bookings</Text>
+                    </View>
+                  ) : (
+                    <View style={styles.weekCards}>
+                      {dayAppointments.map((item) => {
+                        const minutes = Number(String(item.duration).match(/\d+/)?.[0] ?? 60);
+                        const status = WEEK_STATUS[item.status] ?? WEEK_STATUS.pending;
+                        return (
+                          <TouchableOpacity key={item.id} onPress={() => openAppointment(item)} style={[styles.weekCard, { backgroundColor: colors.card, borderColor: colors.border }]} testID={`week-appt-${item.appointmentId}`}>
+                            <View style={[styles.weekStripe, { backgroundColor: colors.primary }]} />
+                            <View style={{ flex: 1, minWidth: 0 }}>
+                              <View style={styles.weekCardTop}>
+                                <View style={styles.weekTime}>
+                                  <Feather name="clock" size={12} color={colors.mutedForeground} />
+                                  <Text style={[styles.weekTimeText, { color: colors.mutedForeground }]}>{formatClock(item.startMinutes)} – {formatClock(item.startMinutes + minutes)}</Text>
+                                </View>
+                                <View style={[styles.weekStatus, { backgroundColor: status.bg }]}><Text style={[styles.weekStatusText, { color: status.text }]}>{status.label}</Text></View>
+                              </View>
+                              <Text numberOfLines={1} style={[styles.weekName, { color: colors.foreground }]}>{item.name.split(' ')[0] || item.name}</Text>
+                              <Text numberOfLines={1} style={[styles.weekService, { color: colors.mutedForeground }]}>{item.service}</Text>
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  )}
+                </View>
               );
             })}
           </View>
@@ -634,6 +690,32 @@ const styles = StyleSheet.create({
   monthNumberText: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
   monthDot: { width: 4, height: 4, borderRadius: 2, marginTop: 5 },
   weekAgenda: { gap: 9 },
+  weekSummary: { borderWidth: 1, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 10 },
+  weekSummaryTitle: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
+  weekSummaryCount: { fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 2 },
+  weekList: { borderWidth: 1, borderRadius: 16, overflow: 'hidden' },
+  weekDay: {},
+  weekDayHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 9 },
+  weekBadge: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  weekBadgeDay: { fontSize: 10, fontFamily: 'Inter_600SemiBold', letterSpacing: 0.4 },
+  weekBadgeNumber: { fontSize: 15, fontFamily: 'Inter_700Bold', lineHeight: 17 },
+  weekDayTitle: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
+  weekDayCount: { fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 1 },
+  todayPill: { paddingHorizontal: 9, paddingVertical: 3, borderRadius: 999 },
+  todayPillText: { fontSize: 12, fontFamily: 'Inter_700Bold' },
+  weekEmpty: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 10 },
+  weekEmptyBar: { width: 1, height: 28, borderRadius: 1 },
+  weekEmptyText: { fontSize: 13, fontStyle: 'italic', fontFamily: 'Inter_400Regular' },
+  weekCards: { paddingHorizontal: 12, paddingVertical: 8, gap: 8 },
+  weekCard: { flexDirection: 'row', gap: 11, borderWidth: 1, borderRadius: 13, paddingHorizontal: 12, paddingVertical: 10 },
+  weekStripe: { width: 4, borderRadius: 2, alignSelf: 'stretch', minHeight: 34 },
+  weekCardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  weekTime: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 },
+  weekTimeText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
+  weekStatus: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999 },
+  weekStatusText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  weekName: { fontSize: 16, fontFamily: 'Inter_700Bold', marginTop: 5 },
+  weekService: { fontSize: 14, fontFamily: 'Inter_400Regular', marginTop: 1 },
   weekDayRow: { minHeight: 69, borderWidth: 1, borderRadius: 16, padding: 11, flexDirection: 'row', alignItems: 'center', gap: 11 },
   weekDayLabel: { width: 44, alignItems: 'center' },
   weekDayName: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },

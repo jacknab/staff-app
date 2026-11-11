@@ -66,7 +66,7 @@ export const HELP: Record<string, HelpPage> = {
       { heading: 'Moving around', points: [
         'Day, Week and Month switch the view.',
         'The arrows go to the previous or next day, week or month. Today jumps back to today.',
-        'Day: tap a day in the strip at the top to see it. Week: each day lists its first bookings, or Open schedule when nothing is booked. Month: tap a day to open it.',
+        'Day: tap a day in the strip at the top to see it. Week: the week's dates and how many bookings, then each day with its bookings (time, status, client and service); tap a booking to open it, or a day to see it; No bookings when nothing is booked. Month: tap a day to open it.',
         'The refresh button reloads your calendar from Certxa.',
       ] },
       { heading: 'Bookings', points: [
