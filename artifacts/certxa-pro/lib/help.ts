@@ -395,8 +395,8 @@ export const HELP: Record<string, HelpPage> = {
     sections: [
       { heading: 'Not connected yet', points: [
         'The first page shows what a Google Business Profile does for you. Set Up Google Business Profile walks you through creating one on Google; Connect My Existing Profile signs in to Google and connects the profile you already have. The back arrow returns to Settings.',
-        'Connect Google Business Profile opens Google’s sign-in on a Certxa page. Sign in with the Google account that manages your profile and allow Certxa access. If the account has more than one business, tap yours. Then you’re back in the app.',
-        'I don’t have one yet shows the steps to create a profile on Google.',
+        'Connect My Existing Profile opens Google’s sign-in on a Certxa page. Sign in with the Google account that manages your profile and allow Certxa access. If the account has more than one business, tap yours. Then you’re back in the app. Closing that page before you finish brings you back to the first page.',
+        'If connecting fails, the reason shows with Connect Google Business Profile to try again, or I don’t have one yet for the steps to create a profile.',
       ] },
       { heading: 'Creating a profile', points: [
         'The numbered steps explain what Google asks for: your business name and category, where you work (a home studio can hide its street address; house calls add the areas you travel to), your phone and website, and Google’s check that the business is yours.',

@@ -16,7 +16,7 @@ import { look } from '@/components/look/tokens';
 import { api } from '@/lib/live-api';
 import { disconnectGoogle, getGoogleProfile, googleConnected, myStoreId, openCreateProfile, runGoogleConnect, syncGoogleReviews, type GoogleProfile } from '@/lib/google-business';
 
-type Stage = 'loading' | 'welcome' | 'connected' | 'intro' | 'guide' | 'working' | 'error';
+type Stage = 'loading' | 'welcome' | 'connected' | 'guide' | 'working' | 'error';
 
 // The picture's own top and bottom colours, so the page around it matches whatever the phone's shape.
 const WELCOME_TOP = '#F4EFFD';
@@ -43,9 +43,10 @@ export default function GoogleBusinessScreen() {
       if (slug) setWebsite(`${slug}.certxa.com`);
       const p = await getGoogleProfile(id).catch(() => null);
       setProfile(p);
-      setStage((current) => (googleConnected(p) ? 'connected' : current === 'loading' ? 'welcome' : 'intro'));
+      // Not connected (the Google page closed without finishing): back to the first page.
+      setStage(googleConnected(p) ? 'connected' : 'welcome');
     } catch {
-      setStage((current) => (current === 'loading' ? 'welcome' : 'intro'));
+      setStage('welcome');
     }
   }, []);
   useEffect(() => { void load(); }, [load]);
@@ -128,7 +129,7 @@ export default function GoogleBusinessScreen() {
     <View style={{ flex: 1, backgroundColor: look.pageTop }}>
       <AppBackground />
       <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.content, { paddingTop: topInset + 12, paddingBottom: insets.bottom + 28 }]}>
-        <TouchableOpacity accessibilityLabel="Back" onPress={() => (stage === 'guide' ? setStage('intro') : router.back())} style={styles.back} testID="google-back">
+        <TouchableOpacity accessibilityLabel="Back" onPress={() => (stage === 'guide' || stage === 'error' ? setStage('welcome') : router.back())} style={styles.back} testID="google-back">
           <Feather name="arrow-left" size={20} color={colors.foreground} />
         </TouchableOpacity>
         <Text style={[styles.eyebrow, { color: colors.primary }]}>GOOGLE BUSINESS PROFILE</Text>
