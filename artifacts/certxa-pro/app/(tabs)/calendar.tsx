@@ -575,10 +575,17 @@ export default function CalendarScreen() {
               <View style={[styles.timelineLabels, { backgroundColor: colors.card }]}>
                 {/* A label on every quarter-hour line: the hour as "11am", then 15, 30, 45. */}
                 {timelineHours.flatMap((time, index) => [0, 1, 2, 3].map((q) => (
-                  <Text key={`${time}-${q}`} style={[styles.timelineLabel, q === 0 ? styles.timelineHourLabel : { color: colors.mutedForeground }, { top: Math.max(0, (index * 4 + q) * QUARTER - 8) }]}>
+                  // A label under the time-now pill is left out.
+                  todayIsSelected && Math.abs((index * 4 + q) * QUARTER - nowTop) < 18 ? null : <Text key={`${time}-${q}`} style={[styles.timelineLabel, q === 0 ? styles.timelineHourLabel : { color: colors.mutedForeground }, { top: Math.max(0, (index * 4 + q) * QUARTER - 8) }]}>
                     {q === 0 ? `${time / 60 % 12 || 12}${time / 60 >= 12 ? 'pm' : 'am'}` : String(q * 15)}
                   </Text>
                 )))}
+                {/* The time now, on the left end of the now line (owner, 2026-11-11). */}
+                {todayIsSelected && nowTop >= 0 && nowTop <= timelineHeight ? (
+                  <View pointerEvents="none" testID="calendar-now-time" style={[styles.nowPill, { top: nowTop - 11, backgroundColor: colors.primary }]}>
+                    <Text style={[styles.nowPillText, { color: colors.primaryForeground }]}>{formatClock(zonedMinutes(now, timeZone)).replace(/ [AP]M$/, '')}</Text>
+                  </View>
+                ) : null}
               </View>
               <View style={[styles.timelineTrack, { backgroundColor: colors.card }]}>
                 {timelineHours.flatMap((time, index) => [0, 1, 2, 3].map((q) => <View key={`${time}-${q}`} style={[styles.timelineLine, q > 0 && styles.timelineQuarterLine, { top: (index * 4 + q) * QUARTER, backgroundColor: colors.border }]} />))}
@@ -750,6 +757,8 @@ const styles = StyleSheet.create({
   timelineEmpty: { position: 'absolute', top: 120, left: 0, right: 0, alignItems: 'center', gap: 8 },
   timelineEmptyText: { color: '#A9ACC0', fontSize: 15, fontFamily: 'Inter_500Medium' },
   currentTime: { position: 'absolute', left: 0, right: 0, height: 2 },
+  nowPill: { position: 'absolute', left: 4, right: 0, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
+  nowPillText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(17, 21, 46, 0.42)', justifyContent: 'center', padding: 20 },
   rescheduleModal: { borderRadius: 22, padding: 20, shadowColor: '#2E1065', shadowOpacity: 0.18, shadowRadius: 20, shadowOffset: { width: 0, height: 8 }, elevation: 8 },
   modalIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: '#ECE5FD', alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
