@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { PaymentsSetupBanner } from '@/components/PaymentsSetupBanner';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Alert, Modal, Platform, ScrollView as RNScrollView, StatusBar, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
@@ -390,7 +389,6 @@ export default function CalendarScreen() {
       {/* Fixed header: it never scrolls. */}
       <View style={styles.fixedHeader}>
         <HelpTitle help="calendar" style={[styles.pageTitle, { color: colors.foreground }]}>Calendar</HelpTitle>
-        <View style={{ marginBottom: 10 }}><PaymentsSetupBanner /></View>
         {openRequests > 0 ? (
           <TouchableOpacity testID="calendar-requests-banner" onPress={() => router.push('/requests')} style={[styles.requestsBanner, { backgroundColor: colors.card, borderColor: colors.primary }]}>
             <Text style={[styles.requestsText, { color: colors.foreground }]}>{openRequests === 1 ? '1 booking request is waiting for you' : `${openRequests} booking requests are waiting for you`}</Text>
