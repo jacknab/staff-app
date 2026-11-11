@@ -407,6 +407,7 @@ export const HELP: Record<string, HelpPage> = {
         'The card shows the business you connected and when your Google reviews were last updated.',
         'Open Reviews shows your Google reviews, where you can reply; replies are posted on Google.',
         'Update reviews now fetches your latest Google reviews right away (they also update on their own).',
+        'Your portfolio photos are shared to your Google Business Profile on their own, the ones already on your website and each new one you add, a few a day. Photos of clients you put on your website are never sent to Google. Deleting a photo before its turn keeps it off Google.',
         'Disconnect Google stops showing your Google reviews; your Certxa reviews show again. If Google asks you to sign in again, a button for it appears here.',
       ] },
     ],
