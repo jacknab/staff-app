@@ -382,7 +382,33 @@ export const HELP: Record<string, HelpPage> = {
       'Each review shows the stars, the comment and any photo the client added. View booking opens the visit it was for.',
       'Reply: write an answer your clients will see on your website and tap Post reply. Edit your reply or Remove reply changes it later.',
       'Reviews come from the review request clients get after a visit (Settings › Client notifications). They can’t be edited or removed.',
+    ] }, { heading: 'Google reviews', points: [
+      'When your Google Business Profile is connected (Settings › Google), your Google reviews show first, under GOOGLE REVIEWS, with the date and “Posted on Google”.',
+      'Reply opens a box; Post on Google publishes your answer on Google for everyone to see, and it shows under the review as YOUR REPLY ON GOOGLE. Edit your reply changes it.',
+      'Your earlier Certxa reviews stay below, under CERTXA REVIEWS, and you can still reply to them.',
+      'While Google is connected, clients you ask for a review are sent to Google.',
     ] }],
+  },
+  'google-business': {
+    title: 'Google Business Profile',
+    intro: 'Connecting your Google Business Profile, or creating one if you don’t have it yet.',
+    sections: [
+      { heading: 'Not connected yet', points: [
+        'Connect Google Business Profile opens Google’s sign-in on a Certxa page. Sign in with the Google account that manages your profile and allow Certxa access. If the account has more than one business, tap yours. Then you’re back in the app.',
+        'I don’t have one yet shows the steps to create a profile on Google.',
+      ] },
+      { heading: 'Creating a profile', points: [
+        'The numbered steps explain what Google asks for: your business name and category, where you work (a home studio can hide its street address; house calls add the areas you travel to), your phone and website, and Google’s check that the business is yours.',
+        'Open Google Business Profile opens Google’s page to create it.',
+        'I’ve created it — connect now connects it once you’re done; sign in with the same Google account.',
+      ] },
+      { heading: 'Connected', points: [
+        'The card shows the business you connected and when your Google reviews were last updated.',
+        'Open Reviews shows your Google reviews, where you can reply; replies are posted on Google.',
+        'Update reviews now fetches your latest Google reviews right away (they also update on their own).',
+        'Disconnect Google stops showing your Google reviews; your Certxa reviews show again. If Google asks you to sign in again, a button for it appears here.',
+      ] },
+    ],
   },
   credits: {
     title: 'Credit balance',
@@ -647,6 +673,7 @@ export const HELP: Record<string, HelpPage> = {
       'My Business: Business details, Location, Where you see clients, Hours and Catalog.',
       'Bookings: Online booking, Booking approval, Cancellation policy and Blocked clients.',
       'Website: your link, design, look, and the AI website designer.',
+      'Google: Google Business Profile — connect it to show and reply to your Google reviews, or follow the steps to create one.',
       'Client Messages: Client notifications and Business Phone.',
       'Payments: Stripe account, Connect card reader, Deposits, Checkout (tax and tips) and Enable Tap to Pay on iPhone.',
       'Account: your sign-in, and Billing (your plan and invoices on certxa.com).',

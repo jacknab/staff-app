@@ -19,7 +19,7 @@
 import { useCallback, useEffect, useState, type ComponentProps, type ReactNode } from 'react';
 import { Feather } from '@expo/vector-icons';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { ActivityIndicator, Alert, Linking, ScrollView, Share, StatusBar, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
@@ -393,6 +393,14 @@ export default function SettingsScreen() {
           <Row icon="slash" title="Blocked clients" hint="Phone numbers that cannot book online" to="blocked" />
         </Group>
         <Group title="Website"><Row icon="globe" title="Website" hint={website.replace('https://', '') || 'Your booking website'} to="website" /></Group>
+        {/* Google Business Profile (owner, 2026-11-11): connect it, or a guide to creating one (app/google-business.tsx). */}
+        <Group title="Google">
+          <TouchableOpacity testID="settings-google-business" onPress={() => router.push('/google-business' as Href)} style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={[styles.rowIcon, { backgroundColor: colors.secondary }]}><Feather name="map-pin" size={26} color={colors.primary} /></View>
+            <View style={{ flex: 1 }}><Text style={[styles.rowTitle, { color: colors.foreground }]}>Google Business Profile</Text><Text numberOfLines={2} style={[styles.rowHint, { color: colors.mutedForeground }]}>Connect it to show and reply to your Google reviews, or create one</Text></View>
+            <Feather name="chevron-right" size={20} color={colors.mutedForeground} />
+          </TouchableOpacity>
+        </Group>
         <Group title="Client Messages">
           {/* Its own screen, like the website's Settings › Client Notifications (app/notifications.tsx). */}
           <TouchableOpacity testID="settings-notifications" onPress={() => router.push('/notifications')} style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}>

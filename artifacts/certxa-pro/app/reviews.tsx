@@ -18,6 +18,7 @@ import { useColors } from '@/hooks/useColors';
 import { api } from '@/lib/live-api';
 import { appointmentParams, mapAppointment, useBookingData, type ApiAppointment } from '@/contexts/BookingContext';
 import { HelpTitle } from '@/components/HelpTitle';
+import { getGoogleProfile, googleConnected, googleReviews, myStoreId, replyOnGoogle, type GoogleReview } from '@/lib/google-business';
 
 import { AppBackground } from '@/components/look/AppBackground';
 import { look, cardShadow } from '@/components/look/tokens';
@@ -62,6 +63,13 @@ export default function ReviewsScreen() {
   const [reply, setReply] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
+  // Google reviews, when the business has connected its Google Business Profile (Settings › Google; owner, 2026-11-11).
+  const [googleStore, setGoogleStore] = useState<number | null>(null);
+  const [gReviews, setGReviews] = useState<GoogleReview[]>([]);
+  const [gReplyingTo, setGReplyingTo] = useState<number | null>(null);
+  const [gReply, setGReply] = useState('');
+  const [gSaving, setGSaving] = useState(false);
+  const [gError, setGError] = useState('');
 
   const load = useCallback(async () => {
     setError('');
@@ -70,7 +78,24 @@ export default function ReviewsScreen() {
       setReviews(Array.isArray(rows) ? rows : []);
       setStats(totals ?? null);
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not load your reviews from Certxa.'); }
+    try {
+      const id = await myStoreId();
+      const connected = id ? googleConnected(await getGoogleProfile(id)) : false;
+      setGoogleStore(connected ? id : null);
+      setGReviews(connected && id ? await googleReviews(id) : []);
+    } catch { setGoogleStore(null); }
   }, []);
+
+  const replyGoogle = async (review: GoogleReview) => {
+    if (gSaving || !googleStore || !gReply.trim()) return;
+    setGSaving(true); setGError('');
+    try {
+      await replyOnGoogle(googleStore, review.id, gReply.trim());
+      setGReviews((current) => current.map((row) => (row.id === review.id ? { ...row, ownerReply: { comment: gReply.trim() } } : row)));
+      setGReplyingTo(null); setGReply('');
+    } catch (cause) { setGError(cause instanceof Error ? cause.message : 'Google didn’t take the reply. Try again in a moment.'); }
+    finally { setGSaving(false); }
+  };
 
   useEffect(() => { void load().finally(() => setLoading(false)); }, [load]);
 
@@ -122,7 +147,44 @@ export default function ReviewsScreen() {
               </View>
             </View>
 
-            {reviews.length === 0 && !error ? (
+            {googleStore ? (
+              <View testID="google-reviews">
+                <Text style={[styles.responseLabel, { color: colors.mutedForeground, marginBottom: 8 }]}>GOOGLE REVIEWS</Text>
+                {gReviews.length === 0 ? <Text style={[styles.meta, { color: colors.mutedForeground, marginBottom: 14 }]}>No Google reviews yet.</Text> : null}
+                {gReviews.map((review) => {
+                  const open = gReplyingTo === review.id;
+                  const replied = review.ownerReply?.comment;
+                  return (
+                    <View key={`g-${review.id}`} style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                      <View style={styles.cardHead}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.name, { color: colors.foreground }]}>{review.customerName ?? 'Google user'}</Text>
+                          {stars(Math.round(review.rating))}
+                          <Text style={[styles.meta, { color: colors.mutedForeground, marginTop: 4 }]}>{dateLabel(review.reviewCreateTime)} · Posted on Google</Text>
+                        </View>
+                      </View>
+                      {review.reviewText ? <Text style={[styles.comment, { color: colors.foreground }]}>{review.reviewText}</Text> : null}
+                      {replied ? <View style={[styles.response, { backgroundColor: colors.secondary }]}><Text style={[styles.responseLabel, { color: colors.primary }]}>YOUR REPLY ON GOOGLE</Text><Text style={[styles.reviewMeta, { color: colors.foreground, marginTop: 4 }]}>{replied}</Text></View> : null}
+                      {open ? (
+                        <View style={{ marginTop: 12 }}>
+                          <TextInput testID={`google-reply-input-${review.id}`} autoFocus multiline maxLength={4000} value={gReply} onChangeText={setGReply} placeholder="Write a reply. It’s posted on Google for everyone to see." placeholderTextColor={colors.mutedForeground} style={[styles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.foreground }]} />
+                          {gError ? <Text style={[styles.meta, { color: colors.destructive }]}>{gError}</Text> : null}
+                          <View style={styles.actions}>
+                            <TouchableOpacity disabled={gSaving} onPress={() => { setGReplyingTo(null); setGReply(''); setGError(''); }} style={[styles.button, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}><Text style={[styles.buttonText, { color: colors.foreground }]}>Cancel</Text></TouchableOpacity>
+                            <TouchableOpacity testID={`google-reply-save-${review.id}`} disabled={gSaving || !gReply.trim()} onPress={() => void replyGoogle(review)} style={[styles.button, { backgroundColor: gSaving || !gReply.trim() ? colors.muted : colors.primary }]}><Text style={[styles.buttonText, { color: gSaving || !gReply.trim() ? colors.mutedForeground : colors.primaryForeground }]}>{gSaving ? 'Posting…' : 'Post on Google'}</Text></TouchableOpacity>
+                          </View>
+                        </View>
+                      ) : (
+                        <TouchableOpacity testID={`google-reply-${review.id}`} onPress={() => { setGReplyingTo(review.id); setGReply(replied ?? ''); setGError(''); }} style={styles.replyLink}><Feather name="corner-up-left" size={16} color={colors.primary} /><Text style={[styles.replyText, { color: colors.primary }]}>{replied ? 'Edit your reply' : 'Reply'}</Text></TouchableOpacity>
+                      )}
+                    </View>
+                  );
+                })}
+                {reviews.length > 0 ? <Text style={[styles.responseLabel, { color: colors.mutedForeground, marginTop: 10, marginBottom: 8 }]}>CERTXA REVIEWS</Text> : null}
+              </View>
+            ) : null}
+
+            {reviews.length === 0 && !error && !googleStore ? (
               <View style={[styles.empty, { backgroundColor: colors.secondary }]}><Feather name="message-circle" size={20} color={colors.primary} /><Text style={[styles.emptyText, { color: colors.primary }]}>No reviews yet. Clients are asked for one after their appointment when review requests are switched on in Settings.</Text></View>
             ) : null}
 

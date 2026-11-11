@@ -149,6 +149,7 @@ function RootLayoutNav() {
       <Stack.Screen name="login" options={{ headerShown: false }} />
       <Stack.Screen name="signup" options={{ headerShown: false }} />
       <Stack.Screen name="get-paid" options={{ headerShown: false, presentation: 'card' }} />
+      <Stack.Screen name="google-business" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="website-setup" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="about-me" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="requests" options={{ headerShown: false, presentation: 'card' }} />
