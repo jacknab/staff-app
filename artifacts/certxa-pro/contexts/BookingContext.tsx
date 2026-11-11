@@ -99,6 +99,8 @@ export type ServiceProfile = {
   icon: 'eye' | 'droplet' | 'briefcase' | 'star';
   /** Solo house calls: done at the professional's place, at the client's, or either. */
   offeredAt: 'place' | 'client' | 'any';
+  /** Its category in Catalog (null: none), for showing services under their category. */
+  categoryId: number | null;
 };
 
 type NewClient = Omit<ClientProfile, 'id' | 'customerId'>;
@@ -131,7 +133,7 @@ type ApiCustomer = {
   visits?: number | null; spentCents?: number | null; lastVisitAt?: string | null; lastService?: string | null; nextAppointmentAt?: string | null;
   allergies?: string | null; isVip?: boolean | null; tags?: string[] | null; avatarUrl?: string | null;
 };
-type ApiService = { id: number; offeredAt?: string | null; name?: string | null; duration?: number | string | null; price?: number | string | null };
+type ApiService = { id: number; categoryId?: number | null; offeredAt?: string | null; name?: string | null; duration?: number | string | null; price?: number | string | null };
 export type ApiAppointment = { feeRetry?: { status: string; owedCents: number; collectedCents: number | null; error: string | null } | null; depositRefundRetry?: string | null; cancelledInPolicy?: boolean | null; depositRefundedCents?: number | null; depositRefundFailed?: boolean | null; cardOnFile?: boolean | null; feePercent?: number | null; feeCents?: number | null; feeChargedCents?: number | null; totalPaid?: number | null; refundedCents?: number | null; calendarHidden?: boolean | null; paymentStatus?: string | null; depositCollected?: number | null; visitAt?: string | null; clientAddress?: HouseCallAddress | null; travelFee?: number | null; appointmentAddons?: { addon?: { id?: number; name?: string | null; price?: number | string | null } | null }[] | null; customLines?: { label?: string; price?: number | string | null }[] | null; id: number; date: string; duration?: number | null; status?: string | null; notes?: string | null; customer?: ApiCustomer | null; service?: ApiService | null };
 
 const BookingContext = createContext<BookingContextValue | null>(null);
@@ -160,7 +162,7 @@ function mapCustomer(customer: ApiCustomer, index: number): ClientProfile {
 function mapService(service: ApiService, index: number): ServiceProfile {
   const minutes = durationMinutes(service.duration);
   const priceValue = Number(service.price ?? 0) || 0;
-  return { id: service.id, name: service.name || 'Service', durationMinutes: minutes, duration: minutes >= 60 ? `${Math.floor(minutes / 60)} hr${minutes % 60 ? ` ${minutes % 60} min` : ''}` : `${minutes} min`, priceValue, price: money(priceValue), icon: (['eye', 'droplet', 'briefcase', 'star'] as const)[index % 4], offeredAt: service.offeredAt === 'place' || service.offeredAt === 'client' ? service.offeredAt : 'any' };
+  return { id: service.id, name: service.name || 'Service', durationMinutes: minutes, duration: minutes >= 60 ? `${Math.floor(minutes / 60)} hr${minutes % 60 ? ` ${minutes % 60} min` : ''}` : `${minutes} min`, priceValue, price: money(priceValue), icon: (['eye', 'droplet', 'briefcase', 'star'] as const)[index % 4], offeredAt: service.offeredAt === 'place' || service.offeredAt === 'client' ? service.offeredAt : 'any', categoryId: service.categoryId == null ? null : Number(service.categoryId) };
 }
 
 export function mapAppointment(appointment: ApiAppointment, timeZone: string): AppointmentRecord {

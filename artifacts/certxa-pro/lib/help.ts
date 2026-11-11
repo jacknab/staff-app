@@ -168,8 +168,8 @@ export const HELP: Record<string, HelpPage> = {
     sections: [
       { heading: 'The steps', points: [
         'Client: type a phone number on the keypad to find the client, or add them as a new client with their name. The Name or e-mail tab finds a client by name or e-mail instead.',
-        'Services: choose one or more. Search finds one quickly.',
-        'Add-ons: optional extras for those services; Skip add-ons goes on without any.',
+        'Services: choose one or more, shown under their category (Catalog › Categories). Search finds one quickly.',
+        'Add-ons: optional extras for those services, shown under each service’s add-on groups (Catalog › Add-on Groups); add-ons linked another way are under More add-ons. Skip add-ons goes on without any.',
         'Date and time: if you do house calls, choose At my place or House call (and enter the client’s address). Then pick a day and one of the open times.',
       ] },
       { heading: 'Repeat', points: ['Repeat books the same visit every 1, 2, 3 or 4 weeks; choose how many times. Dates that are already taken are skipped.'] },

@@ -16,6 +16,9 @@ import { AppBackground } from '@/components/look/AppBackground';
 import { usePaymentsReady } from '@/lib/usePaymentsReady';
 import { look, cardShadow } from '@/components/look/tokens';
 type AddonOption = { id: number; name: string; priceValue: number; minutes: number; serviceIds: number[] };
+/** Catalog's service categories and add-on groups, to show services and add-ons the way they're organized there. */
+type Category = { id: number; name: string; sortOrder: number };
+type AddonGroup = { id: number; name: string; addonIds: number[]; serviceIds: number[] };
 type Slot = { time: string; staffId: number; staffName: string };
 type Stage = 'client' | 'services' | 'addons' | 'calendar' | 'times' | 'payment-choice';
 type PaymentChoice = 'request' | 'skip';
@@ -161,6 +164,8 @@ export default function BookingScreen() {
   const [addonOptions, setAddonOptions] = useState<AddonOption[]>([]);
   const [addonIds, setAddonIds] = useState<number[]>([]);
   const [addonQuery, setAddonQuery] = useState('');
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [addonGroups, setAddonGroups] = useState<AddonGroup[]>([]);
   const [storeSlug, setStoreSlug] = useState('');
   const [slots, setSlots] = useState<Slot[]>([]);
   const [slotsState, setSlotsState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
@@ -235,8 +240,9 @@ export default function BookingScreen() {
     let cancelled = false;
     (async () => {
       try {
-        const [addonRows, linkRows, storeRows] = await Promise.all([
+        const [addonRows, linkRows, storeRows, categoryRows, groupRows] = await Promise.all([
           api.get<any[]>('/api/addons'), api.get<any[]>('/api/service-addons'), api.get<any[]>('/api/stores'),
+          api.get<any[]>('/api/service-categories').catch(() => []), api.get<any[]>('/api/addon-groups').catch(() => []),
         ]);
         if (cancelled) return;
         const links = Array.isArray(linkRows) ? linkRows : [];
@@ -245,6 +251,10 @@ export default function BookingScreen() {
           serviceIds: links.filter((l) => Number(l?.addonId) === Number(a.id)).map((l) => Number(l.serviceId)),
         })));
         setStoreSlug(String((Array.isArray(storeRows) ? storeRows[0]?.bookingSlug : '') ?? ''));
+        setCategories((Array.isArray(categoryRows) ? categoryRows : []).map((c) => ({ id: Number(c.id), name: String(c.name ?? ''), sortOrder: Number(c.sortOrder) || 0 }))
+          .sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id));
+        setAddonGroups((Array.isArray(groupRows) ? groupRows : []).map((g) => ({ id: Number(g.id), name: String(g.name ?? 'Add-ons'),
+          addonIds: (g.addonIds ?? []).map(Number), serviceIds: (g.serviceIds ?? []).map(Number) })));
       } catch { /* no add-ons are offered, and the schedule step says times could not be loaded */ }
     })();
     return () => { cancelled = true; };
@@ -263,6 +273,30 @@ export default function BookingScreen() {
   const addonFilter = addonQuery.trim().toLowerCase();
   const visibleAddons = addonFilter ? applicableAddons.filter((item) => item.name.toLowerCase().includes(addonFilter)) : applicableAddons;
   const chosenAddons = applicableAddons.filter((item) => addonIds.includes(item.id));
+  // Step 2 (owner, 2026-11-11): the services under their category, in Catalog's order; none last.
+  const serviceSections = (() => {
+    const named = categories.map((c) => ({ key: `c${c.id}`, title: c.name, items: visibleServices.filter((x) => x.categoryId === c.id) }));
+    const rest = visibleServices.filter((x) => x.categoryId == null || !categories.some((c) => c.id === x.categoryId));
+    return [...named, { key: 'none', title: named.some((n) => n.items.length) ? 'Other services' : '', items: rest }].filter((sec) => sec.items.length > 0);
+  })();
+  // Step 3 (owner, 2026-11-11): each chosen service's add-on groups, under the group's name and in its order; add-ons
+  // that reach a service another way (linked directly, or offered with every service) under More add-ons.
+  const addonSections = (() => {
+    const byId = new Map(visibleAddons.map((a) => [a.id, a]));
+    const shown = new Set<number>();
+    const sections: { key: string; title: string; items: AddonOption[] }[] = [];
+    for (const service of chosenServices) {
+      for (const group of addonGroups.filter((g) => g.serviceIds.includes(service.id))) {
+        const items = group.addonIds.map((id) => byId.get(id)).filter((a): a is AddonOption => !!a);
+        if (!items.length) continue;
+        items.forEach((a) => shown.add(a.id));
+        sections.push({ key: `g${group.id}-s${service.id}`, title: chosenServices.length > 1 ? `${group.name} · ${service.name}` : group.name, items });
+      }
+    }
+    const more = visibleAddons.filter((a) => !shown.has(a.id));
+    if (more.length) sections.push({ key: 'more', title: sections.length ? 'More add-ons' : '', items: more });
+    return sections;
+  })();
   const totalMinutes = chosenServices.reduce((sum, item) => sum + item.durationMinutes, 0) + chosenAddons.reduce((sum, item) => sum + item.minutes, 0);
   const totalPrice = chosenServices.reduce((sum, item) => sum + item.priceValue, 0) + chosenAddons.reduce((sum, item) => sum + item.priceValue, 0);
   const primaryServiceId = serviceIds[0];
@@ -766,18 +800,25 @@ export default function BookingScreen() {
                   <Text style={[styles.subheading, { color: colors.mutedForeground }]}>{stage === 'services' ? `Choose one or more services for ${ticketClient?.name.split(' ')[0] ?? 'this client'}.` : 'Optional extras for the services you picked.'}</Text>
                 </View>
                 <TextInput testID={stage === 'services' ? 'booking-service-search' : 'booking-addon-search'} autoCapitalize="none" autoCorrect={false} value={stage === 'services' ? serviceQuery : addonQuery} onChangeText={stage === 'services' ? setServiceQuery : setAddonQuery} placeholder={stage === 'services' ? 'Search services' : 'Search add-ons'} placeholderTextColor={colors.mutedForeground} style={[styles.nameInput, { height: 48, fontSize: 17, marginBottom: 12, backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
-                <View style={styles.serviceList}>
-                  {(stage === 'services' ? visibleServices.map((item) => ({ id: item.id, name: item.name, minutes: item.durationMinutes, priceValue: item.priceValue })) : visibleAddons).map((item) => {
-                    const picked = (stage === 'services' ? serviceIds : addonIds).includes(item.id);
-                    return (
-                      <TouchableOpacity key={item.id} testID={`booking-${stage === 'services' ? 'service' : 'addon'}-${item.id}`} accessibilityRole="checkbox" accessibilityState={{ checked: picked }} onPress={() => toggleItem(item.id)} style={[styles.serviceRow, { backgroundColor: colors.card, borderColor: picked ? colors.primary : colors.border }]}>
-                        <View style={[styles.serviceIcon, { backgroundColor: picked ? colors.primary : colors.secondary }]}><Feather name={picked ? 'check' : 'plus'} size={18} color={picked ? colors.primaryForeground : colors.primary} /></View>
-                        <View style={{ flex: 1 }}><Text numberOfLines={1} style={[styles.matchName, { color: colors.foreground }]}>{item.name}</Text><Text style={[styles.matchPhone, { color: colors.mutedForeground }]}>{minutesLabel(item.minutes)}</Text></View>
-                        <Text style={[styles.price, { color: colors.foreground }]}>{money(item.priceValue)}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+                {(stage === 'services'
+                  ? serviceSections.map((sec) => ({ ...sec, items: sec.items.map((item) => ({ id: item.id, name: item.name, minutes: item.durationMinutes, priceValue: item.priceValue })) }))
+                  : addonSections).map((sec) => (
+                  <View key={sec.key} style={styles.section} testID={`booking-section-${sec.key}`}>
+                    {sec.title ? <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>{sec.title.toUpperCase()}</Text> : null}
+                    <View style={styles.serviceList}>
+                      {sec.items.map((item) => {
+                        const picked = (stage === 'services' ? serviceIds : addonIds).includes(item.id);
+                        return (
+                          <TouchableOpacity key={item.id} testID={`booking-${stage === 'services' ? 'service' : 'addon'}-${item.id}`} accessibilityRole="checkbox" accessibilityState={{ checked: picked }} onPress={() => toggleItem(item.id)} style={[styles.serviceRow, { backgroundColor: colors.card, borderColor: picked ? colors.primary : colors.border }]}>
+                            <View style={[styles.serviceIcon, { backgroundColor: picked ? colors.primary : colors.secondary }]}><Feather name={picked ? 'check' : 'plus'} size={18} color={picked ? colors.primaryForeground : colors.primary} /></View>
+                            <View style={{ flex: 1 }}><Text numberOfLines={1} style={[styles.matchName, { color: colors.foreground }]}>{item.name}</Text><Text style={[styles.matchPhone, { color: colors.mutedForeground }]}>{minutesLabel(item.minutes)}</Text></View>
+                            <Text style={[styles.price, { color: colors.foreground }]}>{money(item.priceValue)}</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+                ))}
                 {(stage === 'services' ? visibleServices : visibleAddons).length === 0 ? (
                   <View style={[styles.lookupHint, { marginTop: 0, backgroundColor: colors.secondary }]}><Feather name="search" size={17} color={colors.primary} /><Text style={[styles.hintText, { flex: 1, color: colors.primary }]}>{stage === 'services' ? 'No service matches that search.' : 'No add-on matches that search.'}</Text></View>
                 ) : null}
@@ -898,6 +939,8 @@ const styles = StyleSheet.create({
   dayDot: { width: 4, height: 4, borderRadius: 2 },
   sectionHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 19, marginBottom: 9 },
   sectionHint: { fontSize: 13, fontFamily: 'Inter_400Regular' },
+  section: { marginBottom: 14 },
+  sectionTitle: { fontSize: 13, letterSpacing: 0.8, fontFamily: 'Inter_700Bold', marginBottom: 8, marginLeft: 2 },
   serviceList: { gap: 7 },
   serviceRow: { borderWidth: 1, borderRadius: 14, minHeight: 59, paddingHorizontal: 10, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 9, ...cardShadow },
   price: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
