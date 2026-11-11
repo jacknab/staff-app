@@ -200,7 +200,7 @@ export const HELP: Record<string, HelpPage> = {
       { heading: 'The amount', points: [
         'The amount due comes from the booking; for a quick sale you key it in.',
         'Discount: 10%, 15%, 20% or 25% off, or a custom amount off. Tax is worked out after the discount, never on the tip.',
-        'A deposit the client already paid comes off; sales tax is added if you charge it (Settings › Checkout).',
+        'A deposit the client already paid comes off; sales tax and the platform fee are added if you charge them (Settings › Card reader & Checkout).',
         'The client chooses a tip, or enters their own, or no tip.',
       ] },
       { heading: 'How the client pays', points: [
@@ -652,7 +652,7 @@ export const HELP: Record<string, HelpPage> = {
       'Website: your link, design and look.',
       'Google: Google Business Profile — connect it to show and reply to your Google reviews, or follow the steps to create one.',
       'Client Messages: Client notifications and Business Phone.',
-      'Payments: Stripe account, Connect card reader, Deposits, Checkout (tax and tips) and Enable Tap to Pay on iPhone.',
+      'Payments: Stripe account, Connect card reader, Deposits, Card reader & Checkout (platform fee, tax and tips) and Enable Tap to Pay on iPhone.',
       'Account: your sign-in, and Billing (your plan and invoices on certxa.com).',
       'Hold a section’s title for its own help.',
     ] }],
@@ -704,6 +704,6 @@ export const HELP: Record<string, HelpPage> = {
       'The deposit comes off the price at checkout. Card payments must be set up first.',
     ] }],
   },
-  'settings.tax': { title: 'Checkout', intro: 'Sales tax and tips at checkout.', sections: [{ heading: 'What you can set', points: ['Sales tax rate (%), and whether to charge tax on services, on products, or both. Tax rules differ by place, so check with your tax adviser.', 'Tips: up to four tip choices clients see at checkout, as percentages. Clients can still enter their own amount or no tip.'] }] },
+  'settings.tax': { title: 'Card reader & Checkout', intro: 'The platform fee, sales tax and tips at checkout.', sections: [{ heading: 'What you can set', points: ['Each setting shows its value; tap Edit to change it, then Save. The back arrow leaves without saving.', 'Platform fee rate: 0% to 3%, paid by the client on card payments, shown as its own line at checkout and on the receipt. It isn’t added to cash payments, and it isn’t charged on the tip. Card fees aren’t allowed everywhere, so check your state’s rules first.', 'Service sales tax: the tax on services and add-ons. Retail sales tax: the tax on products. 0% means no tax. Tax rules differ by place, so check with your tax adviser.', 'Tip customized options: the three tip choices clients see at checkout, as percentages of the visit, and the tip selected by default (or None). Clients can still change it, enter their own amount or choose no tip.'] }] },
   'settings.account': { title: 'Account', intro: 'Your sign-in and account.', sections: [{ heading: 'What you can do', points: ['Mobile number: change it; a code is texted to the new number to confirm it.', 'Password: E-mail me a link to change it.', 'Sign out signs this phone out.', 'Delete my account: asks for your password, then deletes your business, bookings, clients and website for good.'] }] },
 };

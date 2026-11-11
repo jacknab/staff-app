@@ -40,7 +40,7 @@ import { look, cardShadow } from '@/components/look/tokens';
 // Stripe M2 does not require that Apple entitlement.
 const TAP_TO_PAY_ENABLED = true;
 // Shown on the payment screen so a tester can tell which build is installed.
-const BUILD_LABEL = 'Build Nov 11 · O';
+const BUILD_LABEL = 'Build Nov 11 · P';
 const EXPO_GO_PREVIEW = process.env.EXPO_PUBLIC_EXPO_GO_PREVIEW === '1';
 
 type PaymentStep = 'idle' | 'tap_intro' | 'initializing' | 'discovering' | 'connecting' | 'ready' | 'processing' | 'capture_pending' | 'success' | 'error';
@@ -231,28 +231,38 @@ export default function CheckoutScreen() {
   // The business's sales tax (Settings → Sales tax; off unless they turn on tax on services) and tip presets.
   const [tax, setTax] = useState<{ rate: number; services: boolean }>({ rate: 0, services: false });
   const [tipPresets, setTipPresets] = useState<number[] | undefined>(undefined);
+  const [defaultTip, setDefaultTip] = useState<number | null>(null);
+  // The fee the client pays on a card payment (Settings › Card reader & Checkout), 0 to 3%.
+  const [feeRate, setFeeRate] = useState(0);
   const [storeId, setStoreId] = useState<number | null>(null);
   useEffect(() => {
     if (EXPO_GO_PREVIEW) return;
-    api.get<{ presets?: number[] }>('/api/tip-presets').then((row) => { if (Array.isArray(row?.presets)) setTipPresets(row.presets); }).catch(() => undefined);
+    api.get<{ presets?: number[]; defaultPreset?: number | null }>('/api/tip-presets').then((row) => {
+      if (Array.isArray(row?.presets)) setTipPresets(row.presets);
+      setDefaultTip(Number(row?.defaultPreset) > 0 ? Number(row!.defaultPreset) : null);
+    }).catch(() => undefined);
     api.get<Array<{ id: number; name?: string | null }>>('/api/stores').then(async (rows) => {
       const id = Array.isArray(rows) ? Number(rows[0]?.id) : 0;
       if (!id) return;
       if (rows[0]?.name) setBusinessName(String(rows[0].name));
       setStoreId(id);
-      const pos = await api.get<{ salesTaxRate?: string | number; taxServicesTaxable?: boolean }>(`/api/pos-settings/${id}`);
+      const pos = await api.get<{ salesTaxRate?: string | number; taxServicesTaxable?: boolean; clientFeeRate?: string | number }>(`/api/pos-settings/${id}`);
       const rate = Number(pos?.salesTaxRate ?? 0);
       setTax({ rate: Number.isFinite(rate) && rate > 0 && rate <= 0.3 ? rate : 0, services: Boolean(pos?.taxServicesTaxable) });
+      const fee = Number(pos?.clientFeeRate ?? 0);
+      setFeeRate(Number.isFinite(fee) && fee > 0 && fee <= 0.03 ? fee : 0);
     }).catch(() => undefined);
   }, []);
   // Tax is on the visit after the discount, never on the tip.
   const taxCents = tax.services && tax.rate > 0 ? Math.round((baseCentsParam - discountCents) * tax.rate) : 0;
   // A deposit the client paid when booking comes off this charge (it is recorded as already paid).
   const depositCents = Math.max(0, Math.round(Number(params.depositCents) || 0));
+  // The client's card fee: on what is charged now, after the discount, tax and deposit, never on the tip.
+  const feeCents = feeRate > 0 ? Math.round(Math.max(0, baseCentsParam - discountCents + taxCents - depositCents) * feeRate) : 0;
   useEffect(() => {
     if (step !== 'tap_intro' || baseCentsParam <= 0) return;
-    setDigits(String(Math.max(0, baseCentsParam - discountCents + taxCents + tipCents - depositCents)));
-  }, [baseCentsParam, depositCents, discountCents, step, taxCents, tipCents]);
+    setDigits(String(Math.max(0, baseCentsParam - discountCents + taxCents + tipCents - depositCents + feeCents)));
+  }, [baseCentsParam, depositCents, discountCents, feeCents, step, taxCents, tipCents]);
 
   // Receipt after a card payment, by text and/or e-mail, to the client's details (editable).
   const [receiptPhone, setReceiptPhone] = useState(String(params.phone ?? '').replace(/\D/g, '').slice(-10));
@@ -266,11 +276,11 @@ export default function CheckoutScreen() {
     try {
       if (kind === 'text') {
         await api.post('/api/pos/sms-receipt', { phone: receiptPhone, clientName, appointmentId: Number(appointmentId) || undefined, paymentMethod: 'card',
-          items: [{ label: visit, price: baseCentsParam / 100 }], ...totals });
+          items: [{ label: visit, price: baseCentsParam / 100 }, ...(feeCents > 0 ? [{ label: 'Platform fee', price: feeCents / 100 }] : [])], ...totals });
         setReceiptNote(`Receipt texted to ${receiptPhone}.`);
       } else {
         await api.post('/api/pos/email-receipt', { storeId: storeId ?? undefined, email: receiptEmail.trim(), clientName: clientName.trim().split(/\s+/)[0] || 'there',
-          items: [{ name: visit, price: baseCentsParam / 100 }], subtotal: baseCentsParam / 100, paymentMethod: 'Card', transactionId: paymentIntentId ?? '', ...totals });
+          items: [{ name: visit, price: baseCentsParam / 100 }, ...(feeCents > 0 ? [{ name: 'Platform fee', price: feeCents / 100 }] : [])], subtotal: (baseCentsParam + feeCents) / 100, paymentMethod: 'Card', transactionId: paymentIntentId ?? '', ...totals });
         setReceiptNote(`Receipt e-mailed to ${receiptEmail.trim()}.`);
       }
     } catch (cause) {
@@ -382,6 +392,7 @@ export default function CheckoutScreen() {
         tipCents,
         discountCents,
         priorTenderedCents: depositCents,
+        clientFeeCents: feeCents,
       });
       createdPaymentIntentId = created.paymentIntentId;
       setPaymentIntentId(created.paymentIntentId);
@@ -595,6 +606,7 @@ export default function CheckoutScreen() {
              </View> : null}
              {isTapIntro && depositCents > 0 ? <Text testID="deposit-line" style={[styles.fieldLabel, { width: '100%', marginTop: 12, color: colors.foreground }]}>{`Deposit already paid · −${dollars(String(depositCents))}`}</Text> : null}
              {isTapIntro && taxCents > 0 ? <Text testID="sales-tax-line" style={[styles.fieldLabel, { width: '100%', marginTop: 12, color: colors.foreground }]}>{`Sales tax (${(tax.rate * 100).toFixed(2).replace(/\.?0+$/, '')}%) · ${dollars(String(taxCents))}`}</Text> : null}
+             {isTapIntro && feeCents > 0 ? <Text testID="platform-fee-line" style={[styles.fieldLabel, { width: '100%', marginTop: 12, color: colors.foreground }]}>{`Platform fee (${(feeRate * 100).toFixed(2).replace(/\.?0+$/, '')}%) · ${dollars(String(feeCents))}`}</Text> : null}
              {isTapIntro ? <View testID="m2-registration-intro" style={[styles.formField, { width: '100%', marginTop: 18 }]}>
                <Text style={[styles.fieldLabel, { color: colors.foreground }]}>New Stripe M2 setup <Text style={{ color: colors.mutedForeground }}>(one time)</Text></Text>
                <View style={styles.registrationRow}>
@@ -615,6 +627,7 @@ export default function CheckoutScreen() {
   return <TipCheckout
     baseCents={Number(params.amountCents) || 0}
     presets={tipPresets}
+    defaultPercent={defaultTip}
     serviceName={String(params.serviceName || '')}
     onBack={() => {
       if (isQuickSale) {

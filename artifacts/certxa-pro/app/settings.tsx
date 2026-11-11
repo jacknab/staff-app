@@ -12,7 +12,7 @@
  *                                POST /api/pro/phone/cancel · /resume · /pay ($10/month)
  *   Stripe account               GET /api/payments/stripe/status
  *   Card readers                 GET /api/payments/terminal/reader/list · POST …/reader/register
- *   Sales tax                    GET · PATCH /api/pos-settings/:storeId
+ *   Card reader & Checkout       GET · PATCH /api/pos-settings/:storeId, GET · PUT /api/tip-presets
  *   Account                      POST /api/auth/forgot-password · DELETE /api/user/delete-account
  *                                (the password is checked first with POST /api/solo/login)
  */
@@ -46,12 +46,28 @@ const BUSINESS_TYPES = ['Nail Salon', 'Hair Salon', 'Barbershop', 'Lash and Brow
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const TITLES: Record<Screen, string> = {
   menu: 'Settings', business: 'Business details', location: 'Location', places: 'Where you see clients', hours: 'Hours', rules: 'Online booking', policy: 'Cancellation policy',
-  approval: 'Booking approval', blocked: 'Blocked clients', phone: 'Business Phone', website: 'Website', stripe: 'Stripe account', readers: 'Connect card reader', deposits: 'Deposits', tax: 'Checkout', account: 'Account',
+  approval: 'Booking approval', blocked: 'Blocked clients', phone: 'Business Phone', website: 'Website', stripe: 'Stripe account', readers: 'Connect card reader', deposits: 'Deposits', tax: 'Card reader & Checkout', account: 'Account',
 };
 
 function errorText(cause: unknown, fallback: string) { return cause instanceof Error && cause.message ? cause.message : fallback; }
 function minutesOf(time: string) { const [h, m] = time.split(':').map(Number); return (h || 0) * 60 + (m || 0); }
 function formatPhone(raw: string) { const d = (raw ?? '').replace(/\D/g, '').replace(/^1(?=\d{10}$)/, ''); return d.length === 10 ? `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}` : raw; }
+/** Card reader & Checkout values from /api/pos-settings and /api/tip-presets, as the screen shows them (percent strings). */
+function checkoutDraft(tax: Record<string, any>, tips: { presets?: number[]; defaultPreset?: number | null } | null) {
+  const rate = (v: unknown) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : 0; };
+  const pct = (n: number) => String(Number((n * 100).toFixed(3)));
+  const sales = rate(tax.salesTaxRate);
+  const retail = tax.retailTaxRate != null && tax.retailTaxRate !== '' ? rate(tax.retailTaxRate) : sales; // no retail rate yet = the one rate
+  const presets = Array.isArray(tips?.presets) && tips!.presets.length ? tips!.presets : [18, 20, 25];
+  const values = {
+    fee: pct(rate(tax.clientFeeRate)),
+    service: pct(tax.taxServicesTaxable ? sales : 0),
+    retail: pct(tax.taxProductsTaxable !== false ? retail : 0),
+    tips: Array.from({ length: 3 }, (_, i) => (presets[i] != null ? String(presets[i]) : '')),
+    defaultTip: Number(tips?.defaultPreset) > 0 ? Number(tips!.defaultPreset) : 0,
+  };
+  return { ...values, saved: values, editing: null as string | null };
+}
 
 export default function SettingsScreen() {
   const colors = useColors();
@@ -142,11 +158,10 @@ export default function SettingsScreen() {
         setDraft({ mobile: overview?.user?.phone ?? '', mobileNow: overview?.user?.phone ?? '', code: '', codeSent: false });
       }
       else if (next === 'tax') {
-        // Checkout (owner, 2026-11-09; after GlossGenius's Checkout settings): sales tax, and the tip options clients see.
-        const [tax, tips] = await Promise.all([api.get<Record<string, any>>(`/api/pos-settings/${current.id}`), api.get<{ presets?: number[] }>('/api/tip-presets').catch(() => null)]);
-        const presets = Array.isArray(tips?.presets) && tips!.presets.length ? tips!.presets : [18, 20, 25];
-        setDraft({ percent: String(Number((Number(tax.salesTaxRate ?? 0) * 100).toFixed(3))), services: !!tax.taxServicesTaxable, products: tax.taxProductsTaxable !== false,
-          tips: Array.from({ length: 4 }, (_, i) => (presets[i] != null ? String(presets[i]) : '')) });
+        // Card reader & Checkout (owner, 2026-11-11; after GlossGenius's): the client's card fee, service and retail
+        // sales tax, and the tip choices clients see. Each value has its own Edit, like GlossGenius.
+        const [tax, tips] = await Promise.all([api.get<Record<string, any>>(`/api/pos-settings/${current.id}`), api.get<{ presets?: number[]; defaultPreset?: number | null }>('/api/tip-presets').catch(() => null)]);
+        setDraft(checkoutDraft(tax, tips));
       }
     } catch (cause) { setError(errorText(cause, 'Could not load this from Certxa.')); }
     finally { setLoading(false); }
@@ -237,14 +252,27 @@ export default function SettingsScreen() {
         cancellationFeeType: fee > 0 ? 'percentage' : null, cancellationFeeValue: fee > 0 ? fee : null });
     });
     if (screen === 'tax') return run(async () => {
-      const percent = Number(String(draft.percent).replace(/[^0-9.]/g, ''));
-      if (!Number.isFinite(percent) || percent < 0 || percent > 30) throw new Error('Enter a tax rate between 0 and 30 percent.');
+      const percent = (key: string, max: number, what: string) => {
+        const n = Number(String(draft[key] ?? '').replace(/[^0-9.]/g, '') || 0);
+        if (!Number.isFinite(n) || n < 0 || n > max) throw new Error(`Enter a ${what} between 0 and ${max} percent.`);
+        return n;
+      };
+      const fee = percent('fee', 3, 'platform fee rate');
+      const service = percent('service', 30, 'service sales tax');
+      const retail = percent('retail', 30, 'retail sales tax');
       const tips = (draft.tips as string[] | undefined ?? []).map((t) => t.trim()).filter(Boolean).map(Number);
       if (tips.length === 0) throw new Error('Enter at least one tip option.');
       if (tips.some((t) => !Number.isInteger(t) || t < 1 || t > 100)) throw new Error('Tip options are whole percentages from 1 to 100.');
-      await api.patch(`/api/pos-settings/${store.id}`, { salesTaxRate: (percent / 100).toFixed(4), taxServicesTaxable: draft.services, taxProductsTaxable: draft.products });
-      const saved = await api.put<{ presets: number[] }>('/api/tip-presets', { presets: tips });
-      setDraft((d) => ({ ...d, tips: Array.from({ length: 4 }, (_, i) => (saved.presets[i] != null ? String(saved.presets[i]) : '')) }));
+      const defaultTip = Number(draft.defaultTip) || 0;
+      if (defaultTip && !tips.includes(defaultTip)) throw new Error('The tip selected by default must be one of your tips.');
+      // Each tax is charged only when it is above 0%.
+      const tax = await api.patch<Record<string, any>>(`/api/pos-settings/${store.id}`, {
+        clientFeeRate: (fee / 100).toFixed(4),
+        salesTaxRate: (service / 100).toFixed(4), taxServicesTaxable: service > 0,
+        retailTaxRate: (retail / 100).toFixed(4), taxProductsTaxable: retail > 0,
+      });
+      const saved = await api.put<{ presets: number[]; defaultPreset?: number | null }>('/api/tip-presets', { presets: tips, defaultPreset: defaultTip || null });
+      setDraft(checkoutDraft({ ...tax, clientFeeRate: fee / 100, salesTaxRate: service / 100, taxServicesTaxable: service > 0, retailTaxRate: retail / 100, taxProductsTaxable: retail > 0 }, saved));
     });
   };
 
@@ -423,7 +451,7 @@ export default function SettingsScreen() {
           </TouchableOpacity>
           <Row icon="radio" title="Connect card reader" hint="Register and view Stripe M2 readers" to="readers" />
           <Row icon="dollar-sign" title="Deposits" hint="Ask clients for a deposit when they book" to="deposits" />
-          <Row icon="percent" title="Checkout" hint="Sales tax and the tip choices clients see" to="tax" />
+          <Row icon="percent" title="Card reader & Checkout" hint="Platform fee, sales tax and tips" to="tax" />
         </Group>
         <Group title="Account">
           <Row icon="user" title="Account" hint={user?.email ?? 'Password, sign out, delete account'} to="account" />
@@ -695,23 +723,56 @@ export default function SettingsScreen() {
         <View key={String(reader.id ?? index)} style={[styles.toggleRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={{ flex: 1 }}><Text style={[styles.rowTitle, { color: colors.foreground }]}>{String(reader.label || reader.deviceType || reader.device_type || 'Card reader')}</Text><Text style={[styles.rowHint, { color: colors.mutedForeground }]}>{[reader.serialNumber ?? reader.serial_number, reader.status].filter(Boolean).join(' · ')}</Text></View></View>
       ))}
     </>);
-    if (screen === 'tax') return (<>
-      <SectionTitle style={styles.section}>Sales tax</SectionTitle>
-      <Help>Tax rules differ by place, so check with your tax adviser before changing these.</Help>
-      <Label>Sales tax rate (%)</Label>{field('percent', '0', { keyboardType: 'decimal-pad' })}
-      {toggle('services', 'Charge tax on services')}{toggle('products', 'Charge tax on products')}
-      <SectionTitle style={styles.section}>Tips</SectionTitle>
-      <Help>The tip choices clients see at checkout, as a percentage of the visit. They can still enter their own amount or choose no tip.</Help>
-      {(draft.tips as string[] | undefined ?? []).map((value, i) => (
-        <View key={i}>
-          <Label>{`Tip ${i + 1} (%)`}</Label>
-          <TextInput testID={`settings-tip-${i}`} value={value} onChangeText={(v) => set('tips', (draft.tips as string[]).map((t, j) => (j === i ? v.replace(/[^0-9]/g, '').slice(0, 3) : t)))}
-            placeholder={i === 0 ? '20' : 'Optional'} placeholderTextColor={colors.mutedForeground} keyboardType="number-pad"
-            style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
+    if (screen === 'tax') {
+      const tips = (draft.tips as string[] | undefined ?? []);
+      const pct = (v: unknown) => `${String(v ?? '').trim() || '0'}%`;
+      const tipList = tips.filter((t) => t.trim()).map((t) => `${t}%`).join(', ') || 'None';
+      const valueRow = (key: string, title: string, value: string) => (
+        <View key={key} style={[styles.toggleRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={{ flex: 1 }}><Text style={[styles.rowTitle, { color: colors.foreground }]}>{title}</Text><Text testID={`settings-value-${key}`} style={[styles.rowHint, { color: colors.mutedForeground }]}>{value}</Text></View>
+          <TouchableOpacity testID={`settings-edit-${key}`} accessibilityRole="button" accessibilityLabel={`Edit ${title}`} onPress={() => { setNotice(''); setError(''); set('editing', key); }} style={styles.editButton}>
+            <Text style={[styles.editText, { color: colors.primary }]}>Edit</Text>
+          </TouchableOpacity>
         </View>
-      ))}
-      {saveButton()}
-    </>);
+      );
+      if (draft.editing === 'fee') return (<>
+        <Label>Platform fee rate (%)</Label>{field('fee', '0', { keyboardType: 'decimal-pad' })}
+        <Help>Clients pay this fee on card payments, shown as its own line at checkout. 0% to 3%. Card fees aren’t allowed everywhere, so check your state’s rules first.</Help>
+        {saveButton()}
+      </>);
+      if (draft.editing === 'service') return (<>
+        <Label>Service sales tax (%)</Label>{field('service', '0', { keyboardType: 'decimal-pad' })}
+        <Help>Tax rules differ by place, so check with your tax adviser before changing this.</Help>
+        {saveButton()}
+      </>);
+      if (draft.editing === 'retail') return (<>
+        <Label>Retail sales tax (%)</Label>{field('retail', '0', { keyboardType: 'decimal-pad' })}
+        <Help>Tax rules differ by place, so check with your tax adviser before changing this.</Help>
+        {saveButton()}
+      </>);
+      if (draft.editing === 'tips') {
+        const filled = tips.map((t) => Number(t.trim())).filter((t) => Number.isInteger(t) && t > 0);
+        return (<>
+          {tips.map((value, i) => (
+            <View key={i}>
+              <Label>{`Tip ${i + 1} (%)`}</Label>
+              <TextInput testID={`settings-tip-${i}`} value={value} onChangeText={(v) => set('tips', tips.map((t, j) => (j === i ? v.replace(/[^0-9]/g, '').slice(0, 3) : t)))}
+                placeholder={i === 0 ? '20' : 'Optional'} placeholderTextColor={colors.mutedForeground} keyboardType="number-pad"
+                style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
+            </View>
+          ))}
+          <Label>Tip selected by default</Label>
+          {choices('defaultTip', [{ value: 0, label: 'None' }, ...Array.from(new Set(filled)).map((t) => ({ value: t, label: `${t}%` }))])}
+          {saveButton()}
+        </>);
+      }
+      return (<>
+        {valueRow('fee', 'Platform fee rate', pct(draft.fee))}
+        {valueRow('service', 'Service sales tax', pct(draft.service))}
+        {valueRow('retail', 'Retail sales tax', pct(draft.retail))}
+        {valueRow('tips', 'Tip customized options', Number(draft.defaultTip) ? `${tipList} · ${draft.defaultTip}% selected by default` : tipList)}
+      </>);
+    }
     return (<>
       <View style={[styles.toggleRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={{ flex: 1 }}><Text style={[styles.rowHint, { color: colors.mutedForeground, marginTop: 0 }]}>Signed in as</Text><Text style={[styles.rowTitle, { color: colors.foreground }]}>{user?.email ?? 'Your Certxa account'}</Text></View></View>
       <Label>Mobile number</Label>
@@ -740,7 +801,7 @@ export default function SettingsScreen() {
       <AppBackground />
       <StatusBar barStyle="dark-content" />
       <View style={styles.header}>
-        <TouchableOpacity testID="settings-back" accessibilityLabel="Back" onPress={() => (screen === 'menu' ? router.back() : void open('menu'))} style={styles.headerButton}><Feather name="arrow-left" size={21} color={colors.foreground} /></TouchableOpacity>
+        <TouchableOpacity testID="settings-back" accessibilityLabel="Back" onPress={() => (screen === 'menu' ? router.back() : screen === 'tax' && draft.editing ? setDraft((d) => ({ ...d, ...d.saved, editing: null })) : void open('menu'))} style={styles.headerButton}><Feather name="arrow-left" size={21} color={colors.foreground} /></TouchableOpacity>
         <HelpTitle help={screen === 'menu' ? 'settings' : `settings.${screen}`} style={[styles.headerTitle, { color: colors.foreground }]}>{TITLES[screen]}</HelpTitle>
         <View style={styles.headerButton} />
       </View>
@@ -762,6 +823,8 @@ const styles = StyleSheet.create({
   group: { marginBottom: 4, gap: 10 },
   section: { marginTop: 24, marginBottom: 4 },
   groupTitle: { fontSize: 13, letterSpacing: 1.2, fontFamily: 'Inter_700Bold', marginBottom: 2 },
+  editButton: { minHeight: 44, paddingHorizontal: 10, justifyContent: 'center' },
+  editText: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
   row: { borderWidth: 1, borderRadius: 18, minHeight: 74, paddingHorizontal: 14, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 14, ...cardShadow },
   rowIcon: { width: 54, height: 54, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   rowTitle: { fontSize: 18, fontFamily: 'Inter_600SemiBold' },

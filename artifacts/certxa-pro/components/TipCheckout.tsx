@@ -11,6 +11,8 @@ type TipCheckoutProps = {
   serviceName?: string;
   /** The business's tip percentages (Certxa POS settings); Certxa's defaults until they load. */
   presets?: number[];
+  /** The tip picked before the client chooses (Settings › Card reader & Checkout); null = none. */
+  defaultPercent?: number | null;
   onConfirmTip: (tipCents: number) => void;
   /** Back out of checkout (to the appointment it was opened from). */
   onBack?: () => void;
@@ -22,13 +24,17 @@ function dollars(cents: number) {
   return `$${(Math.max(0, cents) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-export function TipCheckout({ baseCents, serviceName, presets, onConfirmTip, onBack }: TipCheckoutProps) {
+export function TipCheckout({ baseCents, serviceName, presets, defaultPercent, onConfirmTip, onBack }: TipCheckoutProps) {
   const tipOptions = (presets && presets.length > 0 ? presets : DEFAULT_PRESETS).slice(0, 4).map((percent) => ({ label: `${percent}%`, percent }));
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const [screen, setScreen] = useState<'select' | 'custom'>('select');
   const [selectedPercent, setSelectedPercent] = useState<number | null>(null);
+  // The settings load after this opens: pick the default tip once it arrives, unless the client already chose.
+  useEffect(() => {
+    if (defaultPercent && tipOptions.some((o) => o.percent === defaultPercent)) setSelectedPercent((current) => current ?? defaultPercent);
+  }, [defaultPercent, presets]); // eslint-disable-line react-hooks/exhaustive-deps
   const [customDigits, setCustomDigits] = useState('0');
   const safeBaseCents = Math.max(0, Math.round(baseCents || 0));
   const selectedTipCents = selectedPercent === null ? null : Math.round(safeBaseCents * selectedPercent / 100);

@@ -33,6 +33,8 @@ export type CreateTerminalPaymentIntentRequest = {
   tipCents?: number;
   discountCents?: number;
   priorTenderedCents?: number;
+  /** The client's card fee (Settings › Card reader & Checkout), part of amountCents. */
+  clientFeeCents?: number;
 };
 
 export type CreateTerminalPaymentIntentResponse = {
