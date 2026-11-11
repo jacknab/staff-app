@@ -35,6 +35,7 @@ import { HelpTitle } from '@/components/HelpTitle';
 
 import { AppBackground } from '@/components/look/AppBackground';
 import { SectionHeader, SectionTitle } from '@/components/look/SectionHeader';
+import { usePaymentsReady } from '@/lib/usePaymentsReady';
 import { look, cardShadow } from '@/components/look/tokens';
 type Screen = 'menu' | 'business' | 'location' | 'places' | 'hours' | 'rules' | 'approval' | 'policy' | 'blocked' | 'phone' | 'website' | 'stripe' | 'readers' | 'deposits' | 'tax' | 'account';
 type Store = { id: number; name?: string | null; phone?: string | null; email?: string | null; category?: string | null; address?: string | null; city?: string | null; state?: string | null; postcode?: string | null; bookingSlug?: string | null; timezone?: string | null };
@@ -56,6 +57,7 @@ export default function SettingsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const paymentsReady = usePaymentsReady();
   const { user, logout } = useAuth();
   const { setTimeZone, refresh: refreshCalendar, clients } = useBookingData();
   const [screen, setScreen] = useState<Screen>('menu');
@@ -82,6 +84,8 @@ export default function SettingsScreen() {
   useEffect(() => { if (done) { setScreen('menu'); setError(''); setNotice(''); } }, [done]);
 
   const open = useCallback(async (next: Screen) => {
+    // Payments not set up: Deposits opens its Stripe page instead (owner, 2026-11-11; app/payments-deposits.tsx).
+    if (next === 'deposits' && paymentsReady === false) { router.push('/payments-deposits' as Href); return; }
     setScreen(next); setError(''); setNotice(''); setDraft({}); setLoading(true);
     try {
       const current = store ?? await loadStore();
@@ -146,7 +150,7 @@ export default function SettingsScreen() {
       }
     } catch (cause) { setError(errorText(cause, 'Could not load this from Certxa.')); }
     finally { setLoading(false); }
-  }, [loadStore, store]);
+  }, [loadStore, store, paymentsReady]);
 
   useEffect(() => { void open('menu'); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -566,8 +570,18 @@ export default function SettingsScreen() {
       <Label>Cancellation notice</Label>{withCurrent('cancellationHoursCutoff', [12, 24, 48], (value) => `${value} hours before`)}
       <Help>Cancelling later than this is a late cancellation: the late-cancel fee can apply and a deposit is kept. Clients can cancel online only before it.</Help>
       <Label>No-show and late-cancel fee</Label>
-      {field('feePercent', 'Percent of the booking, e.g. 50 (empty = no fee)', { keyboardType: 'decimal-pad' })}
-      <Help>Protects your time from no-shows. Most pros set 20–30% of the appointment price. It's charged to the client's card on file, only when you tap Charge fee on a no-show or cancelled booking. Ask for a card on file in Settings › Deposits.</Help>
+      {/* Charging a fee needs card payments: until Stripe is set up this opens its page (owner, 2026-11-11). */}
+      {paymentsReady === false ? (
+        <TouchableOpacity testID="settings-policy-fee-setup" onPress={() => router.push('/payments-cancellation' as Href)} style={[styles.toggleRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.rowTitle, { color: colors.foreground }]}>Set up payments to charge fees</Text>
+            <Text style={[styles.rowHint, { color: colors.mutedForeground }]}>Charge no-show and late-cancel fees to the client's card.</Text>
+          </View>
+          <Feather name="chevron-right" size={20} color={colors.mutedForeground} />
+        </TouchableOpacity>
+      ) : <>
+        {field('feePercent', 'Percent of the booking, e.g. 50 (empty = no fee)', { keyboardType: 'decimal-pad' })}        <Help>Protects your time from no-shows. Most pros set 20–30% of the appointment price. It's charged to the client's card on file, only when you tap Charge fee on a no-show or cancelled booking. Ask for a card on file in Settings › Deposits.</Help>
+      </>}
       {saveButton()}
     </>);
     if (screen === 'blocked') return (<>

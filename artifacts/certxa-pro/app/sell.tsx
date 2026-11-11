@@ -3,18 +3,21 @@
  * screen offers them (app/gift-cards.tsx, app/packages.tsx). In the Certxa Pro look (components/look).
  */
 import { Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { HelpTitle } from '@/components/HelpTitle';
 import { AppBackground } from '@/components/look/AppBackground';
 import { MenuCard } from '@/components/look/MenuCard';
 import { look } from '@/components/look/tokens';
+import { usePaymentsReady } from '@/lib/usePaymentsReady';
 
 export default function SellScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const topInset = Platform.OS === 'web' ? 67 : insets.top;
+  // Payments not set up: each opens its Stripe page instead (owner, 2026-11-11; app/payments-gift-cards.tsx, -packages).
+  const paymentsReady = usePaymentsReady();
   return (
     <View style={[styles.root, { paddingTop: topInset }]} testID="sell-screen">
       <AppBackground />
@@ -26,8 +29,8 @@ export default function SellScreen() {
         <View style={styles.navSide} />
       </View>
       <ScrollView contentContainerStyle={styles.content}>
-        <MenuCard testID="sell-gift-cards" icon={{ feather: 'gift' }} title="Gift cards" subtitle="Sell, use and check balances" onPress={() => router.push('/gift-cards')} />
-        <MenuCard testID="sell-packages" icon={{ feather: 'package' }} title="Packages" subtitle="Prepaid visits on your website" onPress={() => router.push('/packages')} />
+        <MenuCard testID="sell-gift-cards" icon={{ feather: 'gift' }} title="Gift cards" subtitle="Sell, use and check balances" onPress={() => router.push(paymentsReady === false ? '/payments-gift-cards' as Href : '/gift-cards')} />
+        <MenuCard testID="sell-packages" icon={{ feather: 'package' }} title="Packages" subtitle="Prepaid visits on your website" onPress={() => router.push(paymentsReady === false ? '/payments-packages' as Href : '/packages')} />
       </ScrollView>
     </View>
   );

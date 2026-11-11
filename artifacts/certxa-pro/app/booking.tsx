@@ -13,6 +13,7 @@ import { HelpTitle } from '@/components/HelpTitle';
 import { ClientAvatar } from '@/components/ClientAvatar';
 
 import { AppBackground } from '@/components/look/AppBackground';
+import { usePaymentsReady } from '@/lib/usePaymentsReady';
 import { look, cardShadow } from '@/components/look/tokens';
 type AddonOption = { id: number; name: string; priceValue: number; minutes: number; serviceIds: number[] };
 type Slot = { time: string; staffId: number; staffName: string };
@@ -174,6 +175,7 @@ export default function BookingScreen() {
   const [checkingPaymentPolicy, setCheckingPaymentPolicy] = useState(false);
   const [paymentRequirement, setPaymentRequirement] = useState<'deposit' | 'card_on_file' | null>(null);
   const [paymentChoice, setPaymentChoice] = useState<PaymentChoice | null>(null);
+  const paymentsReady = usePaymentsReady();
   // Repeat (owner, 2026-11-03): the same visit every 1–4 weeks, 2–12 times in all; 0 = doesn't repeat.
   const [repeatWeeks, setRepeatWeeks] = useState(0);
   const [repeatTimes, setRepeatTimes] = useState(4);
@@ -449,14 +451,16 @@ export default function BookingScreen() {
       const policy = await api.get<{ policy: 'none' | 'deposit' | 'card_on_file'; requirement: 'deposit' | 'card_on_file' | null }>(
         `/api/booking-payment-policy?customerId=${client.customerId}`,
       );
-      if (policy.requirement) {
+      // Texting a payment link needs card payments: until Stripe is set up the booking is confirmed without one
+      // (owner, 2026-11-11).
+      if (policy.requirement && paymentsReady !== false) {
         setPaymentRequirement(policy.requirement);
         setPaymentChoice(null);
         setStage('payment-choice');
       } else {
         setPaymentRequirement(null);
         setCheckingPaymentPolicy(false);
-        await saveBooking(undefined, client);
+        await saveBooking(policy.requirement ? 'skip' : undefined, client);
       }
     } catch (cause) {
       setSaveError(cause instanceof Error ? cause.message : 'Could not check this account’s payment requirements.');

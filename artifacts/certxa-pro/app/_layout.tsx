@@ -128,6 +128,10 @@ function RootLayoutNav() {
       <Stack.Screen name="payments-intro" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="payments-pos" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="payments-checkout" options={{ headerShown: false, presentation: 'card' }} />
+      <Stack.Screen name="payments-gift-cards" options={{ headerShown: false, presentation: 'card' }} />
+      <Stack.Screen name="payments-packages" options={{ headerShown: false, presentation: 'card' }} />
+      <Stack.Screen name="payments-deposits" options={{ headerShown: false, presentation: 'card' }} />
+      <Stack.Screen name="payments-cancellation" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="credits" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="money" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="block-time" options={{ headerShown: false, presentation: 'card' }} />
