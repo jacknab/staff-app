@@ -509,7 +509,7 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
           openWhen={() => setWhenOpen(true)}
         />
       ) : (
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]} showsVerticalScrollIndicator={false}>
           <View style={styles.profile}>
             <ClientAvatar testID="appointment-client-avatar" clientId={isPreview ? 0 : Number(params.customerId)} avatarUrl={params.avatarUrl} initials={initialsFor(clientName)}
               style={[styles.avatar, { backgroundColor: colors.muted }]} textStyle={[styles.avatarText, { color: colors.mutedForeground }]} />
@@ -549,7 +549,7 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
               <View style={styles.visitWhenRow} testID="appointment-when">
                 <Feather name="calendar" size={19} color={colors.primary} />
                 <Text style={[styles.visitWhenText, { color: colors.foreground }]} numberOfLines={2}>
-                  {day.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · {time} – {visitEnd} <Text style={{ color: colors.mutedForeground }}>({duration})</Text>
+                  {day.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · {time} – {visitEnd} <Text style={{ color: colors.mutedForeground }}>({duration.replace(/ /g, '\u00A0')})</Text>
                 </Text>
               </View>
               {depositDue ? <DetailRow icon="clock" label="Waiting for the client to pay the deposit (link sent by text)" colors={colors} /> : null}
@@ -660,7 +660,8 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
                   <Text style={[styles.secondaryActionText, { color: colors.destructive }]}>CANCEL</Text>
                 </TouchableOpacity>
               </View>
-              {!isPreview && !prepaid ? (
+              {/* Texting a payment link needs card payments (owner, 2026-11-11): hidden until Stripe is set up. */}
+              {!isPreview && !prepaid && paymentsReady !== false ? (
                 <TouchableOpacity testID="appointment-pay-link" disabled={saving} onPress={() => void payLink()} style={styles.textAction}>
                   <Text style={[styles.textActionText, { color: colors.primary }]}>Text a payment link</Text>
                 </TouchableOpacity>
@@ -682,7 +683,7 @@ function QuickAction({ icon, label, color, onPress }: { icon: React.ComponentPro
   return (
     <TouchableOpacity accessibilityLabel={label} onPress={onPress} style={styles.quickAction}>
       <View style={[styles.quickIcon, { backgroundColor: `${color}18` }]}><Feather name={icon} size={19} color={color} /></View>
-      <Text style={[styles.quickLabel, { color }]}>{label}</Text>
+      <Text style={[styles.quickLabel, { color }]} numberOfLines={1}>{label}</Text>
     </TouchableOpacity>
   );
 }
@@ -890,7 +891,7 @@ const styles = StyleSheet.create({
   clientName: { fontSize: 25, fontFamily: 'Inter_500Medium', letterSpacing: 0.2, marginTop: 11 },
   clientSubtitle: { fontSize: 14, fontFamily: 'Inter_400Regular', marginTop: 4 },
   quickActions: { flexDirection: 'row', justifyContent: 'center', gap: 19, marginTop: 21, marginBottom: 20 },
-  quickAction: { width: 52, alignItems: 'center', gap: 6 },
+  quickAction: { width: 66, alignItems: 'center', gap: 6 },
   quickIcon: { width: 37, height: 37, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   quickLabel: { fontSize: 13, fontFamily: 'Inter_500Medium' },
   notesRow: { minHeight: 58, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', ...cardShadow },
