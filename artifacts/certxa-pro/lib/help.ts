@@ -119,6 +119,7 @@ export const HELP: Record<string, HelpPage> = {
         'Prepaid packages they bought, with the visits left.',
       ] },
       { heading: 'Visits', points: ['Upcoming and Past visits, with their status. Tap one to open it. Show all lists every past visit.'] },
+      { heading: 'Forms', points: ['The forms and waivers they filled in (tap View to read their answers and signature), and links sent but not filled in yet (Send again, or Fill in here to open it on your phone). Send a form sends one of your forms.'] },
       { heading: 'Notes and photos', points: [
         'Notes: the newest notes, pinned ones first. Add or see all opens every note; Pin note keeps one at the top.',
         'Before and after photos: take or choose a photo and mark it Before or After. Only you see them, unless you choose to show one in the Portfolio on your website (only with the client’s OK).',
@@ -142,6 +143,7 @@ export const HELP: Record<string, HelpPage> = {
         'The client, with Text, Call and Email buttons.',
         'The services, add-ons, date, time and total, and any deposit: paid, due (a link was texted), kept or refunded.',
         'For a house call: the client’s address (Open in Maps), when to leave, the drive, setup and pack-up time, and the travel fee.',
+        'Forms: the forms and waivers this visit needs — filled in (View), sent and waiting, or not sent. Send e-mails the link (or texts it when there’s no e-mail); Fill in here opens the form on your phone for the client. Send another form sends any of your other forms.',
       ] },
       { heading: 'Before the visit', points: [
         'Edit: change the services, add-ons, date or time.',
@@ -573,6 +575,20 @@ export const HELP: Record<string, HelpPage> = {
     title: 'Deals',
     intro: 'Vouchers for one of your packages at a lower price, on sale for a set time.',
     sections: [{ heading: 'How it works', points: ['Make a package first, then tap + and choose it.', 'Set the title, deal price, how many vouchers are available and the dates it’s on sale.', 'Pause deal stops selling it for a while; Archive deal ends it.'] }],
+  },
+  forms: {
+    title: 'Forms & Waivers',
+    intro: 'Intake forms and waivers your clients fill in on their phone before the visit.',
+    sections: [
+      { heading: 'Your forms', points: ['Tap + to start one: a blank form, or a ready-made one (new client form, service waiver, photo release, before each visit) you can change.', 'Each form shows its type, how often it is asked, when it is sent and how many clients filled it in. Tap one to change it.'] },
+      { heading: 'Making a form', points: ['Type: an intake form asks questions; a waiver ends with the client’s signature.', 'Ask clients: Once keeps their answers for good; Before every visit asks again for each booking.', 'Send when clients book: a few minutes after a client books, Certxa e-mails them the link (or texts it when they have no e-mail; a text uses a credit).', 'For every service, or only the services you tick.', 'Questions: choose the kind (short or long answer, yes or no, pick one, pick any, date, I agree, text to read, signature), write it, and set Required. The arrows move a question; the bin removes it.'] },
+      { heading: 'Good to know', points: ['A client’s signed copy keeps the questions as they were, so changing a form later never changes what they signed.', 'Switch off stops a form being sent. Delete removes it; a form clients have filled in is switched off instead, and their copies are kept.', 'Forms you send and the answers are on the booking and on the client’s profile.'] },
+    ],
+  },
+  'form-response': {
+    title: 'Filled-in form',
+    intro: 'What the client answered.',
+    sections: [{ heading: 'What you see', points: ['When the client filled it in or signed it.', 'Each question as it was then, and their answer.', 'For a waiver, the drawn signature and the name they typed.'] }],
   },
   'catalog.products': {
     title: 'Products',

@@ -21,6 +21,7 @@ import { zonedDateLabel } from '@/lib/businessTime';
 import { clientStatusOf, STATUS_LABEL } from '@/lib/clientStatus';
 import { ClientPhotos } from '@/components/ClientPhotos';
 import { HelpTitle } from '@/components/HelpTitle';
+import { FormsPanel } from '@/components/FormsPanel';
 import { HoldToDelete } from '@/components/HoldToDelete';
 
 import { AppBackground } from '@/components/look/AppBackground';
@@ -370,6 +371,9 @@ export default function ClientProfileScreen() {
               <TouchableOpacity testID="client-past-toggle" onPress={() => setShowAllPast(!showAllPast)} style={styles.more}><Text style={[styles.link, { color: colors.primary }]}>{showAllPast ? 'Show fewer' : `Show all ${past.length}`}</Text></TouchableOpacity>
             ) : null}
           </View>
+
+          {/* Forms and waivers the client filled in, and Send a form (owner, 2026-11-15; components/FormsPanel.tsx). */}
+          <FormsPanel customerId={clientId} />
 
           {/* Before/after photos, private to the business (owner, 2026-11-03). */}
           <View style={{ marginTop: 22 }}><ClientPhotos clientId={clientId} avatarUrl={client.avatarUrl} onProfilePhoto={(url) => void setProfilePhoto(url)} onRemoved={() => { void load(); void refreshBookings(); }} /></View>

@@ -11,6 +11,7 @@ import { useColors } from '@/hooks/useColors';
 import { useBookingData } from '@/contexts/BookingContext';
 import { zonedDay, zonedMoment, zonedTimeLabel } from '@/lib/businessTime';
 import { api, ApiError } from '@/lib/live-api';
+import { FormsPanel } from '@/components/FormsPanel';
 import { HelpTitle } from '@/components/HelpTitle';
 import { ClientAvatar } from '@/components/ClientAvatar';
 
@@ -587,6 +588,9 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
               </TouchableOpacity>
             ) : null}
           </View>
+
+          {/* Forms and waivers this visit needs (owner, 2026-11-15; components/FormsPanel.tsx). */}
+          {!isPreview && Number(params.customerId) > 0 && status !== 'cancelled' ? <FormsPanel customerId={Number(params.customerId)} appointmentId={appointmentId} /> : null}
 
           {error ? <View style={[styles.errorBox, { backgroundColor: colors.accent }]}><Feather name="alert-circle" size={17} color={colors.accentForeground} /><Text style={[styles.errorText, { color: colors.accentForeground }]}>{error}</Text></View> : null}
 

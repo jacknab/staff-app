@@ -261,6 +261,7 @@ export default function MoreScreen() {
           <View style={styles.menuList}>
             <MenuCard testID="menu-money" icon={{ feather: 'dollar-sign' }} title="Money" subtitle="Sales, payouts and payments" onPress={() => router.push('/money')} />
             <MenuCard testID="menu-phone" icon={{ feather: 'phone' }} title="Business Phone" subtitle="Your business number for calls and texts" onPress={() => router.push('/phone')} />
+            <MenuCard testID="menu-forms" icon={{ feather: 'file-text' }} title="Forms & Waivers" subtitle="Intake forms and waivers clients sign" onPress={() => router.push('/forms' as any)} />
           </View>
 
           <SectionHeader title="Client Growth" />
