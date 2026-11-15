@@ -17,6 +17,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useStripeTerminal } from '@stripe/stripe-terminal-react-native';
 import { useColors } from '@/hooks/useColors';
 import { TipCheckout } from '@/components/TipCheckout';
+import { SelectField } from '@/components/SelectField';
 import { useBookingData } from '@/contexts/BookingContext';
 import { api } from '@/lib/live-api';
 import {
@@ -42,7 +43,7 @@ import { look, cardShadow } from '@/components/look/tokens';
 // Stripe M2 does not require that Apple entitlement.
 const TAP_TO_PAY_ENABLED = true;
 // Shown on the payment screen so a tester can tell which build is installed.
-const BUILD_LABEL = 'Build Nov 15 · D';
+const BUILD_LABEL = 'Build Nov 15 · E';
 const EXPO_GO_PREVIEW = process.env.EXPO_PUBLIC_EXPO_GO_PREVIEW === '1';
 
 type PaymentStep = 'idle' | 'tap_intro' | 'initializing' | 'discovering' | 'connecting' | 'ready' | 'processing' | 'capture_pending' | 'success' | 'error';
@@ -245,7 +246,7 @@ export default function CheckoutScreen() {
     }).catch(() => undefined);
   }, [params.appointmentId, baseCentsParam]);
   // The business's sales tax (Settings → Sales tax; off unless they turn on tax on services) and tip presets.
-  const [tax, setTax] = useState<{ rate: number; services: boolean }>({ rate: 0, services: false });
+  const [tax, setTax] = useState<{ rate: number; services: boolean; retail: number }>({ rate: 0, services: false, retail: 0 });
   const [tipPresets, setTipPresets] = useState<number[] | undefined>(undefined);
   const [defaultTip, setDefaultTip] = useState<number | null>(null);
   // The fee the client pays on a card payment (Settings › Card reader & Checkout), 0 to 3%.
@@ -262,23 +263,72 @@ export default function CheckoutScreen() {
       if (!id) return;
       if (rows[0]?.name) setBusinessName(String(rows[0].name));
       setStoreId(id);
-      const pos = await api.get<{ salesTaxRate?: string | number; taxServicesTaxable?: boolean; clientFeeRate?: string | number }>(`/api/pos-settings/${id}`);
+      const pos = await api.get<{ salesTaxRate?: string | number; taxServicesTaxable?: boolean; clientFeeRate?: string | number; retailTaxRate?: string | number | null; taxProductsTaxable?: boolean }>(`/api/pos-settings/${id}`);
       const rate = Number(pos?.salesTaxRate ?? 0);
-      setTax({ rate: Number.isFinite(rate) && rate > 0 && rate <= 0.3 ? rate : 0, services: Boolean(pos?.taxServicesTaxable) });
+      // Retail tax on products (Settings › Card reader & Checkout); no retail rate yet = the one rate, as Settings shows it.
+      const retail = pos?.taxProductsTaxable === false ? 0 : Number(pos?.retailTaxRate != null && pos.retailTaxRate !== '' ? pos.retailTaxRate : rate);
+      setTax({ rate: Number.isFinite(rate) && rate > 0 && rate <= 0.3 ? rate : 0, services: Boolean(pos?.taxServicesTaxable), retail: Number.isFinite(retail) && retail > 0 && retail <= 0.3 ? retail : 0 });
       const fee = Number(pos?.clientFeeRate ?? 0);
       setFeeRate(Number.isFinite(fee) && fee > 0 && fee <= 0.03 ? fee : 0);
     }).catch(() => undefined);
   }, []);
-  // Tax is on the visit after the discount, never on the tip.
-  const taxCents = tax.services && tax.rate > 0 ? Math.round((baseCentsParam - discountCents) * tax.rate) : 0;
+  // ── Products and part payments (owner, 2026-11-15: "match GlossGenius"; routes/proCheckout.ts) ──
+  // Retail products added to the visit (retail tax on them), and parts already paid on this checkout: a gift card with
+  // less on it than the bill, and cash toward it. The rest is paid by card, cash or another gift card.
+  type ProductLine = { productId: number; name: string; priceCents: number; quantity: number };
+  const [products, setProducts] = useState<ProductLine[]>([]);
+  const [catalog, setCatalog] = useState<Array<{ id: number; name: string; priceCents: number; stock: number | null }>>([]);
+  const [giftPaidCents, setGiftPaidCents] = useState(0);
+  const [cashPartCents, setCashPartCents] = useState(0);
+  const [savingProducts, setSavingProducts] = useState(false);
+  useEffect(() => {
+    const id = Number(params.appointmentId);
+    setProducts([]); setGiftPaidCents(0); setCashPartCents(0);
+    if (EXPO_GO_PREVIEW || !id || params.quickSale === '1') return;
+    api.get<{ products: ProductLine[]; giftCard: { redeemedCents: number } }>(`/api/pro/appointments/${id}/checkout`).then((r) => {
+      setProducts(Array.isArray(r?.products) ? r.products : []);
+      setGiftPaidCents(Number(r?.giftCard?.redeemedCents) || 0);
+    }).catch(() => undefined);
+    api.get<any[]>('/api/products').then((rows) => setCatalog((Array.isArray(rows) ? rows : [])
+      .map((p) => ({ id: Number(p.id), name: String(p.name ?? ''), priceCents: Math.round(Number(p.price) * 100) || 0, stock: p.stock == null ? null : Number(p.stock) }))))
+      .catch(() => undefined);
+  }, [params.appointmentId, params.quickSale]);
+  const saveProducts = async (next: ProductLine[]) => {
+    const id = Number(appointmentId);
+    if (!id || savingProducts) return;
+    setSavingProducts(true); setError('');
+    try {
+      const r = await api.put<{ products: ProductLine[] }>(`/api/pro/appointments/${id}/products`, { items: next.map((l) => ({ productId: l.productId, quantity: l.quantity })) });
+      setProducts(Array.isArray(r?.products) ? r.products : next);
+    } catch (cause) { setError(errorMessage(cause)); }
+    finally { setSavingProducts(false); }
+  };
+  const productCents = products.reduce((n, l) => n + l.priceCents * l.quantity, 0);
+  const partialCents = giftPaidCents + cashPartCents;
+  // Tax is on the visit after the discount (and on products at the retail rate), never on the tip.
+  const taxCents = (tax.services && tax.rate > 0 ? Math.round((baseCentsParam - discountCents) * tax.rate) : 0) + Math.round(productCents * tax.retail);
   // A deposit the client paid when booking comes off this charge (it is recorded as already paid).
   const depositCents = Math.max(0, Math.round(Number(params.depositCents) || 0));
-  // The client's card fee: on what is charged now, after the discount, tax and deposit, never on the tip.
-  const feeCents = feeRate > 0 ? Math.round(Math.max(0, baseCentsParam - discountCents + taxCents - depositCents) * feeRate) : 0;
+  // The client's card fee: on what is charged now, after the discount, tax, deposit and part payments, never on the tip.
+  const feeCents = feeRate > 0 ? Math.round(Math.max(0, baseCentsParam - discountCents + productCents + taxCents - depositCents - partialCents) * feeRate) : 0;
   useEffect(() => {
-    if (step !== 'tap_intro' || baseCentsParam <= 0) return;
-    setDigits(String(Math.max(0, baseCentsParam - discountCents + taxCents + tipCents - depositCents + feeCents)));
-  }, [baseCentsParam, depositCents, discountCents, feeCents, step, taxCents, tipCents]);
+    if (step !== 'tap_intro' || baseCentsParam + productCents <= 0) return;
+    setDigits(String(Math.max(0, baseCentsParam - discountCents + productCents + taxCents + tipCents - depositCents - partialCents + feeCents)));
+  }, [baseCentsParam, depositCents, discountCents, feeCents, partialCents, productCents, step, taxCents, tipCents]);
+  /** How a split checkout was paid, as Certxa records it ("gift_card:20.00,cash:10.00,m2:45.00"); one tender stays as it is. */
+  const tenderString = (last: string, lastCents: number) => {
+    const parts = [
+      ...(giftPaidCents > 0 ? [`gift_card:${(giftPaidCents / 100).toFixed(2)}`] : []),
+      ...(cashPartCents > 0 ? [`cash:${(cashPartCents / 100).toFixed(2)}`] : []),
+    ];
+    return parts.length ? [...parts, `${last}:${(lastCents / 100).toFixed(2)}`].join(',') : last;
+  };
+  const [paidSummary, setPaidSummary] = useState('');
+  const partsSummary = (lastLabel: string, lastCents: number) => [
+    ...(giftPaidCents > 0 ? [`Gift card ${dollars(String(giftPaidCents))}`] : []),
+    ...(cashPartCents > 0 ? [`Cash ${dollars(String(cashPartCents))}`] : []),
+    `${lastLabel} ${dollars(String(lastCents))}`,
+  ].join(' · ');
 
   // Receipt after a card payment, by text and/or e-mail, to the client's details (editable).
   const [receiptPhone, setReceiptPhone] = useState(String(params.phone ?? '').replace(/\D/g, '').slice(-10));
@@ -287,16 +337,20 @@ export default function CheckoutScreen() {
   const [sendingReceipt, setSendingReceipt] = useState<'' | 'text' | 'email'>('');
   const sendReceipt = async (kind: 'text' | 'email') => {
     const visit = String(params.serviceName || 'Appointment');
-    const totals = { discountAmount: discountCents / 100, taxAmount: taxCents / 100, tipAmount: tipCents / 100, grandTotal: ((Number(digits) || 0) + depositCents) / 100 };
+    // The receipt after any payment (card, cash, gift card, or a split), with the products sold (owner, 2026-11-15).
+    const paidFee = paymentMethod === 'card' ? feeCents : 0;
+    const totals = { discountAmount: discountCents / 100, taxAmount: taxCents / 100, tipAmount: tipCents / 100, grandTotal: (baseCentsParam - discountCents + productCents + taxCents + tipCents + paidFee) / 100 };
+    const lines = [{ name: visit, price: baseCentsParam / 100 }, ...products.map((l) => ({ name: l.quantity > 1 ? `${l.name} × ${l.quantity}` : l.name, price: (l.priceCents * l.quantity) / 100 })), ...(paidFee > 0 ? [{ name: 'Platform fee', price: paidFee / 100 }] : [])];
+    const method = paidSummary || (paymentMethod === 'cash' ? 'Cash' : paymentMethod === 'gift_card' ? 'Gift card' : 'Card');
     setSendingReceipt(kind); setReceiptNote('');
     try {
       if (kind === 'text') {
-        await api.post('/api/pos/sms-receipt', { phone: receiptPhone, clientName, appointmentId: Number(appointmentId) || undefined, paymentMethod: 'card',
-          items: [{ label: visit, price: baseCentsParam / 100 }, ...(feeCents > 0 ? [{ label: 'Platform fee', price: feeCents / 100 }] : [])], ...totals });
+        await api.post('/api/pos/sms-receipt', { phone: receiptPhone, clientName, appointmentId: Number(appointmentId) || undefined, paymentMethod: paymentMethod === 'card' && !paidSummary ? 'card' : method,
+          items: lines.map((l) => ({ label: l.name, price: l.price })), ...totals });
         setReceiptNote(`Receipt texted to ${receiptPhone}.`);
       } else {
         await api.post('/api/pos/email-receipt', { storeId: storeId ?? undefined, email: receiptEmail.trim(), clientName: clientName.trim().split(/\s+/)[0] || 'there',
-          items: [{ name: visit, price: baseCentsParam / 100 }, ...(feeCents > 0 ? [{ name: 'Platform fee', price: feeCents / 100 }] : [])], subtotal: (baseCentsParam + feeCents) / 100, paymentMethod: 'Card', transactionId: paymentIntentId ?? '', ...totals });
+          items: lines, subtotal: lines.reduce((n, l) => n + l.price, 0), paymentMethod: method, transactionId: paymentIntentId ?? '', ...totals });
         setReceiptNote(`Receipt e-mailed to ${receiptEmail.trim()}.`);
       }
     } catch (cause) {
@@ -408,7 +462,7 @@ export default function CheckoutScreen() {
         method: readerMode,
         tipCents,
         discountCents,
-        priorTenderedCents: depositCents,
+        priorTenderedCents: depositCents + partialCents,
         clientFeeCents: feeCents,
       });
       createdPaymentIntentId = created.paymentIntentId;
@@ -444,8 +498,9 @@ export default function CheckoutScreen() {
       }
       setStatusText('Finalizing payment…');
       phase = 'Finalize';
-      const capturedPayment = await captureTerminalPaymentIntent(token, created.paymentIntentId, readerMode);
+      const capturedPayment = await captureTerminalPaymentIntent(token, created.paymentIntentId, tenderString(readerMode, amountCents));
       captured = true;
+      if (partialCents > 0) setPaidSummary(partsSummary('Card', amountCents));
       try {
         await clearPendingTerminalCapture();
       } catch {
@@ -505,27 +560,53 @@ export default function CheckoutScreen() {
   // deposit counted in the total as the card path does. A gift card is taken first (once per booking, so a retry is safe).
   const paymentsReady = usePaymentsReady();
   const [giftOpen, setGiftOpen] = useState(false);
+  const [cashOpen, setCashOpen] = useState(false);
+  const [cashGiven, setCashGiven] = useState('');
+  const [changeCents, setChangeCents] = useState(0);
   const [recording, setRecording] = useState(false);
-  const offlineDueCents = Math.max(0, baseCentsParam - discountCents + taxCents + tipCents - depositCents);
+  const offlineDueCents = Math.max(0, baseCentsParam - discountCents + productCents + taxCents + tipCents - depositCents - partialCents);
   const recordOfflinePayment = async (method: 'cash' | 'gift_card') => {
     const apptId = Number(appointmentId);
     if (!Number.isInteger(apptId) || apptId <= 0) { setError('This payment has no booking to record it on.'); return; }
     if (method === 'gift_card' && !giftCardCode.trim()) { setError('Enter the gift card code.'); return; }
-    if (method === 'gift_card' && offlineDueCents <= 0) { setError('There is nothing left to pay.'); return; }
+    if (offlineDueCents <= 0) { setError('There is nothing left to pay.'); return; }
+    // Cash: what the client handed over. Less than the bill pays part of it; more gives change.
+    const givenCents = method === 'cash' ? Math.round((Number(cashGiven.replace(/[^0-9.]/g, '')) || 0) * 100) : 0;
+    if (method === 'cash' && givenCents <= 0) { setError('Enter the cash the client gave you.'); return; }
     setRecording(true); setError('');
     try {
+      let thisCents = method === 'cash' ? Math.min(givenCents, offlineDueCents) : offlineDueCents;
+      if (method === 'gift_card' && !EXPO_GO_PREVIEW) {
+        // Pays what the card has, up to the bill. What a card already paid on this visit is never counted twice.
+        await api.post(`/api/pro/appointments/${apptId}/gift-card`, { code: giftCardCode.trim(), amountCents: offlineDueCents, partial: true });
+        const r = await api.get<{ giftCard: { redeemedCents: number } }>(`/api/pro/appointments/${apptId}/checkout`);
+        const total = Number(r?.giftCard?.redeemedCents) || 0;
+        thisCents = total - giftPaidCents;
+        if (thisCents <= 0) { setError('This gift card was already used on this visit.'); return; }
+        if (thisCents < offlineDueCents) {
+          setGiftPaidCents(total); setGiftOpen(false); setGiftCardCode('');
+          setStatusText(`Gift card paid ${dollars(String(thisCents))}. ${dollars(String(offlineDueCents - thisCents))} left to pay.`);
+          return;
+        }
+      }
+      if (method === 'cash' && givenCents < offlineDueCents) {
+        setCashPartCents((c) => c + givenCents); setCashOpen(false); setCashGiven('');
+        setStatusText(`Cash ${dollars(String(givenCents))} taken. ${dollars(String(offlineDueCents - givenCents))} left to pay.`);
+        return;
+      }
       if (!EXPO_GO_PREVIEW) {
-        if (method === 'gift_card') await api.post(`/api/pro/appointments/${apptId}/gift-card`, { code: giftCardCode.trim(), amountCents: offlineDueCents });
         await api.patch(`/api/appointments/${apptId}`, {
-          status: 'completed', paymentMethod: method,
-          totalPaid: ((offlineDueCents + depositCents) / 100).toFixed(2),
+          status: 'completed', paymentMethod: tenderString(method, thisCents),
+          totalPaid: ((thisCents + partialCents + depositCents) / 100).toFixed(2),
           tipAmount: (tipCents / 100).toFixed(2), discountAmount: (discountCents / 100).toFixed(2),
-          serviceRevenue: (Math.max(0, baseCentsParam - discountCents) / 100).toFixed(2), productRevenue: '0.00',
+          serviceRevenue: (Math.max(0, baseCentsParam - discountCents) / 100).toFixed(2), productRevenue: (productCents / 100).toFixed(2),
         });
       }
+      if (partialCents > 0) setPaidSummary(partsSummary(method === 'cash' ? 'Cash' : 'Gift card', thisCents));
+      setChangeCents(method === 'cash' ? Math.max(0, givenCents - offlineDueCents) : 0);
       setPaymentMethod(method);
-      setDigits(String(offlineDueCents));
-      setSales((current) => [{ amount: dollars(String(offlineDueCents)), label: `${method === 'cash' ? 'Cash' : 'Gift card'} · ${clientName.trim() || 'In-person service'}`, time: 'Just now · Certxa' }, ...current]);
+      setDigits(String(thisCents + partialCents));
+      setSales((current) => [{ amount: dollars(String(thisCents + partialCents)), label: `${method === 'cash' ? 'Cash' : 'Gift card'} · ${clientName.trim() || 'In-person service'}`, time: 'Just now · Certxa' }, ...current]);
       setStatusText('Payment complete.');
       setStep('success');
       void refreshBookings();
@@ -592,6 +673,8 @@ export default function CheckoutScreen() {
     setPaymentMethod('card');
     setGiftCardCode('');
     setGiftOpen(false);
+    setCashOpen(false); setCashGiven(''); setChangeCents(0); setPaidSummary('');
+    setProducts([]); setGiftPaidCents(0); setCashPartCents(0);
     void clearPendingTerminalCapture();
     if (isQuickSale) router.replace('/(tabs)/pos');
   };
@@ -626,8 +709,10 @@ export default function CheckoutScreen() {
             <View style={[styles.successBadge, { backgroundColor: colors.secondary }]}><Feather name="check" size={32} color={colors.primary} /></View>
             <Text style={[styles.successTitle, { color: colors.foreground }]}>Payment successful</Text>
             <Text style={[styles.successAmount, { color: colors.foreground }]}>{dollars(digits)}</Text>
-            <Text style={[styles.successNote, { color: colors.mutedForeground }]}>{paymentMethod === 'card' ? `Captured through Certxa · ${paymentIntentId}` : `Paid by ${selectedMethod.label.toLowerCase()}${paymentMethod === 'gift_card' && giftCardCode.trim() ? ` · ${giftCardCode.trim().toUpperCase()}` : ''}`}</Text>
-            {paymentMethod === 'card' ? <View testID="receipt-block" style={{ width: '100%', gap: 8, marginBottom: 14 }}>
+            <Text style={[styles.successNote, { color: colors.mutedForeground }]}>{paidSummary ? `Paid by ${paidSummary}` : paymentMethod === 'card' ? `Captured through Certxa · ${paymentIntentId}` : `Paid by ${selectedMethod.label.toLowerCase()}${paymentMethod === 'gift_card' && giftCardCode.trim() ? ` · ${giftCardCode.trim().toUpperCase()}` : ''}`}</Text>
+            {changeCents > 0 ? <Text testID="cash-change" style={[styles.successTitle, { color: colors.foreground, fontSize: 22, marginBottom: 12 }]}>{`Change: ${dollars(String(changeCents))}`}</Text> : null}
+            {/* A receipt after any payment: card, cash, gift card or a split (owner, 2026-11-15). */}
+            {step === 'success' ? <View testID="receipt-block" style={{ width: '100%', gap: 8, marginBottom: 14 }}>
               <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Send a receipt</Text>
               <View style={styles.registrationRow}>
                 <TextInput testID="receipt-phone" keyboardType="phone-pad" value={receiptPhone} onChangeText={(v) => setReceiptPhone(v.replace(/\D/g, '').slice(0, 10))} placeholder="Client's phone" placeholderTextColor={colors.mutedForeground} style={[styles.fieldInput, styles.registrationInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
@@ -644,7 +729,7 @@ export default function CheckoutScreen() {
             <TouchableOpacity testID="new-checkout" onPress={resetCheckout} style={[styles.primaryButton, { backgroundColor: colors.primary }]}><Text style={[styles.primaryButtonText, { color: colors.primaryForeground }]}>{isQuickSale ? 'New sale' : 'New checkout'}</Text></TouchableOpacity>
           </View>
         ) : (
-          <View style={[styles.tapContent, { paddingBottom: insets.bottom + 84 }]}>
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.tapContent, { flexGrow: 1, paddingBottom: insets.bottom + 84 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
              {isTapIntro ? null : <View style={[styles.nfcCircle, { backgroundColor: isReady || isCapturePending ? colors.secondary : colors.muted }]}><Feather name={isCapturePending ? 'alert-circle' : isReady ? 'radio' : 'loader'} size={32} color={isReady || isCapturePending ? colors.primary : colors.mutedForeground} /></View>}
              <Text style={[styles.tapTitle, { color: colors.foreground }]}>{isCapturePending ? 'Payment needs finalizing' : isTapIntro ? 'Take payment' : isReady ? 'Ready for payment' : `Connecting ${readerMode === 'm2' ? 'Stripe M2' : 'Tap to Pay'}`}</Text>
              <Text style={[styles.tapSub, { color: colors.mutedForeground }]}>{error || (isTapIntro ? 'Card, cash or gift card.' : statusText)}</Text>
@@ -661,6 +746,22 @@ export default function CheckoutScreen() {
                {memberDiscount ? <Text testID="member-discount-line" style={[styles.serviceLabel, { color: colors.mutedForeground, marginBottom: 6 }]}>{`Member discount: ${memberDiscount.name}, ${memberDiscount.percent}% off`}</Text> : null}
                <TextInput keyboardType="numbers-and-punctuation" returnKeyType="done" onChangeText={setCustomDiscount} placeholder="Or a custom amount off, e.g. 39.00" placeholderTextColor={colors.mutedForeground} style={[styles.fieldInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} testID="discount-custom" value={customDiscount} />
              </View> : null}
+             {isTapIntro && !isQuickSale && Number(appointmentId) > 0 && (catalog.length > 0 || products.length > 0) ? <View testID="products-block" style={[styles.formField, { width: '100%', marginTop: 16 }]}>
+               <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Products{productCents > 0 ? <Text style={{ color: colors.primary }}>{` · ${dollars(String(productCents))}`}</Text> : null}</Text>
+               {products.map((l, i) => (
+                 <View key={l.productId} testID={`product-line-${l.productId}`} style={styles.registrationRow}>
+                   <Text style={[styles.fieldLabel, { flex: 1, color: colors.foreground }]} numberOfLines={1}>{`${l.name} · ${dollars(String(l.priceCents))}`}</Text>
+                   <TouchableOpacity testID={`product-less-${l.productId}`} disabled={savingProducts} accessibilityLabel="One fewer" onPress={() => void saveProducts(l.quantity > 1 ? products.map((x, j) => (j === i ? { ...x, quantity: x.quantity - 1 } : x)) : products.filter((_, j) => j !== i))} style={[styles.registerButton, { backgroundColor: colors.secondary, minWidth: 44 }]}><Feather name={l.quantity > 1 ? 'minus' : 'x'} size={18} color={colors.primary} /></TouchableOpacity>
+                   <Text style={[styles.fieldLabel, { minWidth: 22, textAlign: 'center', color: colors.foreground }]}>{l.quantity}</Text>
+                   <TouchableOpacity testID={`product-more-${l.productId}`} disabled={savingProducts || l.quantity >= 99} accessibilityLabel="One more" onPress={() => void saveProducts(products.map((x, j) => (j === i ? { ...x, quantity: x.quantity + 1 } : x)))} style={[styles.registerButton, { backgroundColor: colors.secondary, minWidth: 44 }]}><Feather name="plus" size={18} color={colors.primary} /></TouchableOpacity>
+                 </View>
+               ))}
+               {catalog.some((p) => !products.some((l) => l.productId === p.id)) ? <SelectField testID="product-add" title="Add a product" placeholder={savingProducts ? 'Saving…' : 'Add a product'} value={null}
+                 options={catalog.filter((p) => !products.some((l) => l.productId === p.id)).map((p) => ({ value: p.id, label: `${p.name} · ${dollars(String(p.priceCents))}${p.stock != null ? ` · ${p.stock} in stock` : ''}` }))}
+                 onChange={(productId) => { const p = catalog.find((x) => x.id === productId); if (p) void saveProducts([...products, { productId: p.id, name: p.name, priceCents: p.priceCents, quantity: 1 }]); }} /> : null}
+             </View> : null}
+             {isTapIntro && giftPaidCents > 0 ? <Text testID="gift-paid-line" style={[styles.fieldLabel, { width: '100%', marginTop: 12, color: colors.foreground }]}>{`Gift card paid · −${dollars(String(giftPaidCents))}`}</Text> : null}
+             {isTapIntro && cashPartCents > 0 ? <Text testID="cash-part-line" style={[styles.fieldLabel, { width: '100%', marginTop: 12, color: colors.foreground }]}>{`Cash taken · −${dollars(String(cashPartCents))}`}</Text> : null}
              {isTapIntro && depositCents > 0 ? <Text testID="deposit-line" style={[styles.fieldLabel, { width: '100%', marginTop: 12, color: colors.foreground }]}>{`Deposit already paid · −${dollars(String(depositCents))}`}</Text> : null}
              {isTapIntro && taxCents > 0 ? <Text testID="sales-tax-line" style={[styles.fieldLabel, { width: '100%', marginTop: 12, color: colors.foreground }]}>{`Sales tax (${(tax.rate * 100).toFixed(2).replace(/\.?0+$/, '')}%) · ${dollars(String(taxCents))}`}</Text> : null}
              {isTapIntro && feeCents > 0 ? <Text testID="platform-fee-line" style={[styles.fieldLabel, { width: '100%', marginTop: 12, color: colors.foreground }]}>{`Platform fee (${(feeRate * 100).toFixed(2).replace(/\.?0+$/, '')}%) · ${dollars(String(feeCents))}`}</Text> : null}
@@ -675,17 +776,23 @@ export default function CheckoutScreen() {
              <TouchableOpacity disabled={(!isReady && !isCapturePending && !isTapIntro) || isBusy} testID={isTapIntro ? 'start-tap-to-pay' : isCapturePending ? 'retry-capture' : 'accept-payment'} onPress={isTapIntro ? () => startCard('tap_to_pay') : isCapturePending ? retryCapture : processPayment} style={[styles.primaryButton, { backgroundColor: (isReady || isCapturePending || isTapIntro) && !isBusy ? colors.primary : colors.muted }]}><Feather name={isTapIntro ? 'radio' : isCapturePending ? 'refresh-cw' : 'radio'} size={19} color={(isReady || isCapturePending || isTapIntro) && !isBusy ? colors.primaryForeground : colors.mutedForeground} /><Text style={[styles.primaryButtonText, { color: (isReady || isCapturePending || isTapIntro) && !isBusy ? colors.primaryForeground : colors.mutedForeground }]}>{isBusy ? (step === 'processing' ? 'Payment in progress…' : 'Preparing…') : isTapIntro ? 'Start Tap to Pay' : isCapturePending ? 'Retry capture' : 'Accept payment'}</Text></TouchableOpacity>
              {isTapIntro ? <TouchableOpacity testID="start-stripe-m2" disabled={isBusy} onPress={() => startCard('m2')} style={[styles.primaryButton, { marginTop: -12, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}><Feather name="credit-card" size={19} color={colors.foreground} /><Text style={[styles.primaryButtonText, { color: colors.foreground }]}>Use Stripe M2 reader</Text></TouchableOpacity> : null}
              {isTapIntro && Number(appointmentId) > 0 ? <View testID="offline-payments" style={{ width: '100%', gap: 10 }}>
-               <TouchableOpacity testID="pay-cash" disabled={recording || isBusy} onPress={() => Alert.alert('Cash payment', `Record ${dollars(String(offlineDueCents))} paid in cash?`, [{ text: 'Not now', style: 'cancel' }, { text: 'Record cash', onPress: () => void recordOfflinePayment('cash') }])} style={[styles.primaryButton, { marginTop: -4, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}><Feather name="dollar-sign" size={19} color={colors.foreground} /><Text style={[styles.primaryButtonText, { color: colors.foreground }]}>{recording && !giftOpen ? 'Recording…' : `Cash · ${dollars(String(offlineDueCents))}`}</Text></TouchableOpacity>
-               {!giftOpen ? <TouchableOpacity testID="pay-gift-card" disabled={recording || isBusy} onPress={() => { setError(''); setGiftOpen(true); }} style={[styles.primaryButton, { marginTop: -4, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}><Feather name="gift" size={19} color={colors.foreground} /><Text style={[styles.primaryButtonText, { color: colors.foreground }]}>Gift card</Text></TouchableOpacity> : (
+               {!cashOpen ? <TouchableOpacity testID="pay-cash" disabled={recording || isBusy} onPress={() => { setError(''); setCashGiven((offlineDueCents / 100).toFixed(2)); setCashOpen(true); setGiftOpen(false); }} style={[styles.primaryButton, { marginTop: -4, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}><Feather name="dollar-sign" size={19} color={colors.foreground} /><Text style={[styles.primaryButtonText, { color: colors.foreground }]}>{`Cash · ${dollars(String(offlineDueCents))}`}</Text></TouchableOpacity> : (
+                 <View testID="cash-block" style={styles.formField}>
+                   <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Cash the client gave you <Text style={{ color: colors.mutedForeground }}>(less pays part of it)</Text></Text>
+                   <TextInput testID="cash-given" keyboardType="decimal-pad" returnKeyType="done" value={cashGiven} onChangeText={setCashGiven} placeholder="0.00" placeholderTextColor={colors.mutedForeground} style={[styles.fieldInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
+                   <TouchableOpacity testID="cash-record" disabled={recording} onPress={() => void recordOfflinePayment('cash')} style={[styles.primaryButton, { backgroundColor: recording ? colors.muted : colors.primary }]}><Feather name="dollar-sign" size={19} color={recording ? colors.mutedForeground : colors.primaryForeground} /><Text style={[styles.primaryButtonText, { color: recording ? colors.mutedForeground : colors.primaryForeground }]}>{recording ? 'Recording…' : 'Record cash'}</Text></TouchableOpacity>
+                 </View>
+               )}
+               {!giftOpen ? <TouchableOpacity testID="pay-gift-card" disabled={recording || isBusy} onPress={() => { setError(''); setGiftOpen(true); setCashOpen(false); }} style={[styles.primaryButton, { marginTop: -4, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}><Feather name="gift" size={19} color={colors.foreground} /><Text style={[styles.primaryButtonText, { color: colors.foreground }]}>Gift card</Text></TouchableOpacity> : (
                  <View testID="gift-card-block" style={styles.formField}>
                    <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Gift card code</Text>
                    <TextInput testID="gift-card-code" autoCapitalize="characters" autoCorrect={false} value={giftCardCode} onChangeText={setGiftCardCode} placeholder="Code on the gift card" placeholderTextColor={colors.mutedForeground} style={[styles.fieldInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
-                   <TouchableOpacity testID="gift-card-use" disabled={recording || !giftCardCode.trim()} onPress={() => void recordOfflinePayment('gift_card')} style={[styles.primaryButton, { backgroundColor: giftCardCode.trim() && !recording ? colors.primary : colors.muted }]}><Feather name="gift" size={19} color={giftCardCode.trim() && !recording ? colors.primaryForeground : colors.mutedForeground} /><Text style={[styles.primaryButtonText, { color: giftCardCode.trim() && !recording ? colors.primaryForeground : colors.mutedForeground }]}>{recording ? 'Checking the card…' : `Use gift card · ${dollars(String(offlineDueCents))}`}</Text></TouchableOpacity>
+                   <TouchableOpacity testID="gift-card-use" disabled={recording || !giftCardCode.trim()} onPress={() => void recordOfflinePayment('gift_card')} style={[styles.primaryButton, { backgroundColor: giftCardCode.trim() && !recording ? colors.primary : colors.muted }]}><Feather name="gift" size={19} color={giftCardCode.trim() && !recording ? colors.primaryForeground : colors.mutedForeground} /><Text style={[styles.primaryButtonText, { color: giftCardCode.trim() && !recording ? colors.primaryForeground : colors.mutedForeground }]}>{recording ? 'Checking the card…' : 'Use gift card'}</Text></TouchableOpacity>
                  </View>
                )}
              </View> : null}
              <Text testID="build-label" style={[styles.tapSub, { fontSize: 13, marginTop: 10, color: colors.mutedForeground }]}>{BUILD_LABEL}</Text>
-          </View>
+          </ScrollView>
         )}
       </View>
     );

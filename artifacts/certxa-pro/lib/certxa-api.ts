@@ -254,7 +254,8 @@ export function createTerminalPaymentIntent(
 export function captureTerminalPaymentIntent(
   token: string,
   paymentIntentId: string,
-  method: TerminalPaymentMethod,
+  /** The reader, or for a split checkout how it was paid ("gift_card:20.00,cash:10.00,m2:45.00"). */
+  method: TerminalPaymentMethod | string,
 ) {
   return certxaRequest<CaptureTerminalPaymentIntentResponse>(
     '/api/payments/terminal/capture-payment-intent',
