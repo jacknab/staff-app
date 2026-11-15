@@ -8,8 +8,8 @@ import { Alert } from 'react-native';
 import { CatalogScreen, Empty, ErrorLine, Field, List, Loading, Pair, QuietButton, Row, SaveButton, errorText, money } from '@/components/catalog/CatalogKit';
 import { api } from '@/lib/live-api';
 
-type Product = { id: number; name: string; brand: string; price: number; stock: number };
-type Draft = { id: number; name: string; brand: string; price: string; stock: string };
+type Product = { id: number; name: string; brand: string; price: number; stock: number; lowAt: number };
+type Draft = { id: number; name: string; brand: string; price: string; stock: string; lowAt: string };
 
 export default function ProductsScreen() {
   const router = useRouter();
@@ -24,7 +24,7 @@ export default function ProductsScreen() {
       const list = await api.get<any[]>('/api/products');
       setRows((Array.isArray(list) ? list : []).map((row) => ({
         id: Number(row.id), name: String(row.name ?? ''), brand: String(row.brand ?? ''), price: Number(row.price) || 0,
-        stock: Number(row.stock) || 0,
+        stock: Number(row.stock) || 0, lowAt: row.lowStockThreshold == null ? 5 : Number(row.lowStockThreshold) || 0,
       })).sort((a, b) => a.name.localeCompare(b.name)));
       setError('');
     } catch (cause) { setError(errorText(cause, 'Could not load your products.')); }
@@ -40,9 +40,11 @@ export default function ProductsScreen() {
     if (!name) return setError('Enter the name of the product.');
     if (!draft.price || !Number.isFinite(price) || price < 0) return setError('Enter the price, for example 24 or 24.99.');
     if (!Number.isInteger(stock) || stock < 0) return setError('Enter how many you have in stock.');
+    const lowAt = Number.parseInt(draft.lowAt || '0', 10);
+    if (!Number.isInteger(lowAt) || lowAt < 0) return setError('Enter when to tell you it’s running low (0 for never).');
     setSaving(true); setError('');
     try {
-      const body = { name, brand: draft.brand.trim() || null, price: price.toFixed(2), stock };
+      const body = { name, brand: draft.brand.trim() || null, price: price.toFixed(2), stock, lowStockThreshold: lowAt };
       if (draft.id > 0) await api.patch(`/api/products/${draft.id}`, body);
       else await api.post('/api/products', body);
       setDraft(null);
@@ -68,7 +70,7 @@ export default function ProductsScreen() {
       help="catalog.products"
       title={draft ? (draft.id > 0 ? 'Edit product' : 'New product') : 'Products'}
       onBack={() => (draft ? (setDraft(null), setError('')) : router.back())}
-      onAdd={draft ? undefined : () => { setError(''); setDraft({ id: 0, name: '', brand: '', price: '', stock: '' }); }}
+      onAdd={draft ? undefined : () => { setError(''); setDraft({ id: 0, name: '', brand: '', price: '', stock: '', lowAt: '5' }); }}
       addLabel="Add a product"
       testID="products"
     >
@@ -80,6 +82,8 @@ export default function ProductsScreen() {
             <Field label="Price ($)" testID="product-price" keyboardType="decimal-pad" value={draft.price} onChangeText={(price) => setDraft({ ...draft, price: price.replace(/[^\d.]/g, '') })} placeholder="24.99" />
             <Field label="In stock" testID="product-stock" keyboardType="number-pad" value={draft.stock} onChangeText={(stock) => setDraft({ ...draft, stock: stock.replace(/\D/g, '') })} placeholder="10" />
           </Pair>
+          {/* Low-stock alert (owner, 2026-11-15): a notification when sales bring it down to this many. */}
+          <Field label="Tell me when it's down to" testID="product-low-at" keyboardType="number-pad" value={draft.lowAt} onChangeText={(lowAt) => setDraft({ ...draft, lowAt: lowAt.replace(/\D/g, '') })} placeholder="5" />
           <ErrorLine>{error}</ErrorLine>
           <SaveButton saving={saving} onPress={() => void save()} testID="product-save" />
           {editing ? <QuietButton destructive disabled={saving} label="Remove product" onPress={() => remove(editing)} testID="product-remove" /> : null}
@@ -90,8 +94,8 @@ export default function ProductsScreen() {
           {rows.length === 0 && !error ? <Empty>You have no products yet. Tap + to add the first one.</Empty> : null}
           <List>
             {rows.map((row) => (
-              <Row key={row.id} testID={`product-${row.id}`} title={row.name} hint={`${row.brand ? `${row.brand} · ` : ''}${row.stock} in stock`} right={money(row.price)}
-                onPress={() => { setError(''); setDraft({ id: row.id, name: row.name, brand: row.brand, price: row.price.toFixed(2), stock: String(row.stock) }); }} />
+              <Row key={row.id} testID={`product-${row.id}`} title={row.name} hint={`${row.brand ? `${row.brand} · ` : ''}${row.stock} in stock${row.lowAt > 0 && row.stock <= row.lowAt ? ' · running low' : ''}`} right={money(row.price)}
+                onPress={() => { setError(''); setDraft({ id: row.id, name: row.name, brand: row.brand, price: row.price.toFixed(2), stock: String(row.stock), lowAt: String(row.lowAt) }); }} />
             ))}
           </List>
         </>

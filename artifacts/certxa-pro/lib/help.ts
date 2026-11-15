@@ -205,7 +205,7 @@ export const HELP: Record<string, HelpPage> = {
         'The amount due comes from the booking; for a quick sale you key it in.',
         'Discount: 10%, 15%, 20% or 25% off, or a custom amount off. Tax is worked out after the discount, never on the tip.',
         'For a member with a member discount, it is put in as the amount off for you (you can change it).',
-        'Products: Add a product puts a retail item on the visit (it shows how many you have in stock); − and + change how many. Retail sales tax is added on products. They come out of your stock when the visit is paid.',
+        'Products: Add a product puts a retail item on the visit (it shows how many you have in stock); − and + change how many. Retail sales tax is added on products. They come out of your stock when the visit is paid, and you get a notification when one is down to its low-stock level.',
         'A deposit the client already paid comes off; sales tax and the platform fee are added if you charge them (Settings › Card reader & Checkout).',
         'The client chooses a tip, or enters their own, or no tip.',
       ] },
@@ -590,6 +590,15 @@ export const HELP: Record<string, HelpPage> = {
       { heading: 'Good to know', points: ['A client’s signed copy keeps the questions as they were, so changing a form later never changes what they signed.', 'Switch off stops a form being sent. Delete removes it; a form clients have filled in is switched off instead, and their copies are kept.', 'Forms you send and the answers are on the booking and on the client’s profile.'] },
     ],
   },
+  expenses: {
+    title: 'Expenses',
+    intro: 'What your business spends, month by month, ready for tax time.',
+    sections: [
+      { heading: 'Each month', points: ['The arrows change the month.', 'Takings: what clients paid that month (visits and memberships, not tips). Expenses: what you spent. Left: takings less expenses.', 'Under it, your spending by category, then each expense. Tap one to change it.'] },
+      { heading: 'Adding an expense', points: ['Tap +: the amount, the date, a category, who you paid and a note.', 'Receipt: choose a photo of the receipt, so it’s kept with the expense.', 'Repeats every month: for costs like rent or software, Certxa adds it again on the same day each month. Delete the first one to stop it.'] },
+      { heading: 'For your taxes', points: ['Send the year as a spreadsheet shares every expense of the year (date, category, who you paid, amount, note, receipt link), to e-mail to yourself or your tax adviser.'] },
+    ],
+  },
   memberships: {
     title: 'Memberships',
     intro: 'Monthly or yearly plans your clients pay for, like “1 gel fill a month for $45”.',
@@ -607,7 +616,7 @@ export const HELP: Record<string, HelpPage> = {
   'catalog.products': {
     title: 'Products',
     intro: 'The retail items you sell, like polish or aftercare.',
-    sections: [{ heading: 'How it works', points: ['Tap + to add one, or tap one to change it.', 'Each has a name, brand, price and how many you have in stock.', 'Remove product takes it off your list.'] }],
+    sections: [{ heading: 'How it works', points: ['Tap + to add one, or tap one to change it.', 'Each has a name, brand, price and how many you have in stock. Products sold at checkout come out of stock by themselves.', 'Tell me when it’s down to: you get a notification when sales bring it down to this many (0 never tells you). The list shows running low.', 'Remove product takes it off your list.'] }],
   },
 
   // ── Setup ─────────────────────────────────────────────────────────────────────────────────────────────────────────
