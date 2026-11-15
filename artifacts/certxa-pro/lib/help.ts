@@ -120,6 +120,7 @@ export const HELP: Record<string, HelpPage> = {
         'Memberships: what’s left this period, when it renews or ends, Cancel membership, and Add membership (charge the card on file or send a link to join).',
       ] },
       { heading: 'Visits', points: ['Upcoming and Past visits, with their status. Tap one to open it. Show all lists every past visit.'] },
+      { heading: 'Credit & referrals', points: ['The credit they can use at checkout, who referred them and who they referred. Referred by (once, while Referrals is on) saves who sent them and gives them their credit.'] },
       { heading: 'Forms', points: ['The forms and waivers they filled in (tap View to read their answers and signature), and links sent but not filled in yet (Send again, or Fill in here to open it on your phone). Send a form sends one of your forms.'] },
       { heading: 'Notes and photos', points: [
         'Notes: the newest notes, pinned ones first. Add or see all opens every note; Pin note keeps one at the top.',
@@ -214,7 +215,8 @@ export const HELP: Record<string, HelpPage> = {
         'Card needs card payments set up; until then the card buttons open the set-up page.',
         'Cash: tap Cash, enter the cash the client gave you and tap Record cash (no card fee). More than the bill shows the change to give back; less pays part of it, and the rest is paid another way.',
         'Gift card: enter the code on a Certxa gift card. It pays what is on the card, up to the bill. If that isn’t enough, the rest is paid another way: card, cash or another gift card.',
-        'Split payments: each part paid shows above the buttons (Gift card paid, Cash taken), and the amount due is what is left.',
+        'Credit: a client with referral credit has Use credit; it pays what they have, up to the bill.',
+        'Split payments: each part paid shows above the buttons (Credit used, Gift card paid, Cash taken), and the amount due is what is left.',
         'When it’s done, send a receipt by text or e-mail, after any payment. New sale starts the next one.',
       ] },
       { heading: 'Card reader', points: ['New Stripe M2 setup (one time): enter the code shown on the reader and tap Register. After that, checkout finds it on its own.'] },
@@ -588,6 +590,14 @@ export const HELP: Record<string, HelpPage> = {
       { heading: 'Your forms', points: ['Tap + to start one: a blank form, or a ready-made one (new client form, service waiver, photo release, before each visit) you can change.', 'Each form shows its type, how often it is asked, when it is sent and how many clients filled it in. Tap one to change it.'] },
       { heading: 'Making a form', points: ['Type: an intake form asks questions; a waiver ends with the client’s signature.', 'Ask clients: Once keeps their answers for good; Before every visit asks again for each booking.', 'Send when clients book: a few minutes after a client books, Certxa e-mails them the link (or texts it when they have no e-mail; a text uses a credit).', 'For every service, or only the services you tick.', 'Questions: choose the kind (short or long answer, yes or no, pick one, pick any, date, I agree, text to read, signature), write it, and set Required. The arrows move a question; the bin removes it.'] },
       { heading: 'Good to know', points: ['A client’s signed copy keeps the questions as they were, so changing a form later never changes what they signed.', 'Switch off stops a form being sent. Delete removes it; a form clients have filled in is switched off instead, and their copies are kept.', 'Forms you send and the answers are on the booking and on the client’s profile.'] },
+    ],
+  },
+  referrals: {
+    title: 'Referrals',
+    intro: 'Reward clients who send you a friend.',
+    sections: [
+      { heading: 'Your reward', points: ['Reward referrals turns it on. Set the credit for the client who referred and for the new client, then tap Save.', 'On a new client’s profile, choose Referred by. The new client gets their credit at once; the client who referred them gets theirs after the new client’s first paid visit (you get a notification).', 'Credit is used at checkout with Use credit.'] },
+      { heading: 'Referrals', points: ['Every referral, and whether both have been rewarded. Tap one to open the new client.'] },
     ],
   },
   expenses: {

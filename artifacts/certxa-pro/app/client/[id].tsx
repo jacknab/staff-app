@@ -23,6 +23,7 @@ import { ClientPhotos } from '@/components/ClientPhotos';
 import { HelpTitle } from '@/components/HelpTitle';
 import { FormsPanel } from '@/components/FormsPanel';
 import { MembershipsPanel } from '@/components/MembershipsPanel';
+import { CreditPanel } from '@/components/CreditPanel';
 import { HoldToDelete } from '@/components/HoldToDelete';
 
 import { AppBackground } from '@/components/look/AppBackground';
@@ -375,6 +376,9 @@ export default function ClientProfileScreen() {
 
           {/* Memberships: what's left this period, renew/end, Add membership (owner, 2026-11-15; components/MembershipsPanel.tsx). */}
           <MembershipsPanel customerId={clientId} hasCard={!!client.cardLast4} />
+
+          {/* Referral credit and who referred whom (owner, 2026-11-15; components/CreditPanel.tsx). */}
+          <CreditPanel customerId={clientId} />
 
           {/* Forms and waivers the client filled in, and Send a form (owner, 2026-11-15; components/FormsPanel.tsx). */}
           <FormsPanel customerId={clientId} />

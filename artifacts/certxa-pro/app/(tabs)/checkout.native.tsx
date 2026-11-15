@@ -43,12 +43,13 @@ import { look, cardShadow } from '@/components/look/tokens';
 // Stripe M2 does not require that Apple entitlement.
 const TAP_TO_PAY_ENABLED = true;
 // Shown on the payment screen so a tester can tell which build is installed.
-const BUILD_LABEL = 'Build Nov 15 · F';
+const BUILD_LABEL = 'Build Nov 15 · G';
 const EXPO_GO_PREVIEW = process.env.EXPO_PUBLIC_EXPO_GO_PREVIEW === '1';
 
 type PaymentStep = 'idle' | 'tap_intro' | 'initializing' | 'discovering' | 'connecting' | 'ready' | 'processing' | 'capture_pending' | 'success' | 'error';
 type ReaderMode = 'tap_to_pay' | 'm2';
-type PaymentMethod = 'card' | 'cash' | 'gift_card';
+// 'credit': the client's referral credit (routes/proReferrals.ts); not in the list below, it has its own button.
+type PaymentMethod = 'card' | 'cash' | 'gift_card' | 'credit';
 
 const paymentMethods: Array<{ key: PaymentMethod; label: string; description: string; icon: ComponentProps<typeof Feather>['name'] }> = [
   { key: 'card', label: 'Card', description: 'Stripe reader', icon: 'credit-card' },
@@ -280,14 +281,18 @@ export default function CheckoutScreen() {
   const [catalog, setCatalog] = useState<Array<{ id: number; name: string; priceCents: number; stock: number | null }>>([]);
   const [giftPaidCents, setGiftPaidCents] = useState(0);
   const [cashPartCents, setCashPartCents] = useState(0);
+  const [creditPaidCents, setCreditPaidCents] = useState(0);
+  const [creditBalanceCents, setCreditBalanceCents] = useState(0);
   const [savingProducts, setSavingProducts] = useState(false);
   useEffect(() => {
     const id = Number(params.appointmentId);
-    setProducts([]); setGiftPaidCents(0); setCashPartCents(0);
+    setProducts([]); setGiftPaidCents(0); setCashPartCents(0); setCreditPaidCents(0); setCreditBalanceCents(0);
     if (EXPO_GO_PREVIEW || !id || params.quickSale === '1') return;
-    api.get<{ products: ProductLine[]; giftCard: { redeemedCents: number } }>(`/api/pro/appointments/${id}/checkout`).then((r) => {
+    api.get<{ products: ProductLine[]; giftCard: { redeemedCents: number }; credit?: { usedCents: number; balanceCents: number } }>(`/api/pro/appointments/${id}/checkout`).then((r) => {
       setProducts(Array.isArray(r?.products) ? r.products : []);
       setGiftPaidCents(Number(r?.giftCard?.redeemedCents) || 0);
+      setCreditPaidCents(Number(r?.credit?.usedCents) || 0);
+      setCreditBalanceCents(Number(r?.credit?.balanceCents) || 0);
     }).catch(() => undefined);
     api.get<any[]>('/api/products').then((rows) => setCatalog((Array.isArray(rows) ? rows : [])
       .map((p) => ({ id: Number(p.id), name: String(p.name ?? ''), priceCents: Math.round(Number(p.price) * 100) || 0, stock: p.stock == null ? null : Number(p.stock) }))))
@@ -304,7 +309,7 @@ export default function CheckoutScreen() {
     finally { setSavingProducts(false); }
   };
   const productCents = products.reduce((n, l) => n + l.priceCents * l.quantity, 0);
-  const partialCents = giftPaidCents + cashPartCents;
+  const partialCents = giftPaidCents + cashPartCents + creditPaidCents;
   // Tax is on the visit after the discount (and on products at the retail rate), never on the tip.
   const taxCents = (tax.services && tax.rate > 0 ? Math.round((baseCentsParam - discountCents) * tax.rate) : 0) + Math.round(productCents * tax.retail);
   // A deposit the client paid when booking comes off this charge (it is recorded as already paid).
@@ -318,6 +323,7 @@ export default function CheckoutScreen() {
   /** How a split checkout was paid, as Certxa records it ("gift_card:20.00,cash:10.00,m2:45.00"); one tender stays as it is. */
   const tenderString = (last: string, lastCents: number) => {
     const parts = [
+      ...(creditPaidCents > 0 ? [`credit:${(creditPaidCents / 100).toFixed(2)}`] : []),
       ...(giftPaidCents > 0 ? [`gift_card:${(giftPaidCents / 100).toFixed(2)}`] : []),
       ...(cashPartCents > 0 ? [`cash:${(cashPartCents / 100).toFixed(2)}`] : []),
     ];
@@ -325,6 +331,7 @@ export default function CheckoutScreen() {
   };
   const [paidSummary, setPaidSummary] = useState('');
   const partsSummary = (lastLabel: string, lastCents: number) => [
+    ...(creditPaidCents > 0 ? [`Credit ${dollars(String(creditPaidCents))}`] : []),
     ...(giftPaidCents > 0 ? [`Gift card ${dollars(String(giftPaidCents))}`] : []),
     ...(cashPartCents > 0 ? [`Cash ${dollars(String(cashPartCents))}`] : []),
     `${lastLabel} ${dollars(String(lastCents))}`,
@@ -341,7 +348,7 @@ export default function CheckoutScreen() {
     const paidFee = paymentMethod === 'card' ? feeCents : 0;
     const totals = { discountAmount: discountCents / 100, taxAmount: taxCents / 100, tipAmount: tipCents / 100, grandTotal: (baseCentsParam - discountCents + productCents + taxCents + tipCents + paidFee) / 100 };
     const lines = [{ name: visit, price: baseCentsParam / 100 }, ...products.map((l) => ({ name: l.quantity > 1 ? `${l.name} × ${l.quantity}` : l.name, price: (l.priceCents * l.quantity) / 100 })), ...(paidFee > 0 ? [{ name: 'Platform fee', price: paidFee / 100 }] : [])];
-    const method = paidSummary || (paymentMethod === 'cash' ? 'Cash' : paymentMethod === 'gift_card' ? 'Gift card' : 'Card');
+    const method = paidSummary || (paymentMethod === 'cash' ? 'Cash' : paymentMethod === 'gift_card' ? 'Gift card' : paymentMethod === 'credit' ? 'Credit' : 'Card');
     setSendingReceipt(kind); setReceiptNote('');
     try {
       if (kind === 'text') {
@@ -565,7 +572,7 @@ export default function CheckoutScreen() {
   const [changeCents, setChangeCents] = useState(0);
   const [recording, setRecording] = useState(false);
   const offlineDueCents = Math.max(0, baseCentsParam - discountCents + productCents + taxCents + tipCents - depositCents - partialCents);
-  const recordOfflinePayment = async (method: 'cash' | 'gift_card') => {
+  const recordOfflinePayment = async (method: 'cash' | 'gift_card' | 'credit') => {
     const apptId = Number(appointmentId);
     if (!Number.isInteger(apptId) || apptId <= 0) { setError('This payment has no booking to record it on.'); return; }
     if (method === 'gift_card' && !giftCardCode.trim()) { setError('Enter the gift card code.'); return; }
@@ -589,6 +596,17 @@ export default function CheckoutScreen() {
           return;
         }
       }
+      if (method === 'credit' && !EXPO_GO_PREVIEW) {
+        // The client's credit, up to the bill; once per booking.
+        const r = await api.post<{ usedCents: number }>(`/api/pro/appointments/${apptId}/credit`, { amountCents: offlineDueCents });
+        thisCents = Number(r?.usedCents) || 0;
+        setCreditBalanceCents((b) => Math.max(0, b - thisCents));
+        if (thisCents < offlineDueCents) {
+          setCreditPaidCents(thisCents);
+          setStatusText(`Credit paid ${dollars(String(thisCents))}. ${dollars(String(offlineDueCents - thisCents))} left to pay.`);
+          return;
+        }
+      }
       if (method === 'cash' && givenCents < offlineDueCents) {
         setCashPartCents((c) => c + givenCents); setCashOpen(false); setCashGiven('');
         setStatusText(`Cash ${dollars(String(givenCents))} taken. ${dollars(String(offlineDueCents - givenCents))} left to pay.`);
@@ -602,11 +620,12 @@ export default function CheckoutScreen() {
           serviceRevenue: (Math.max(0, baseCentsParam - discountCents) / 100).toFixed(2), productRevenue: (productCents / 100).toFixed(2),
         });
       }
-      if (partialCents > 0) setPaidSummary(partsSummary(method === 'cash' ? 'Cash' : 'Gift card', thisCents));
+      const label = method === 'cash' ? 'Cash' : method === 'credit' ? 'Credit' : 'Gift card';
+      if (partialCents > 0 || method === 'credit') setPaidSummary(partsSummary(label, thisCents));
       setChangeCents(method === 'cash' ? Math.max(0, givenCents - offlineDueCents) : 0);
       setPaymentMethod(method);
       setDigits(String(thisCents + partialCents));
-      setSales((current) => [{ amount: dollars(String(thisCents + partialCents)), label: `${method === 'cash' ? 'Cash' : 'Gift card'} · ${clientName.trim() || 'In-person service'}`, time: 'Just now · Certxa' }, ...current]);
+      setSales((current) => [{ amount: dollars(String(thisCents + partialCents)), label: `${label} · ${clientName.trim() || 'In-person service'}`, time: 'Just now · Certxa' }, ...current]);
       setStatusText('Payment complete.');
       setStep('success');
       void refreshBookings();
@@ -674,7 +693,7 @@ export default function CheckoutScreen() {
     setGiftCardCode('');
     setGiftOpen(false);
     setCashOpen(false); setCashGiven(''); setChangeCents(0); setPaidSummary('');
-    setProducts([]); setGiftPaidCents(0); setCashPartCents(0);
+    setProducts([]); setGiftPaidCents(0); setCashPartCents(0); setCreditPaidCents(0); setCreditBalanceCents(0);
     void clearPendingTerminalCapture();
     if (isQuickSale) router.replace('/(tabs)/pos');
   };
@@ -760,6 +779,7 @@ export default function CheckoutScreen() {
                  options={catalog.filter((p) => !products.some((l) => l.productId === p.id)).map((p) => ({ value: p.id, label: `${p.name} · ${dollars(String(p.priceCents))}${p.stock != null ? ` · ${p.stock} in stock` : ''}` }))}
                  onChange={(productId) => { const p = catalog.find((x) => x.id === productId); if (p) void saveProducts([...products, { productId: p.id, name: p.name, priceCents: p.priceCents, quantity: 1 }]); }} /> : null}
              </View> : null}
+             {isTapIntro && creditPaidCents > 0 ? <Text testID="credit-paid-line" style={[styles.fieldLabel, { width: '100%', marginTop: 12, color: colors.foreground }]}>{`Credit used · −${dollars(String(creditPaidCents))}`}</Text> : null}
              {isTapIntro && giftPaidCents > 0 ? <Text testID="gift-paid-line" style={[styles.fieldLabel, { width: '100%', marginTop: 12, color: colors.foreground }]}>{`Gift card paid · −${dollars(String(giftPaidCents))}`}</Text> : null}
              {isTapIntro && cashPartCents > 0 ? <Text testID="cash-part-line" style={[styles.fieldLabel, { width: '100%', marginTop: 12, color: colors.foreground }]}>{`Cash taken · −${dollars(String(cashPartCents))}`}</Text> : null}
              {isTapIntro && depositCents > 0 ? <Text testID="deposit-line" style={[styles.fieldLabel, { width: '100%', marginTop: 12, color: colors.foreground }]}>{`Deposit already paid · −${dollars(String(depositCents))}`}</Text> : null}
@@ -776,6 +796,7 @@ export default function CheckoutScreen() {
              <TouchableOpacity disabled={(!isReady && !isCapturePending && !isTapIntro) || isBusy} testID={isTapIntro ? 'start-tap-to-pay' : isCapturePending ? 'retry-capture' : 'accept-payment'} onPress={isTapIntro ? () => startCard('tap_to_pay') : isCapturePending ? retryCapture : processPayment} style={[styles.primaryButton, { backgroundColor: (isReady || isCapturePending || isTapIntro) && !isBusy ? colors.primary : colors.muted }]}><Feather name={isTapIntro ? 'radio' : isCapturePending ? 'refresh-cw' : 'radio'} size={19} color={(isReady || isCapturePending || isTapIntro) && !isBusy ? colors.primaryForeground : colors.mutedForeground} /><Text style={[styles.primaryButtonText, { color: (isReady || isCapturePending || isTapIntro) && !isBusy ? colors.primaryForeground : colors.mutedForeground }]}>{isBusy ? (step === 'processing' ? 'Payment in progress…' : 'Preparing…') : isTapIntro ? 'Start Tap to Pay' : isCapturePending ? 'Retry capture' : 'Accept payment'}</Text></TouchableOpacity>
              {isTapIntro ? <TouchableOpacity testID="start-stripe-m2" disabled={isBusy} onPress={() => startCard('m2')} style={[styles.primaryButton, { marginTop: -12, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}><Feather name="credit-card" size={19} color={colors.foreground} /><Text style={[styles.primaryButtonText, { color: colors.foreground }]}>Use Stripe M2 reader</Text></TouchableOpacity> : null}
              {isTapIntro && Number(appointmentId) > 0 ? <View testID="offline-payments" style={{ width: '100%', gap: 10 }}>
+               {creditBalanceCents > 0 && creditPaidCents === 0 && offlineDueCents > 0 ? <TouchableOpacity testID="pay-credit" disabled={recording || isBusy} onPress={() => void recordOfflinePayment('credit')} style={[styles.primaryButton, { marginTop: -4, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}><Feather name="award" size={19} color={colors.foreground} /><Text style={[styles.primaryButtonText, { color: colors.foreground }]}>{recording ? 'Recording…' : `Use credit · ${dollars(String(Math.min(creditBalanceCents, offlineDueCents)))}`}</Text></TouchableOpacity> : null}
                {!cashOpen ? <TouchableOpacity testID="pay-cash" disabled={recording || isBusy} onPress={() => { setError(''); setCashGiven((offlineDueCents / 100).toFixed(2)); setCashOpen(true); setGiftOpen(false); }} style={[styles.primaryButton, { marginTop: -4, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}><Feather name="dollar-sign" size={19} color={colors.foreground} /><Text style={[styles.primaryButtonText, { color: colors.foreground }]}>{`Cash · ${dollars(String(offlineDueCents))}`}</Text></TouchableOpacity> : (
                  <View testID="cash-block" style={styles.formField}>
                    <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Cash the client gave you <Text style={{ color: colors.mutedForeground }}>(less pays part of it)</Text></Text>
