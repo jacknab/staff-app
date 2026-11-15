@@ -218,9 +218,10 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
   const fullyRefunded = paidRecorded && refundedCents > 0 && refundable <= 0;
   const partRefunded = paidRecorded && refundedCents > 0 && refundable > 0;
   const [refundOpen, setRefundOpen] = useState(false);
+  const rebookServiceIds = [Number(params.serviceId) || 0, ...extraLines.map((line) => services.find((item) => item.name === line.label)?.id ?? 0)].filter((v) => v > 0).join(',');
   const rebook = () => router.push({
     pathname: '/booking',
-    params: { clientId: params.customerId ?? '', phone: params.phone ?? '', serviceIds: [Number(params.serviceId) || 0, ...extraLines.map((line) => services.find((item) => item.name === line.label)?.id ?? 0)].filter((v) => v > 0).join(',') },
+    params: { clientId: params.customerId ?? '', phone: params.phone ?? '', serviceIds: rebookServiceIds },
   });
 
   const shiftDay = (amount: number) => setDay((current) => {
@@ -483,7 +484,7 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
   // Checkout always opens (owner, 2026-11-15): cash and gift cards need no Stripe; only its card buttons do.
   const checkout = () => router.push({
     pathname: '/(tabs)/checkout',
-    params: { appointmentId: String(appointmentId), clientName, serviceName, amountCents: String(amountCents), depositCents: String(depositPaidCents), phone: params.phone ?? '', email: params.email ?? '' },
+    params: { appointmentId: String(appointmentId), clientName, serviceName, amountCents: String(amountCents), depositCents: String(depositPaidCents), phone: params.phone ?? '', email: params.email ?? '', clientId: params.customerId ?? '', serviceIds: rebookServiceIds },
   });
 
   const openContact = async (type: 'text' | 'call' | 'email') => {

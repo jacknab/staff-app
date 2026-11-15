@@ -11,7 +11,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Feather } from '@expo/vector-icons';
 import { ActivityIndicator, Alert, Image, Linking, ScrollView, StatusBar, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { callClient } from '@/lib/voice';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { SelectField } from '@/components/SelectField';
@@ -107,7 +107,8 @@ export default function ClientProfileScreen() {
       setError(cause instanceof ApiError ? cause.message : 'Could not load this client. Check the connection and try again.');
     } finally { setLoading(false); }
   }, [clientId]);
-  useEffect(() => { void load(); }, [load]);
+  // Loaded again on every return, so a note added meanwhile (Quick Notes after checkout) shows (owner, 2026-11-15).
+  useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   const name = client ? (client.fullName || [client.firstName, client.lastName].filter(Boolean).join(' ') || 'Client') : '';
   const initials = name.split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase() ?? '').join('') || '?';

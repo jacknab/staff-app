@@ -43,7 +43,7 @@ import { look, cardShadow } from '@/components/look/tokens';
 // Stripe M2 does not require that Apple entitlement.
 const TAP_TO_PAY_ENABLED = true;
 // Shown on the payment screen so a tester can tell which build is installed.
-const BUILD_LABEL = 'Build Nov 15 · H';
+const BUILD_LABEL = 'Build Nov 15 · I';
 const EXPO_GO_PREVIEW = process.env.EXPO_PUBLIC_EXPO_GO_PREVIEW === '1';
 
 type PaymentStep = 'idle' | 'tap_intro' | 'initializing' | 'discovering' | 'connecting' | 'ready' | 'processing' | 'capture_pending' | 'success' | 'error';
@@ -71,7 +71,7 @@ export default function CheckoutScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { refresh: refreshBookings } = useBookingData();
-  const params = useLocalSearchParams<{ appointmentId?: string; clientName?: string; serviceName?: string; amountCents?: string; depositCents?: string; phone?: string; email?: string; quickSale?: string }>();
+  const params = useLocalSearchParams<{ appointmentId?: string; clientName?: string; serviceName?: string; amountCents?: string; depositCents?: string; phone?: string; email?: string; quickSale?: string; clientId?: string; serviceIds?: string }>();
   const [digits, setDigits] = useState('0');
   const [tipCents, setTipCents] = useState(0);
   const [appointmentId, setAppointmentId] = useState('');
@@ -355,10 +355,14 @@ export default function CheckoutScreen() {
         await api.post('/api/pos/sms-receipt', { phone: receiptPhone, clientName, appointmentId: Number(appointmentId) || undefined, paymentMethod: paymentMethod === 'card' && !paidSummary ? 'card' : method,
           items: lines.map((l) => ({ label: l.name, price: l.price })), ...totals });
         setReceiptNote(`Receipt texted to ${receiptPhone}.`);
+        goHome();
+        return;
       } else {
         await api.post('/api/pos/email-receipt', { storeId: storeId ?? undefined, email: receiptEmail.trim(), clientName: clientName.trim().split(/\s+/)[0] || 'there',
           items: lines, subtotal: lines.reduce((n, l) => n + l.price, 0), paymentMethod: method, transactionId: paymentIntentId ?? '', ...totals });
         setReceiptNote(`Receipt e-mailed to ${receiptEmail.trim()}.`);
+        goHome();
+        return;
       }
     } catch (cause) {
       setReceiptNote(errorMessage(cause));
@@ -681,7 +685,7 @@ export default function CheckoutScreen() {
     setStatusText('');
   };
 
-  const resetCheckout = () => {
+  const clearCheckout = () => {
     setDigits('0');
     setTipCents(0);
     setAppointmentId('');
@@ -697,7 +701,15 @@ export default function CheckoutScreen() {
     setCashOpen(false); setCashGiven(''); setChangeCents(0); setPaidSummary('');
     setProducts([]); setGiftPaidCents(0); setCashPartCents(0); setCreditPaidCents(0); setCreditBalanceCents(0);
     void clearPendingTerminalCapture();
+  };
+  const resetCheckout = () => {
+    clearCheckout();
     if (isQuickSale) router.replace('/(tabs)/pos');
+  };
+  // A receipt sent from "Payment successful" finishes the checkout: back to Home (owner, 2026-11-15).
+  const goHome = () => {
+    clearCheckout();
+    router.replace('/(tabs)');
   };
 
   if (step !== 'idle') {
@@ -747,6 +759,8 @@ export default function CheckoutScreen() {
             </View> : null}
             {/* Quick Notes for the visit just paid (owner, 2026-11-11; app/quick-notes.tsx). */}
             {!isQuickSale && Number(appointmentId) > 0 ? <TouchableOpacity testID="checkout-quick-notes" onPress={() => router.push({ pathname: '/quick-notes' as any, params: { appointmentId: String(appointmentId) } })} style={[styles.primaryButton, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, marginBottom: 10 }]}><Feather name="edit-3" size={19} color={colors.foreground} /><Text style={[styles.primaryButtonText, { color: colors.foreground }]}>Quick Notes</Text></TouchableOpacity> : null}
+            {/* Book the client's next visit with the same services (owner, 2026-11-15). */}
+            {!isQuickSale && String(params.serviceIds ?? '') ? <TouchableOpacity testID="checkout-rebook" onPress={() => { const next = { clientId: String(params.clientId ?? ''), phone: String(params.phone ?? ''), serviceIds: String(params.serviceIds ?? '') }; resetCheckout(); router.push({ pathname: '/booking', params: next }); }} style={[styles.primaryButton, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, marginBottom: 10 }]}><Feather name="calendar" size={19} color={colors.foreground} /><Text style={[styles.primaryButtonText, { color: colors.foreground }]}>Rebook</Text></TouchableOpacity> : null}
             <TouchableOpacity testID="new-checkout" onPress={resetCheckout} style={[styles.primaryButton, { backgroundColor: colors.primary }]}><Text style={[styles.primaryButtonText, { color: colors.primaryForeground }]}>{isQuickSale ? 'New sale' : 'New checkout'}</Text></TouchableOpacity>
           </View>
         ) : (
