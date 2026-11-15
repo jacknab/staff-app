@@ -117,6 +117,7 @@ export const HELP: Record<string, HelpPage> = {
       { heading: 'Their numbers', points: [
         'Visits, lifetime spend, average visit, the last 12 months, last and next visit, and loyalty points.',
         'Prepaid packages they bought, with the visits left.',
+        'Memberships: what’s left this period, when it renews or ends, Cancel membership, and Add membership (charge the card on file or send a link to join).',
       ] },
       { heading: 'Visits', points: ['Upcoming and Past visits, with their status. Tap one to open it. Show all lists every past visit.'] },
       { heading: 'Forms', points: ['The forms and waivers they filled in (tap View to read their answers and signature), and links sent but not filled in yet (Send again, or Fill in here to open it on your phone). Send a form sends one of your forms.'] },
@@ -155,6 +156,7 @@ export const HELP: Record<string, HelpPage> = {
         'CHECKOUT opens checkout for this visit, with tip and discount.',
         'MARK AS COMPLETED marks the visit as done. It does not record a payment: the booking shows COMPLETED, and you can still take payment with CHECKOUT, a package visit or a payment link. When the client already paid in full online, it says MARK AS DONE.',
         'USE A PACKAGE VISIT pays with one visit from a package the client bought (it shows how many are left).',
+        'USE A MEMBERSHIP VISIT pays with a visit included in the client’s membership this period (it shows how many are left).',
         'NO-SHOW marks a missed visit. If your policy has a no-show fee and the client saved a card, you can charge it.',
       ] },
       { heading: 'After', points: [
@@ -202,6 +204,7 @@ export const HELP: Record<string, HelpPage> = {
       { heading: 'The amount', points: [
         'The amount due comes from the booking; for a quick sale you key it in.',
         'Discount: 10%, 15%, 20% or 25% off, or a custom amount off. Tax is worked out after the discount, never on the tip.',
+        'For a member with a member discount, it is put in as the amount off for you (you can change it).',
         'A deposit the client already paid comes off; sales tax and the platform fee are added if you charge them (Settings › Card reader & Checkout).',
         'The client chooses a tip, or enters their own, or no tip.',
       ] },
@@ -583,6 +586,15 @@ export const HELP: Record<string, HelpPage> = {
       { heading: 'Your forms', points: ['Tap + to start one: a blank form, or a ready-made one (new client form, service waiver, photo release, before each visit) you can change.', 'Each form shows its type, how often it is asked, when it is sent and how many clients filled it in. Tap one to change it.'] },
       { heading: 'Making a form', points: ['Type: an intake form asks questions; a waiver ends with the client’s signature.', 'Ask clients: Once keeps their answers for good; Before every visit asks again for each booking.', 'Send when clients book: a few minutes after a client books, Certxa e-mails them the link (or texts it when they have no e-mail; a text uses a credit).', 'For every service, or only the services you tick.', 'Questions: choose the kind (short or long answer, yes or no, pick one, pick any, date, I agree, text to read, signature), write it, and set Required. The arrows move a question; the bin removes it.'] },
       { heading: 'Good to know', points: ['A client’s signed copy keeps the questions as they were, so changing a form later never changes what they signed.', 'Switch off stops a form being sent. Delete removes it; a form clients have filled in is switched off instead, and their copies are kept.', 'Forms you send and the answers are on the booking and on the client’s profile.'] },
+    ],
+  },
+  memberships: {
+    title: 'Memberships',
+    intro: 'Monthly or yearly plans your clients pay for, like “1 gel fill a month for $45”.',
+    sections: [
+      { heading: 'Your memberships', points: ['Each shows what it includes, its price and how many members it has. Tap + to make one, or tap one to change it.', 'Members lists everyone with a membership: when it renews or ends, or that a payment was declined. Tap one to open the client.', 'Card payments must be set up first: members pay by card.'] },
+      { heading: 'Making a membership', points: ['Name, description (clients see it when they join), price and whether it’s charged every month or every year.', 'Included each month (or year): a service and how many visits of it. Visits not used don’t carry over.', 'Member discount: a percent off their services at checkout. Use it on its own or with included visits.', 'Changing a membership doesn’t change what existing members pay or get. Stop offering keeps current members but no one new can join.'] },
+      { heading: 'Members', points: ['Add a member from the client’s profile: Add membership. Charge card on file charges the first month now; Send link to join e-mails (or texts) them a page where they pay and their card is saved.', 'Certxa charges each renewal on your Stripe account. A declined card is tried again daily, three times, then the membership ends; you get a notification.', 'On a booking, USE A MEMBERSHIP VISIT pays for an included service. At checkout the member discount is put in for you; you can change it.', 'Cancel from the client’s profile: at the end of the paid period, or now. Nothing is refunded.'] },
     ],
   },
   'form-response': {

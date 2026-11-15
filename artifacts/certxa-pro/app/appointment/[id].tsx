@@ -340,6 +340,34 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
     } finally { setSaving(false); }
   };
 
+  // A membership with a visit of this service left this period (owner, 2026-11-15; routes/proMemberships.ts): pays for
+  // the booking like a package visit, and is given back if the booking can't be marked paid.
+  const [memberVisit, setMemberVisit] = useState<{ membershipId: number; name: string; left: number } | null>(null);
+  useEffect(() => {
+    if (isPreview || !Number(params.customerId) || !(appointmentId > 0)) return;
+    api.get<{ visit: { membershipId: number; name: string; left: number } | null }>(`/api/pro/memberships/appointment/${appointmentId}`)
+      .then((r) => setMemberVisit(r?.visit ?? null)).catch(() => setMemberVisit(null));
+  }, [isPreview, params.customerId, appointmentId, serviceId]);
+  const spendMemberVisit = async () => {
+    if (!memberVisit) return;
+    setSaving(true); setError('');
+    try {
+      await api.post('/api/pro/memberships/use', { membershipId: memberVisit.membershipId, appointmentId });
+      try {
+        await api.patch(`/api/appointments/${appointmentId}`, { status: 'completed', paymentMethod: 'membership', totalPaid: '0.00', serviceRevenue: '0.00', productRevenue: '0.00' });
+      } catch (cause) {
+        await api.post('/api/pro/memberships/give-back', { appointmentId }).catch(() => undefined);
+        throw cause;
+      }
+      await refresh();
+      setMemberVisit(null);
+      setPaidHere(0); setPaidRecorded(true);
+      setStatus('paid');
+    } catch (cause) {
+      setError(cause instanceof ApiError ? cause.message : 'The membership visit could not be used.');
+    } finally { setSaving(false); }
+  };
+
   // ── Cancel and no-show instead of deleting (owner, 2026-11-03). The booking stays on the client's record. ──
   const close = async (path: 'cancel' | 'no-show', body?: Record<string, unknown>) => {
     setSaving(true); setError('');
@@ -657,6 +685,12 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
                 <TouchableOpacity testID="appointment-use-package" disabled={saving} onPress={() => void spendPackageVisit()} style={[styles.secondaryAction, { backgroundColor: colors.card, borderColor: colors.border }]}>
                   <Feather name="package" size={20} color={colors.primary} />
                   <Text style={[styles.secondaryActionText, { color: colors.foreground }]}>USE A PACKAGE VISIT ({packageForVisit.visitsLeft} LEFT)</Text>
+                </TouchableOpacity>
+              ) : null}
+              {memberVisit ? (
+                <TouchableOpacity testID="appointment-use-membership" disabled={saving} onPress={() => void spendMemberVisit()} style={[styles.secondaryAction, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <Feather name="award" size={20} color={colors.primary} />
+                  <Text style={[styles.secondaryActionText, { color: colors.foreground }]}>USE A MEMBERSHIP VISIT ({memberVisit.left} LEFT)</Text>
                 </TouchableOpacity>
               ) : null}
               {/* Cancel and no-show replace Delete (owner, 2026-11-03): the booking stays on the client's record. */}

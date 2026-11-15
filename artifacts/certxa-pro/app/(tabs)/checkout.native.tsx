@@ -42,7 +42,7 @@ import { look, cardShadow } from '@/components/look/tokens';
 // Stripe M2 does not require that Apple entitlement.
 const TAP_TO_PAY_ENABLED = true;
 // Shown on the payment screen so a tester can tell which build is installed.
-const BUILD_LABEL = 'Build Nov 15 · C';
+const BUILD_LABEL = 'Build Nov 15 · D';
 const EXPO_GO_PREVIEW = process.env.EXPO_PUBLIC_EXPO_GO_PREVIEW === '1';
 
 type PaymentStep = 'idle' | 'tap_intro' | 'initializing' | 'discovering' | 'connecting' | 'ready' | 'processing' | 'capture_pending' | 'success' | 'error';
@@ -231,6 +231,19 @@ export default function CheckoutScreen() {
     baseCentsParam,
     customDiscountCents > 0 ? customDiscountCents : Math.round(baseCentsParam * discountPercent / 100),
   );
+  // A member's discount (owner, 2026-11-15; routes/proMemberships.ts): put in as the amount off, which the pro can change.
+  const [memberDiscount, setMemberDiscount] = useState<{ name: string; percent: number } | null>(null);
+  useEffect(() => {
+    const id = Number(params.appointmentId);
+    setMemberDiscount(null);
+    if (EXPO_GO_PREVIEW || !id || baseCentsParam <= 0) return;
+    api.get<{ discount: { name: string; percent: number } | null }>(`/api/pro/memberships/appointment/${id}`).then((r) => {
+      if (!r?.discount || r.discount.percent <= 0) return;
+      setMemberDiscount(r.discount);
+      setDiscountPercent(0);
+      setCustomDiscount((Math.round(baseCentsParam * r.discount.percent / 100) / 100).toFixed(2));
+    }).catch(() => undefined);
+  }, [params.appointmentId, baseCentsParam]);
   // The business's sales tax (Settings → Sales tax; off unless they turn on tax on services) and tip presets.
   const [tax, setTax] = useState<{ rate: number; services: boolean }>({ rate: 0, services: false });
   const [tipPresets, setTipPresets] = useState<number[] | undefined>(undefined);
@@ -645,6 +658,7 @@ export default function CheckoutScreen() {
                    return <TouchableOpacity key={pct} testID={`discount-${pct}`} onPress={() => { setCustomDiscount(''); setDiscountPercent(pct); }} style={{ flex: 1, height: 38, borderRadius: 11, borderWidth: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: selected ? colors.secondary : colors.card, borderColor: selected ? colors.primary : colors.border }}><Text style={[styles.fieldLabel, { color: colors.foreground }]}>{pct === 0 ? 'None' : `${pct}%`}</Text></TouchableOpacity>;
                  })}
                </View>
+               {memberDiscount ? <Text testID="member-discount-line" style={[styles.serviceLabel, { color: colors.mutedForeground, marginBottom: 6 }]}>{`Member discount: ${memberDiscount.name}, ${memberDiscount.percent}% off`}</Text> : null}
                <TextInput keyboardType="numbers-and-punctuation" returnKeyType="done" onChangeText={setCustomDiscount} placeholder="Or a custom amount off, e.g. 39.00" placeholderTextColor={colors.mutedForeground} style={[styles.fieldInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} testID="discount-custom" value={customDiscount} />
              </View> : null}
              {isTapIntro && depositCents > 0 ? <Text testID="deposit-line" style={[styles.fieldLabel, { width: '100%', marginTop: 12, color: colors.foreground }]}>{`Deposit already paid · −${dollars(String(depositCents))}`}</Text> : null}

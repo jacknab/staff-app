@@ -148,6 +148,7 @@ function RootLayoutNav() {
       <Stack.Screen name="quick-notes" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="forms" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="form-response" options={{ headerShown: false, presentation: 'card' }} />
+      <Stack.Screen name="memberships" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="catalog/index" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="catalog/categories" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="catalog/addons" options={{ headerShown: false, presentation: 'card' }} />
