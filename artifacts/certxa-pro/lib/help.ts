@@ -205,7 +205,9 @@ export const HELP: Record<string, HelpPage> = {
       ] },
       { heading: 'How the client pays', points: [
         'Card: tap Stripe M2 to take the card on the M2 card reader. Tap to Pay on iPhone switches on here once Apple has approved it.',
-        'Gift card: records a gift-card payment; add the card’s code for the receipt.',
+        'Card needs card payments set up; until then the card buttons open the set-up page.',
+        'Cash: tap Cash and confirm. The visit is marked paid in cash (no card fee).',
+        'Gift card: enter the code on a Certxa gift card. The amount comes off the card’s balance and the visit is marked paid. If the balance is too low, it tells you what is left.',
         'When it’s done, send a receipt by text or e-mail. New sale starts the next one.',
       ] },
       { heading: 'Card reader', points: ['New Stripe M2 setup (one time): enter the code shown on the reader and tap Register. After that, checkout finds it on its own.'] },
