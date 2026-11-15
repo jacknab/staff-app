@@ -151,7 +151,7 @@ export const HELP: Record<string, HelpPage> = {
       ] },
       { heading: 'Getting paid', points: [
         'CHECKOUT opens checkout for this visit, with tip and discount.',
-        'MARK AS PAID records a payment you took another way (cash, for example). When the client already paid in full online, it says MARK AS DONE.',
+        'MARK AS COMPLETED marks the visit as done. It does not record a payment: the booking shows COMPLETED, and you can still take payment with CHECKOUT, a package visit or a payment link. When the client already paid in full online, it says MARK AS DONE.',
         'USE A PACKAGE VISIT pays with one visit from a package the client bought (it shows how many are left).',
         'NO-SHOW marks a missed visit. If your policy has a no-show fee and the client saved a card, you can charge it.',
       ] },
@@ -468,7 +468,7 @@ export const HELP: Record<string, HelpPage> = {
   'quick-notes': {
     title: 'Quick Notes',
     intro: 'A few taps after checkout, so next time you remember how this client likes it.',
-    sections: [{ heading: 'How it works', points: ['The client and the services done are shown from the visit; you don’t enter them again.', 'Pick what fits (all optional) and add your own words if you like, then tap Save Notes. Certxa writes it as a short note.', 'The note goes into the client’s notes with the date, so you see it on their profile and from their next appointment’s Notes.', 'It opens after Mark as paid, and from Quick Notes after a card payment.'] }],
+    sections: [{ heading: 'How it works', points: ['The client and the services done are shown from the visit; you don’t enter them again.', 'Pick what fits (all optional) and add your own words if you like, then tap Save Notes. Certxa writes it as a short note.', 'The note goes into the client’s notes with the date, so you see it on their profile and from their next appointment’s Notes.', 'It opens after Mark as completed, and from Quick Notes after a card payment.'] }],
   },
   phone: {
     title: 'Business Phone',

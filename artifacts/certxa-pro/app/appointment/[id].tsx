@@ -57,6 +57,7 @@ function initialsFor(name: string) {
 function statusLabel(status: string) {
   if (status === 'confirmed') return 'CONFIRMED';
   if (status === 'paid') return 'PAID';
+  if (status === 'completed') return 'COMPLETED';
   if (status === 'cancelled') return 'CANCELLED';
   if (status === 'no_show') return 'NO-SHOW';
   return status.replace('_', ' ').toUpperCase();
@@ -143,7 +144,7 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
   const [day, setDay] = useState(() => zonedDay(originalDate, timeZone));
   const [time, setTime] = useState(() => zonedTimeLabel(originalDate, timeZone));
   const [serviceId, setServiceId] = useState(Number(params.serviceId) || services[0]?.id || 0);
-  const [status, setStatus] = useState(params.status === 'completed' ? 'paid' : params.status || 'pending');
+  const [status, setStatus] = useState(params.status === 'completed' && params.totalPaidCents ? 'paid' : params.status || 'pending');
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -175,7 +176,7 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
   const today = zonedDay(new Date(), timeZone);
   const pastDay = zonedDay(originalDate, timeZone).getTime() < new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
   const closed = status === 'cancelled' || status === 'no_show';
-  const canEdit = status !== 'paid' && !closed && !pastDay;
+  const canEdit = status !== 'paid' && status !== 'completed' && !closed && !pastDay;
   const extraLines = useMemo<Line[]>(() => { try { const v = JSON.parse(params.extraLines || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } }, [params.extraLines]);
   // Several services: the first is the booking's service, the others are priced lines on it (as a new booking makes them).
   const [serviceIds, setServiceIds] = useState<number[]>([]);
@@ -284,27 +285,27 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
     ...otherLines.map((line) => ({ label: line.label, cents: Math.round(Number(line.price) * 100) })),
     ...(travelFeeCents > 0 ? [{ label: 'Travel fee', cents: travelFeeCents }] : []),
   ] : [];
-  const markPaid = async () => {
-    if (status === 'paid' || status === 'cancelled') return;
+  const markCompleted = async () => {
+    if (status === 'paid' || status === 'completed' || status === 'cancelled') return;
     setSaving(true);
     setError('');
     try {
       if (!isPreview) {
-        // Mark as paid = paid in cash (or another way outside the app) for the visit's total (owner, 2026-10-28). It is
-        // recorded as a cash sale, so it reaches reports, commission and loyalty. ("paid" is not a server status: it
-        // used to put the appointment back to pending and record nothing.)
-        await api.patch(`/api/appointments/${appointmentId}`, {
-          status: 'completed', paymentMethod: prepaid ? 'card' : 'cash', totalPaid: (Math.max(0, amountCents) / 100).toFixed(2),
+        // MARK AS COMPLETED (owner, 2026-11-15): the visit is done but NOT paid — no payment is recorded, and
+        // Checkout / a package visit / a payment link still take the payment afterwards. Paid in full online
+        // (MARK AS DONE) is the exception: that payment is already made, so it is recorded with the visit.
+        await api.patch(`/api/appointments/${appointmentId}`, prepaid ? {
+          status: 'completed', paymentMethod: 'card', totalPaid: (Math.max(0, amountCents) / 100).toFixed(2),
           serviceRevenue: (Math.max(0, amountCents - travelFeeCents) / 100).toFixed(2), productRevenue: '0.00',
-        });
+        } : { status: 'completed' });
         await refresh();
       }
-      setPaidHere(Math.max(0, amountCents)); setPaidRecorded(true);
-      setStatus('paid');
+      if (prepaid) { setPaidHere(Math.max(0, amountCents)); setPaidRecorded(true); }
+      setStatus(prepaid ? 'paid' : 'completed');
       // Checked out: Quick Notes next, for a visit with a client (owner, 2026-11-11; app/quick-notes.tsx).
       if (!isPreview && Number(params.customerId) > 0) router.push({ pathname: '/quick-notes' as any, params: { appointmentId: String(appointmentId) } });
     } catch (cause) {
-      setError(cause instanceof ApiError ? cause.message : 'Could not mark appointment as paid.');
+      setError(cause instanceof ApiError ? cause.message : 'Could not mark the appointment as completed.');
     } finally {
       setSaving(false);
     }
@@ -641,10 +642,12 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
                   </TouchableOpacity>
                 </LinearGradient>
               ) : null}
-              <TouchableOpacity testID="appointment-mark-paid" disabled={saving} onPress={() => void markPaid()} style={[styles.secondaryAction, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              {status !== 'completed' ? (
+              <TouchableOpacity testID="appointment-mark-completed" disabled={saving} onPress={() => void markCompleted()} style={[styles.secondaryAction, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <Feather name="check" size={20} color={colors.primary} />
-                <Text style={[styles.secondaryActionText, { color: colors.foreground }]}>{saving ? 'UPDATING…' : prepaid ? 'MARK AS DONE' : 'MARK AS PAID'}</Text>
+                <Text style={[styles.secondaryActionText, { color: colors.foreground }]}>{saving ? 'UPDATING…' : prepaid ? 'MARK AS DONE' : 'MARK AS COMPLETED'}</Text>
               </TouchableOpacity>
+              ) : null}
               {packageForVisit ? (
                 <TouchableOpacity testID="appointment-use-package" disabled={saving} onPress={() => void spendPackageVisit()} style={[styles.secondaryAction, { backgroundColor: colors.card, borderColor: colors.border }]}>
                   <Feather name="package" size={20} color={colors.primary} />
@@ -652,6 +655,7 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
                 </TouchableOpacity>
               ) : null}
               {/* Cancel and no-show replace Delete (owner, 2026-11-03): the booking stays on the client's record. */}
+              {status !== 'completed' ? (
               <View style={styles.closeRow}>
                 <TouchableOpacity testID="appointment-no-show" disabled={saving} onPress={markNoShow} style={[styles.closeAction, { backgroundColor: colors.muted, borderColor: colors.border }]}>
                   <Feather name="user-x" size={19} color={colors.foreground} />
@@ -662,6 +666,7 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
                   <Text style={[styles.secondaryActionText, { color: colors.destructive }]}>CANCEL</Text>
                 </TouchableOpacity>
               </View>
+              ) : null}
               {/* Texting a payment link needs card payments (owner, 2026-11-11): hidden until Stripe is set up. */}
               {!isPreview && !prepaid && paymentsReady !== false ? (
                 <TouchableOpacity testID="appointment-pay-link" disabled={saving} onPress={() => void payLink()} style={styles.textAction}>

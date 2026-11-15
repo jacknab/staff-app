@@ -40,7 +40,7 @@ import { look, cardShadow } from '@/components/look/tokens';
 // Stripe M2 does not require that Apple entitlement.
 const TAP_TO_PAY_ENABLED = true;
 // Shown on the payment screen so a tester can tell which build is installed.
-const BUILD_LABEL = 'Build Nov 11 · V';
+const BUILD_LABEL = 'Build Nov 15 · A';
 const EXPO_GO_PREVIEW = process.env.EXPO_PUBLIC_EXPO_GO_PREVIEW === '1';
 
 type PaymentStep = 'idle' | 'tap_intro' | 'initializing' | 'discovering' | 'connecting' | 'ready' | 'processing' | 'capture_pending' | 'success' | 'error';
@@ -300,8 +300,9 @@ export default function CheckoutScreen() {
     const paidCheckId = Number(appointmentId);
     if (!EXPO_GO_PREVIEW && Number.isInteger(paidCheckId) && paidCheckId > 0) {
       try {
-        const current = await api.get<{ status?: string | null }>(`/api/appointments/${paidCheckId}`);
-        const alreadyPaid = current?.status === 'completed' || current?.status === 'paid';
+        const current = await api.get<{ status?: string | null; totalPaid?: string | number | null }>(`/api/appointments/${paidCheckId}`);
+        // Completed with no payment (MARK AS COMPLETED) still owes the visit.
+        const alreadyPaid = (current?.status === 'completed' && current?.totalPaid != null) || current?.status === 'paid';
         if (alreadyPaid || current?.status === 'cancelled') {
           setError(alreadyPaid ? 'This appointment has already been paid.' : 'This appointment was cancelled.');
           void refreshBookings();

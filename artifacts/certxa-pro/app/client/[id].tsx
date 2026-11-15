@@ -236,7 +236,7 @@ export default function ClientProfileScreen() {
     const refunded = Number(v.refundedCents ?? 0) || 0;
     const paidTotalCents = Math.round(Number(v.totalPaid ?? 0) * 100);
     const paid = (paidTotalCents - Math.round(Number(v.tipAmount ?? 0) * 100) - refunded) / 100;
-    const statusText = refunded > 0 && v.status === 'completed' ? (refunded >= paidTotalCents ? 'Refunded' : `Part refunded · $${(refunded / 100).toFixed(2)}`) : STATUS_TEXT[v.status] ?? v.status;
+    const statusText = refunded > 0 && v.status === 'completed' ? (refunded >= paidTotalCents ? 'Refunded' : `Part refunded · $${(refunded / 100).toFixed(2)}`) : v.status === 'completed' && v.totalPaid == null ? 'Completed' : STATUS_TEXT[v.status] ?? v.status;
     return (
       <TouchableOpacity key={v.id} testID={`client-visit-${v.id}`} onPress={() => router.push(`/appointment/${v.id}`)} style={[styles.visitRow, { borderBottomColor: colors.border }]}>
         <View style={{ flex: 1 }}>
