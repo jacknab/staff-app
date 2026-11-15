@@ -161,7 +161,7 @@ export function TipCheckout({ baseCents, serviceName, presets, defaultPercent, o
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 84 }]}>
         <TouchableOpacity testID="confirm-tip" disabled={(screen === 'select' && selectedPercent === null) || (screen === 'custom' && customTipCents <= 0)} onPress={confirm} style={[styles.confirmButton, { backgroundColor: ((screen === 'select' && selectedPercent !== null) || (screen === 'custom' && customTipCents > 0)) ? colors.primary : colors.muted }]}>
-          <Text style={[styles.confirmText, { color: ((screen === 'select' && selectedPercent !== null) || (screen === 'custom' && customTipCents > 0)) ? colors.primaryForeground : colors.mutedForeground }]}>{screen === 'custom' ? 'Confirm tip' : 'Continue to Tap to Pay'}</Text>
+          <Text style={[styles.confirmText, { color: ((screen === 'select' && selectedPercent !== null) || (screen === 'custom' && customTipCents > 0)) ? colors.primaryForeground : colors.mutedForeground }]}>{screen === 'custom' ? 'Confirm tip' : 'Continue to payment'}</Text>
           <Feather name="arrow-right" size={19} color={((screen === 'select' && selectedPercent !== null) || (screen === 'custom' && customTipCents > 0)) ? colors.primaryForeground : colors.mutedForeground} />
         </TouchableOpacity>
         <Text style={[styles.footerNote, { color: colors.mutedForeground }]}>You can review the total before payment.</Text>

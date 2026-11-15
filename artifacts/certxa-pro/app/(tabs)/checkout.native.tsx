@@ -43,7 +43,7 @@ import { look, cardShadow } from '@/components/look/tokens';
 // Stripe M2 does not require that Apple entitlement.
 const TAP_TO_PAY_ENABLED = true;
 // Shown on the payment screen so a tester can tell which build is installed.
-const BUILD_LABEL = 'Build Nov 15 · G';
+const BUILD_LABEL = 'Build Nov 15 · H';
 const EXPO_GO_PREVIEW = process.env.EXPO_PUBLIC_EXPO_GO_PREVIEW === '1';
 
 type PaymentStep = 'idle' | 'tap_intro' | 'initializing' | 'discovering' | 'connecting' | 'ready' | 'processing' | 'capture_pending' | 'success' | 'error';
@@ -634,7 +634,9 @@ export default function CheckoutScreen() {
     } finally { setRecording(false); }
   };
   // Card payments need Stripe set up; until then the card buttons open the set-up page.
-  const startCard = (mode: ReaderMode) => paymentsReady === false ? router.push('/payments-checkout' as any) : void startReader(mode);
+  // Without Stripe set up the card buttons are switched off (owner, 2026-11-15): cash and gift card still work.
+  const cardsOff = paymentsReady === false;
+  const startCard = (mode: ReaderMode) => { if (!cardsOff) void startReader(mode); };
 
   const retryCapture = async () => {
     if (!pendingCaptureId) return;
@@ -785,7 +787,7 @@ export default function CheckoutScreen() {
              {isTapIntro && depositCents > 0 ? <Text testID="deposit-line" style={[styles.fieldLabel, { width: '100%', marginTop: 12, color: colors.foreground }]}>{`Deposit already paid · −${dollars(String(depositCents))}`}</Text> : null}
              {isTapIntro && taxCents > 0 ? <Text testID="sales-tax-line" style={[styles.fieldLabel, { width: '100%', marginTop: 12, color: colors.foreground }]}>{`Sales tax (${(tax.rate * 100).toFixed(2).replace(/\.?0+$/, '')}%) · ${dollars(String(taxCents))}`}</Text> : null}
              {isTapIntro && feeCents > 0 ? <Text testID="platform-fee-line" style={[styles.fieldLabel, { width: '100%', marginTop: 12, color: colors.foreground }]}>{`Platform fee (${(feeRate * 100).toFixed(2).replace(/\.?0+$/, '')}%) · ${dollars(String(feeCents))}`}</Text> : null}
-             {isTapIntro ? <View testID="m2-registration-intro" style={[styles.formField, { width: '100%', marginTop: 18 }]}>
+             {isTapIntro && !cardsOff ? <View testID="m2-registration-intro" style={[styles.formField, { width: '100%', marginTop: 18 }]}>
                <Text style={[styles.fieldLabel, { color: colors.foreground }]}>New Stripe M2 setup <Text style={{ color: colors.mutedForeground }}>(one time)</Text></Text>
                <View style={styles.registrationRow}>
                <TextInput autoCapitalize="none" autoCorrect={false} onChangeText={setRegistrationCode} placeholder="Reader registration code" placeholderTextColor={colors.mutedForeground} style={[styles.fieldInput, styles.registrationInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} testID="m2-registration-code" value={registrationCode} />
@@ -793,8 +795,8 @@ export default function CheckoutScreen() {
                </View>
                {readerSetupText ? <Text style={[styles.setupText, { color: colors.primary }]}>{readerSetupText}</Text> : null}
              </View> : null}
-             <TouchableOpacity disabled={(!isReady && !isCapturePending && !isTapIntro) || isBusy} testID={isTapIntro ? 'start-tap-to-pay' : isCapturePending ? 'retry-capture' : 'accept-payment'} onPress={isTapIntro ? () => startCard('tap_to_pay') : isCapturePending ? retryCapture : processPayment} style={[styles.primaryButton, { backgroundColor: (isReady || isCapturePending || isTapIntro) && !isBusy ? colors.primary : colors.muted }]}><Feather name={isTapIntro ? 'radio' : isCapturePending ? 'refresh-cw' : 'radio'} size={19} color={(isReady || isCapturePending || isTapIntro) && !isBusy ? colors.primaryForeground : colors.mutedForeground} /><Text style={[styles.primaryButtonText, { color: (isReady || isCapturePending || isTapIntro) && !isBusy ? colors.primaryForeground : colors.mutedForeground }]}>{isBusy ? (step === 'processing' ? 'Payment in progress…' : 'Preparing…') : isTapIntro ? 'Start Tap to Pay' : isCapturePending ? 'Retry capture' : 'Accept payment'}</Text></TouchableOpacity>
-             {isTapIntro ? <TouchableOpacity testID="start-stripe-m2" disabled={isBusy} onPress={() => startCard('m2')} style={[styles.primaryButton, { marginTop: -12, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}><Feather name="credit-card" size={19} color={colors.foreground} /><Text style={[styles.primaryButtonText, { color: colors.foreground }]}>Use Stripe M2 reader</Text></TouchableOpacity> : null}
+             <TouchableOpacity disabled={(!isReady && !isCapturePending && !isTapIntro) || isBusy || (isTapIntro && cardsOff)} testID={isTapIntro ? 'start-tap-to-pay' : isCapturePending ? 'retry-capture' : 'accept-payment'} onPress={isTapIntro ? () => startCard('tap_to_pay') : isCapturePending ? retryCapture : processPayment} style={[styles.primaryButton, { backgroundColor: (isReady || isCapturePending || (isTapIntro && !cardsOff)) && !isBusy ? colors.primary : colors.muted }]}><Feather name={isTapIntro ? 'radio' : isCapturePending ? 'refresh-cw' : 'radio'} size={19} color={(isReady || isCapturePending || (isTapIntro && !cardsOff)) && !isBusy ? colors.primaryForeground : colors.mutedForeground} /><Text style={[styles.primaryButtonText, { color: (isReady || isCapturePending || (isTapIntro && !cardsOff)) && !isBusy ? colors.primaryForeground : colors.mutedForeground }]}>{isBusy ? (step === 'processing' ? 'Payment in progress…' : 'Preparing…') : isTapIntro ? 'Start Tap to Pay' : isCapturePending ? 'Retry capture' : 'Accept payment'}</Text></TouchableOpacity>
+             {isTapIntro ? <TouchableOpacity testID="start-stripe-m2" disabled={isBusy || cardsOff} onPress={() => startCard('m2')} style={[styles.primaryButton, { marginTop: -12, backgroundColor: cardsOff ? colors.muted : colors.card, borderWidth: 1, borderColor: colors.border }]}><Feather name="credit-card" size={19} color={cardsOff ? colors.mutedForeground : colors.foreground} /><Text style={[styles.primaryButtonText, { color: cardsOff ? colors.mutedForeground : colors.foreground }]}>Use Stripe M2 reader</Text></TouchableOpacity> : null}
              {isTapIntro && Number(appointmentId) > 0 ? <View testID="offline-payments" style={{ width: '100%', gap: 10 }}>
                {creditBalanceCents > 0 && creditPaidCents === 0 && offlineDueCents > 0 ? <TouchableOpacity testID="pay-credit" disabled={recording || isBusy} onPress={() => void recordOfflinePayment('credit')} style={[styles.primaryButton, { marginTop: -4, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}><Feather name="award" size={19} color={colors.foreground} /><Text style={[styles.primaryButtonText, { color: colors.foreground }]}>{recording ? 'Recording…' : `Use credit · ${dollars(String(Math.min(creditBalanceCents, offlineDueCents)))}`}</Text></TouchableOpacity> : null}
                {!cashOpen ? <TouchableOpacity testID="pay-cash" disabled={recording || isBusy} onPress={() => { setError(''); setCashGiven((offlineDueCents / 100).toFixed(2)); setCashOpen(true); setGiftOpen(false); }} style={[styles.primaryButton, { marginTop: -4, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}><Feather name="dollar-sign" size={19} color={colors.foreground} /><Text style={[styles.primaryButtonText, { color: colors.foreground }]}>{`Cash · ${dollars(String(offlineDueCents))}`}</Text></TouchableOpacity> : (

@@ -212,7 +212,7 @@ export const HELP: Record<string, HelpPage> = {
       ] },
       { heading: 'How the client pays', points: [
         'Card: tap Stripe M2 to take the card on the M2 card reader. Tap to Pay on iPhone switches on here once Apple has approved it.',
-        'Card needs card payments set up; until then the card buttons open the set-up page.',
+        'Card needs card payments set up; until then Tap to Pay and Stripe M2 are switched off, and you take cash or a gift card.',
         'Cash: tap Cash, enter the cash the client gave you and tap Record cash (no card fee). More than the bill shows the change to give back; less pays part of it, and the rest is paid another way.',
         'Gift card: enter the code on a Certxa gift card. It pays what is on the card, up to the bill. If that isn’t enough, the rest is paid another way: card, cash or another gift card.',
         'Credit: a client with referral credit has Use credit; it pays what they have, up to the bill.',
