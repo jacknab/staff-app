@@ -112,6 +112,16 @@ export default function MoneyScreen() {
         ) : (
           <>
             {/* One period at a time, full width (owner, 2026-11-09: the three small boxes were too tight). */}
+            {/* Every booking in a period — past, paid, cancelled — as a list or a CSV (owner, 2026-11-17). */}
+            <TouchableOpacity testID="money-appointments-report" onPress={() => router.push('/appointments-report' as any)}
+              style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 0, marginBottom: 14, flexDirection: 'row', alignItems: 'center', gap: 12 }]}>
+              <Feather name="list" size={22} color={colors.foreground} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.cardTitle, { color: colors.foreground }]}>Appointments report</Text>
+                <Text style={[styles.muted, { color: colors.mutedForeground }]}>Past, paid and cancelled bookings · CSV</Text>
+              </View>
+              <Feather name="chevron-right" size={20} color={colors.mutedForeground} />
+            </TouchableOpacity>
             <SelectField testID="money-period" title="Period" value={period} options={PERIODS} onChange={setPeriod} />
             <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]} testID="money-taken">
               <Text style={[styles.label, { color: colors.mutedForeground }]}>{`Taken ${PERIODS.find((p) => p.value === period)!.label.toLowerCase()}`}</Text>

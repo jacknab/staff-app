@@ -47,6 +47,7 @@ export const HELP: Record<string, HelpPage> = {
       ] },
       { heading: 'Taken today', points: ['What you’ve been paid today, how many visits are paid, and how many appointments are still to go.'] },
       { heading: 'Needs your attention', points: [
+        'Cancelled by client: bookings a client cancelled (online or by phone with Autumn). Tap one to choose: delete it, mark a no-show without a fee, or mark a no-show and collect your fee.',
         'Booking requests waiting for your answer: tap one to approve it, offer other times or decline it.',
         'Texts from clients you haven’t read: tap one to open the conversation. All messages opens every conversation.',
         'Each item leaves the list once you’ve answered or read it.',
@@ -120,7 +121,7 @@ export const HELP: Record<string, HelpPage> = {
         'Prepaid packages they bought, with the visits left.',
         'Memberships: what’s left this period, when it renews or ends, Cancel membership, and Add membership (charge the card on file or send a link to join).',
       ] },
-      { heading: 'Visits', points: ['Upcoming and Past visits, with their status. Tap one to open it. Show all lists every past visit.'] },
+      { heading: 'Visits', points: ['Upcoming, Past visits and Cancelled, each with its status. Tap one to open it. Show all lists every one.'] },
       { heading: 'Credit & referrals', points: ['The credit they can use at checkout, who referred them and who they referred. Referred by (once, while Referrals is on) saves who sent them and gives them their credit.'] },
       { heading: 'Forms', points: ['The forms and waivers they filled in (tap View to read their answers and signature), and links sent but not filled in yet (Send again, or Fill in here to open it on your phone). Send a form sends one of your forms.'] },
       { heading: 'Notes and photos', points: [
@@ -159,6 +160,8 @@ export const HELP: Record<string, HelpPage> = {
         'MARK AS COMPLETED marks the visit as done. It does not record a payment: the booking shows COMPLETED, and you can still take payment with CHECKOUT, a package visit or a payment link. When the client already paid in full online, it says MARK AS DONE.',
         'USE A PACKAGE VISIT pays with one visit from a package the client bought (it shows how many are left).',
         'USE A MEMBERSHIP VISIT pays with a visit included in the client’s membership this period (it shows how many are left).',
+        'History, at the bottom: every change to the booking, newest first: who booked it, moves (old and new time), service, length, price or add-on changes, payments, deposits, fees, refunds and cancellations, and who made each change (you, the client or Autumn).',
+        'Cancelled by the client: nothing is charged by itself. Choose DELETE APPOINTMENT (no fee), MARK AS NO-SHOW (NO FEE) or MARK AS NO-SHOW (COLLECT FEE), which charges your fee to their card on file. When their deposit was kept, it is the penalty, so there is no delete and no extra fee.',
         'NO-SHOW appears once the booking’s time is over, and marks a missed visit. If your policy has a no-show fee and the client saved a card, you choose: Mark no-show and charge the fee, or Mark no-show only (you can still charge it later with CHARGE NO-SHOW FEE).',
       ] },
       { heading: 'After', points: [
@@ -296,6 +299,22 @@ export const HELP: Record<string, HelpPage> = {
       'Clients who texted STOP don’t get texts from you.',
       'Pull down to check for new texts.',
     ] }],
+  },
+  appointmentsReport: {
+    title: 'Appointments report',
+    intro: 'Every booking in a period: past, paid, cancelled and no-shows.',
+    sections: [
+      { heading: 'Choosing what to see', points: [
+        'Period: today, this or last week, this or last month, the last 30 days, this year, or Custom dates (type them as YYYY-MM-DD).',
+        'Show: all appointments, or only Booked, Completed (not paid), Paid, Cancelled or No-shows.',
+        'The list shows each booking’s day and time, client, services, status and amount. Tap one to open it.',
+      ] },
+      { heading: 'Getting the file', points: [
+        'Save or share CSV opens the report as a spreadsheet file, with Share and Save to Files. The link works for 10 minutes.',
+        'E-mail CSV sends the file to your account’s e-mail address.',
+        'The file opens in Excel, Numbers or Google Sheets.',
+      ] },
+    ],
   },
   money: {
     title: 'Money',

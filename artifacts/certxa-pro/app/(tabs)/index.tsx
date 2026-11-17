@@ -69,8 +69,11 @@ export default function HomeScreen() {
   }, [ownStaffId, timeZone]);
   // Website messages not read yet: the envelope's count (owner, 2026-11-07).
   const [inboxUnread, setInboxUnread] = useState(0);
+  // Bookings clients cancelled, waiting for the owner's choice (GlossGenius style, 2026-11-17; Booking details).
+  const [cancels, setCancels] = useState<Ticket[]>([]);
   const loadAttention = useCallback(async () => {
     void unreadInboxCount().then(setInboxUnread);
+    void api.get<{ cancellations: Ticket[] }>('/api/pro/cancellations').then((r) => setCancels(Array.isArray(r?.cancellations) ? r.cancellations : [])).catch(() => undefined);
     const [reqs, convs] = await Promise.all([
       listBookingRequests().catch(() => [] as BookingRequest[]),
       api.get<Conversation[]>('/api/sms-inbox/conversations').catch(() => [] as Conversation[]),
@@ -131,12 +134,17 @@ export default function HomeScreen() {
         </Text>
       </View>
 
-      {requests.length + unread.length > 0 ? (<>
+      {requests.length + unread.length + cancels.length > 0 ? (<>
         <View style={styles.sectionLine}>
           <Text style={[styles.section, { color: colors.foreground }]}>Needs your attention</Text>
         </View>
         <View style={[styles.list, card]} testID="home-attention">
           {[
+            ...cancels.map((t) => ({
+              key: `c${t.id}`, title: `Cancelled by client · ${clientName(t)}`,
+              sub: `${t.service?.name || 'Appointment'} · was ${zonedDateLabel(t.date, timeZone)}, ${zonedTimeLabel(t.date, timeZone)} · choose what to do`,
+              open: () => router.push(`/appointment/${t.id}`), testID: `home-cancel-${t.id}`,
+            })),
             ...requests.slice(0, 5).map((r) => ({
               key: `r${r.id}`, title: `Booking request · ${r.clientName}`,
               sub: `${r.serviceName} · ${zonedDateLabel(r.startsAt, timeZone)}, ${zonedTimeLabel(r.startsAt, timeZone)}`,

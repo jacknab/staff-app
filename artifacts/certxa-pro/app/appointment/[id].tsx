@@ -95,6 +95,7 @@ type AppointmentRouteParams = {
     totalPaidCents?: string;
     refundedCents?: string;
     cardOnFile?: string;
+    clientCancelPending?: string;
     feePercent?: string;
     feeCents?: string;
     feeChargedCents?: string;
@@ -468,6 +469,45 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
     } finally { setSaving(false); }
   };
 
+  // ── Cancelled by the client (owner, 2026-11-17, GlossGenius style): it waits for the owner to choose. Nothing was
+  // charged when the client cancelled. A deposit that was kept is the penalty, so then no fee and no delete. ──
+  const [cancelDecided, setCancelDecided] = useState(false);
+  const clientCancelPending = status === 'cancelled' && params.clientCancelPending === '1' && !cancelDecided && !isPreview;
+  const depositKept = depositPaidCents > 0 && params.cancelledInPolicy === '0';
+  const canCollectCancelFee = !depositKept && params.cardOnFile === '1' && feePercent > 0 && feeCents >= 50 && feeCharged == null;
+  const decideCancellation = async (decision: 'delete' | 'no_show' | 'no_show_fee') => {
+    setSaving(true); setError('');
+    try {
+      const r = await api.post<{ deleted?: boolean; feeError?: string | null; feeChargedCents?: number | null }>(`/api/pro/appointments/${appointmentId}/cancellation`, { decision });
+      setCancelDecided(true);
+      await refresh();
+      if (r?.deleted) { router.back(); return; }
+      setStatus('no_show');
+      if (r?.feeChargedCents != null) setFeeCharged(Number(r.feeChargedCents));
+      if (r?.feeError) Alert.alert('Fee not charged', String(r.feeError));
+    } catch (cause) {
+      setError(cause instanceof ApiError ? cause.message : 'Could not update the booking.');
+    } finally { setSaving(false); }
+  };
+  const confirmDecision = (decision: 'delete' | 'no_show' | 'no_show_fee') => {
+    const fee = `$${(feeCents / 100).toFixed(2)}`;
+    const [title, body, action] = decision === 'delete'
+      ? ['Delete this appointment?', `${clientName}'s booking is removed. No fee is charged.`, 'Delete Appointment']
+      : decision === 'no_show' ? ['Mark as no-show?', 'No fee is charged.', 'Mark as No-Show']
+      : ['Mark as no-show and charge the fee?', `${fee} will be charged to ${clientName}'s card on file.`, `Charge ${fee}`];
+    Alert.alert(title, body, [{ text: 'Not now', style: 'cancel' }, { text: action, style: decision === 'no_show' ? 'default' : 'destructive', onPress: () => void decideCancellation(decision) }]);
+  };
+
+  // ── History (owner, 2026-11-17): every change to this booking, who made it, and the old and new values ──
+  const [history, setHistory] = useState<{ at: string; text: string }[] | null>(null);
+  useEffect(() => {
+    if (isPreview) return;
+    let cancelled = false;
+    api.get<{ history: { at: string; text: string }[] }>(`/api/pro/appointments/${appointmentId}/history`)
+      .then((r) => { if (!cancelled) setHistory(r?.history ?? []); }).catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [appointmentId, isPreview, status, feeCharged]);
+
   const deleteAppointment = () => Alert.alert(
     'Delete appointment?',
     `Delete ${clientName}'s ${serviceName.toLowerCase()} appointment?`,
@@ -661,6 +701,31 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
                 </TouchableOpacity>
               )}
             </>
+          ) : clientCancelPending ? (
+            <>
+              {/* Cancelled by the client: the owner chooses (GlossGenius style). */}
+              <Text testID="client-cancel-note" style={[styles.refundedNote, { color: colors.foreground }]}>
+                {`${clientName} cancelled this booking${params.cancelledInPolicy === '1' ? ' within your cancellation policy' : params.cancelledInPolicy === '0' ? ' after your cancellation window' : ''}${depositKept ? `, and the ${depositMoney} deposit was kept` : ''}. Choose what to do:`}
+              </Text>
+              {!depositKept ? (
+                <TouchableOpacity testID="cancel-decision-delete" disabled={saving} onPress={() => confirmDecision('delete')} style={[styles.secondaryAction, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <Feather name="trash-2" size={20} color={colors.foreground} />
+                  <Text style={[styles.secondaryActionText, { color: colors.foreground }]}>DELETE APPOINTMENT</Text>
+                </TouchableOpacity>
+              ) : null}
+              <TouchableOpacity testID="cancel-decision-no-show" disabled={saving} onPress={() => confirmDecision('no_show')} style={[styles.secondaryAction, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Feather name="user-x" size={20} color={colors.foreground} />
+                <Text style={[styles.secondaryActionText, { color: colors.foreground }]}>MARK AS NO-SHOW (NO FEE)</Text>
+              </TouchableOpacity>
+              {canCollectCancelFee ? (
+                <TouchableOpacity testID="cancel-decision-fee" disabled={saving} onPress={() => confirmDecision('no_show_fee')} style={[styles.secondaryAction, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <Feather name="credit-card" size={20} color={colors.primary} />
+                  <Text style={[styles.secondaryActionText, { color: colors.foreground }]}>{`MARK AS NO-SHOW (COLLECT FEE · $${(feeCents / 100).toFixed(2)})`}</Text>
+                </TouchableOpacity>
+              ) : !depositKept && feePercent > 0 && params.cardOnFile !== '1' ? (
+                <Text style={[styles.refundedNote, { color: colors.mutedForeground }]}>No card on file, so the fee can't be charged.</Text>
+              ) : null}
+            </>
           ) : closed ? (
             <>
               {/* Cancelled or no-show: book again, charge the fee (only when tapped), or remove the booking for good. */}
@@ -734,6 +799,17 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
               ) : null}
             </>
           )}
+          {history && history.length ? (
+            <View testID="appointment-history" style={[styles.historyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Text style={[styles.sectionLabel, { color: colors.foreground }]}>History</Text>
+              {history.map((h, i) => (
+                <View key={`${h.at}-${i}`} style={[styles.historyRow, i > 0 ? { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border } : null]}>
+                  <Text style={[styles.historyText, { color: colors.foreground }]}>{h.text}</Text>
+                  <Text style={[styles.historyWhen, { color: colors.mutedForeground }]}>{zonedTimeLabel(new Date(h.at), timeZone)} · {new Date(h.at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone })}</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
           <Text style={[styles.previewNote, { color: colors.mutedForeground }]}>{isPreview ? 'Preview only · Changes are not sent to Certxa.' : 'Appointment updates are processed by Certxa.'}</Text>
         </ScrollView>
       )}
@@ -970,6 +1046,10 @@ const styles = StyleSheet.create({
   statusStack: { flex: 1, marginLeft: 11 },
   metaLabel: { fontSize: 12, letterSpacing: 1, fontFamily: 'Inter_700Bold' },
   statusText: { fontSize: 14, letterSpacing: 0.5, fontFamily: 'Inter_700Bold', marginTop: 4 },
+  historyCard: { borderWidth: 1, borderRadius: 16, padding: 16, marginTop: 18 },
+  historyRow: { paddingVertical: 10 },
+  historyText: { fontSize: 15, fontFamily: 'Inter_500Medium', lineHeight: 21 },
+  historyWhen: { fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 3 },
   cardBadge: { borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4, marginTop: 8 },
   cardBadgeText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
   amount: { fontSize: 19, fontFamily: 'Inter_600SemiBold' },

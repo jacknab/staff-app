@@ -88,6 +88,7 @@ export default function ClientProfileScreen() {
   const [tagText, setTagText] = useState('');
   const [addingTag, setAddingTag] = useState(false);
   const [showAllPast, setShowAllPast] = useState(false);
+  const [showAllCancelled, setShowAllCancelled] = useState(false);
 
   const load = useCallback(async () => {
     if (!Number.isInteger(clientId) || clientId <= 0) { setError('This client could not be found.'); setLoading(false); return; }
@@ -122,7 +123,9 @@ export default function ClientProfileScreen() {
   const status = client ? clientStatusOf({ isVip: client.clientStatus === 'vip', visits: visitCount, lastVisitAt }) : 'new';
   const now = Date.now();
   const upcoming = useMemo(() => visits.filter((v) => OPEN_STATUSES.has(v.status) && new Date(v.date).getTime() >= now - 3600_000).sort((a, b) => +new Date(a.date) - +new Date(b.date)), [visits, now]);
-  const past = useMemo(() => visits.filter((v) => !upcoming.includes(v)), [visits, upcoming]);
+  // Cancelled bookings have their own list (owner, 2026-11-17, as GlossGenius: Upcoming, Past, Cancelled).
+  const past = useMemo(() => visits.filter((v) => !upcoming.includes(v) && v.status !== 'cancelled'), [visits, upcoming]);
+  const cancelledVisits = useMemo(() => visits.filter((v) => v.status === 'cancelled').sort((a, b) => +new Date(b.date) - +new Date(a.date)), [visits]);
   const noShows = visits.filter((v) => v.status === 'no_show').length;
   const avgCents = client && client.totalVisits > 0 ? Math.round(client.totalSpentCents / client.totalVisits) : 0;
   const phoneDigits = (client?.primaryPhone ?? '').replace(/\D/g, '');
@@ -376,6 +379,16 @@ export default function ClientProfileScreen() {
               <TouchableOpacity testID="client-past-toggle" onPress={() => setShowAllPast(!showAllPast)} style={styles.more}><Text style={[styles.link, { color: colors.primary }]}>{showAllPast ? 'Show fewer' : `Show all ${past.length}`}</Text></TouchableOpacity>
             ) : null}
           </View>
+
+          {cancelledVisits.length ? (<>
+            <SectionTitle style={[styles.section]}>Cancelled</SectionTitle>
+            <View testID="client-cancelled" style={[styles.box, card]}>
+              {(showAllCancelled ? cancelledVisits : cancelledVisits.slice(0, 5)).map(visitRow)}
+              {cancelledVisits.length > 5 ? (
+                <TouchableOpacity testID="client-cancelled-toggle" onPress={() => setShowAllCancelled(!showAllCancelled)} style={styles.more}><Text style={[styles.link, { color: colors.primary }]}>{showAllCancelled ? 'Show fewer' : `Show all ${cancelledVisits.length}`}</Text></TouchableOpacity>
+              ) : null}
+            </View>
+          </>) : null}
 
           {/* Memberships: what's left this period, renew/end, Add membership (owner, 2026-11-15; components/MembershipsPanel.tsx). */}
           <MembershipsPanel customerId={clientId} hasCard={!!client.cardLast4} />
