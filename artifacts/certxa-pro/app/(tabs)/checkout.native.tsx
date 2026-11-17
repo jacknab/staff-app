@@ -43,7 +43,7 @@ import { look, cardShadow } from '@/components/look/tokens';
 // Stripe M2 does not require that Apple entitlement.
 const TAP_TO_PAY_ENABLED = true;
 // Shown on the payment screen so a tester can tell which build is installed.
-const BUILD_LABEL = 'Build Nov 15 · I';
+const BUILD_LABEL = 'Build Nov 17 · A';
 const EXPO_GO_PREVIEW = process.env.EXPO_PUBLIC_EXPO_GO_PREVIEW === '1';
 
 type PaymentStep = 'idle' | 'tap_intro' | 'initializing' | 'discovering' | 'connecting' | 'ready' | 'processing' | 'capture_pending' | 'success' | 'error';
@@ -953,7 +953,9 @@ const styles = StyleSheet.create({
   iconButton: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
   backButton: { minWidth: 84, height: 42, flexDirection: 'row', alignItems: 'center', gap: 6 },
   backText: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
-  tapContent: { flex: 1, alignItems: 'center', paddingHorizontal: 22, paddingTop: 28 },
+  // No flex: 1 here: it pinned the content to the screen's height, so the buttons below the fold could not be
+  // scrolled to (2026-11-17). flexGrow on the ScrollView still lets short content fill the screen.
+  tapContent: { alignItems: 'center', paddingHorizontal: 22, paddingTop: 28 },
   nfcCircle: { width: 76, height: 76, borderRadius: 38, alignItems: 'center', justifyContent: 'center', marginBottom: 19 },
   tapTitle: { fontSize: 23, fontFamily: 'Inter_600SemiBold', letterSpacing: -0.5 },
   tapSub: { fontSize: 15, lineHeight: 22, textAlign: 'center', fontFamily: 'Inter_400Regular', marginTop: 7, minHeight: 20 },
