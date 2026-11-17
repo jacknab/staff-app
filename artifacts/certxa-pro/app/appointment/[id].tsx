@@ -170,7 +170,10 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
   const duration = hoursAndMinutes(params.duration || selectedService?.duration || '60 min');
   // The visit on one line (owner, 2026-11-07): "Sat, Nov 7 · 9:00 AM – 10:00 AM (1 hr)".
   const visitMinutes = Number(String(params.duration || selectedService?.duration || '60 min').match(/^(\d+)/)?.[1] ?? 60);
-  const visitEnd = zonedTimeLabel(new Date(withTime(day, time, timeZone).getTime() + visitMinutes * 60_000), timeZone);
+  const visitEndAt = withTime(day, time, timeZone).getTime() + visitMinutes * 60_000;
+  const visitEnd = zonedTimeLabel(new Date(visitEndAt), timeZone);
+  // No-show only once the booking's whole time is over (owner, 2026-11-17); the server checks it too.
+  const visitOver = Date.now() >= visitEndAt;
   const topInset = Platform.OS === 'web' ? 67 : insets.top;
 
   // ── Edit (owner, 2026-11-03): only a booking that is still to come — not paid, not cancelled, not on a past day. ──
@@ -393,10 +396,22 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
     { text: 'Cancel without a text', onPress: () => void close('cancel', { notifyClient: false }) },
     { text: 'Keep the booking', style: 'cancel' },
   ]);
-  const markNoShow = () => Alert.alert('Mark as no-show?', `${clientName} didn't come to their ${serviceName.toLowerCase()}.`, [
-    { text: 'Not now', style: 'cancel' },
-    { text: 'Mark as no-show', style: 'destructive', onPress: () => void close('no-show') },
-  ]);
+  // With a no-show fee set up, the pro chooses whether to charge it (owner, 2026-11-17).
+  const markNoShow = () => {
+    const fee = `$${(feeCents / 100).toFixed(2)}`;
+    const feeSetUp = feePercent > 0 && feeCents >= 50 && depositPaidCents <= 0 && feeCharged == null && !feeRetry;
+    const canCharge = feeSetUp && params.cardOnFile === '1';
+    const why = `${clientName} didn't come to their ${serviceName.toLowerCase()}.`;
+    if (canCharge) return Alert.alert('Mark as no-show?', `${why} You can charge the ${fee} no-show fee to their card on file.`, [
+      { text: `Mark no-show and charge ${fee}`, style: 'destructive', onPress: () => void close('no-show', { chargeFee: true }) },
+      { text: 'Mark no-show only', onPress: () => void close('no-show', { chargeFee: false }) },
+      { text: 'Not now', style: 'cancel' },
+    ]);
+    return Alert.alert('Mark as no-show?', feeSetUp ? `${why} No card on file, so the ${fee} no-show fee can't be charged.` : why, [
+      { text: 'Not now', style: 'cancel' },
+      { text: 'Mark as no-show', style: 'destructive', onPress: () => void close('no-show', { chargeFee: false }) },
+    ]);
+  };
   // The fee (decided 10-22): only when the pro taps it, to the client's card on file. The amount is the one agreed
   // when the client booked (saved with the booking, 11-07); older bookings: the fee % of the booking.
   const [feeCharged, setFeeCharged] = useState<number | null>(params.feeChargedCents ? Number(params.feeChargedCents) : null);
@@ -699,10 +714,12 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
               {/* Cancel and no-show replace Delete (owner, 2026-11-03): the booking stays on the client's record. */}
               {status !== 'completed' ? (
               <View style={styles.closeRow}>
+                {visitOver ? (
                 <TouchableOpacity testID="appointment-no-show" disabled={saving} onPress={markNoShow} style={[styles.closeAction, { backgroundColor: colors.muted, borderColor: colors.border }]}>
                   <Feather name="user-x" size={19} color={colors.foreground} />
                   <Text style={[styles.secondaryActionText, { color: colors.foreground }]}>NO-SHOW</Text>
                 </TouchableOpacity>
+                ) : null}
                 <TouchableOpacity testID="appointment-cancel" disabled={saving} onPress={cancelBooking} style={[styles.closeAction, { backgroundColor: colors.muted, borderColor: colors.border }]}>
                   <Feather name="x" size={19} color={colors.destructive} />
                   <Text style={[styles.secondaryActionText, { color: colors.destructive }]}>CANCEL</Text>

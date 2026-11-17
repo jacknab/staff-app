@@ -159,7 +159,7 @@ export const HELP: Record<string, HelpPage> = {
         'MARK AS COMPLETED marks the visit as done. It does not record a payment: the booking shows COMPLETED, and you can still take payment with CHECKOUT, a package visit or a payment link. When the client already paid in full online, it says MARK AS DONE.',
         'USE A PACKAGE VISIT pays with one visit from a package the client bought (it shows how many are left).',
         'USE A MEMBERSHIP VISIT pays with a visit included in the client’s membership this period (it shows how many are left).',
-        'NO-SHOW marks a missed visit. If your policy has a no-show fee and the client saved a card, you can charge it.',
+        'NO-SHOW appears once the booking’s time is over, and marks a missed visit. If your policy has a no-show fee and the client saved a card, you choose: Mark no-show and charge the fee, or Mark no-show only (you can still charge it later with CHARGE NO-SHOW FEE).',
       ] },
       { heading: 'After', points: [
         'REBOOK books their next visit with the same services.',
