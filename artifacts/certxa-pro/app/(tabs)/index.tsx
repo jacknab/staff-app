@@ -31,7 +31,9 @@ const pretty = (n: string) => { const d = n.replace(/\D/g, '').slice(-10); retur
 
 const money = (cents: number) => `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const clientName = (t: Ticket) => t.customer?.fullName || t.customer?.name || [t.customer?.firstName, t.customer?.lastName].filter(Boolean).join(' ') || 'Walk-in';
-const STATUS_TEXT: Record<string, string> = { completed: 'Paid', paid: 'Paid', started: 'In progress', pending: 'Booked', confirmed: 'Booked', cancelled: 'Cancelled', no_show: 'No-show' };
+// Completed is not paid (MARK AS COMPLETED records no payment; owner, 2026-11-17): only a recorded payment says Paid.
+const isPaid = (t: Ticket) => t.status === 'paid' || (t.status === 'completed' && t.totalPaid != null);
+const STATUS_TEXT: Record<string, string> = { completed: 'Completed', paid: 'Paid', started: 'In progress', pending: 'Booked', confirmed: 'Booked', cancelled: 'Cancelled', no_show: 'No-show' };
 
 export default function HomeScreen() {
   const colors = useColors();
@@ -87,7 +89,7 @@ export default function HomeScreen() {
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const firstName = typeof user?.firstName === 'string' && user.firstName.trim() ? user.firstName.trim() : '';
 
-  const paid = tickets.filter((t) => t.status === 'completed' || t.status === 'paid');
+  const paid = tickets.filter(isPaid);
   const takenCents = paid.reduce((sum, t) => sum + Math.round(Number(t.totalPaid ?? 0) * 100) - Number(t.refundedCents ?? 0), 0);
   const appointments = useMemo(() => tickets
     .filter((t) => (!t.calendarHidden || t.paymentStatus === 'awaiting_payment') && t.status !== 'cancelled')
@@ -185,7 +187,7 @@ export default function HomeScreen() {
       ) : (
         <View style={[styles.list, card]}>
           {appointments.map((t, index) => {
-            const done = t.status === 'completed' || t.status === 'paid';
+            const done = isPaid(t);
             const isNext = nextUp?.id === t.id;
             return (
               <TouchableOpacity key={t.id} testID={`home-appointment-${t.id}`} onPress={() => router.push(`/appointment/${t.id}`)}
@@ -196,7 +198,7 @@ export default function HomeScreen() {
                   <Text style={[styles.rowSub, { color: colors.mutedForeground }]} numberOfLines={1}>{t.service?.name || 'Appointment'}</Text>
                 </View>
                 <View style={[styles.pill, { backgroundColor: done ? colors.secondary : t.status === 'no_show' ? colors.accent : colors.muted }]}>
-                  <Text style={[styles.pillText, { color: done ? colors.secondaryForeground : t.status === 'no_show' ? colors.accentForeground : colors.mutedForeground }]}>{STATUS_TEXT[String(t.status)] ?? 'Booked'}</Text>
+                  <Text style={[styles.pillText, { color: done ? colors.secondaryForeground : t.status === 'no_show' ? colors.accentForeground : colors.mutedForeground }]}>{done ? 'Paid' : STATUS_TEXT[String(t.status)] ?? 'Booked'}</Text>
                 </View>
               </TouchableOpacity>
             );
