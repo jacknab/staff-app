@@ -109,6 +109,7 @@ export const HELP: Record<string, HelpPage> = {
     sections: [
       { heading: 'At the top', points: [
         'Their photo and name. The pencil edits their name, phone, e-mail, the name they go by, birthday and allergies; Delete Client removes them and their history for good.',
+        'Under the name: their status (New, Regular, At risk, Inactive or VIP), a Card on file badge when they have a saved card, and their tags.',
         'Text opens a text to them. Call rings them from your business number when you have Business Phone or Plus, so your own number stays private. Email opens an e-mail.',
         'Book appointment books this client straight away.',
         'Send booking link texts them a link to your website with their name, phone and e-mail already filled in (1 text credit).',
@@ -142,7 +143,7 @@ export const HELP: Record<string, HelpPage> = {
     intro: 'One booking and everything you can do with it.',
     sections: [
       { heading: 'What you see', points: [
-        'The client, with Text, Call and Email buttons.',
+        'The client, with Text, Call and Email buttons. A Card on file badge under the name means the client (or this booking) has a saved card, so a no-show or late-cancel fee can be charged.',
         'The services, add-ons, date, time and total, and any deposit: paid, due (a link was texted), kept or refunded.',
         'For a house call: the client’s address (Open in Maps), when to leave, the drive, setup and pack-up time, and the travel fee.',
         'Forms: the forms and waivers this visit needs — filled in (View), sent and waiting, or not sent. Send e-mails the link (or texts it when there’s no e-mail); Fill in here opens the form on your phone for the client. Send another form sends any of your other forms.',

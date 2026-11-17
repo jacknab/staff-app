@@ -549,6 +549,8 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
               style={[styles.avatar, { backgroundColor: colors.muted }]} textStyle={[styles.avatarText, { color: colors.mutedForeground }]} />
             <Text style={[styles.clientName, { color: colors.foreground }]}>{clientName}</Text>
             <Text style={[styles.clientSubtitle, { color: colors.mutedForeground }]}>{isPreview ? 'Preview client' : 'Client appointment'}</Text>
+            {/* The client (or this booking) has a saved card (owner, 2026-11-17). */}
+            {params.cardOnFile === '1' && !isPreview ? <View testID="appointment-card-badge" style={[styles.cardBadge, { backgroundColor: colors.secondary }]}><Text style={[styles.cardBadgeText, { color: colors.secondaryForeground }]}>Card on file</Text></View> : null}
           </View>
 
           {/* A finished visit is a record: reach the client from their profile. */}
@@ -951,6 +953,8 @@ const styles = StyleSheet.create({
   statusStack: { flex: 1, marginLeft: 11 },
   metaLabel: { fontSize: 12, letterSpacing: 1, fontFamily: 'Inter_700Bold' },
   statusText: { fontSize: 14, letterSpacing: 0.5, fontFamily: 'Inter_700Bold', marginTop: 4 },
+  cardBadge: { borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4, marginTop: 8 },
+  cardBadgeText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
   amount: { fontSize: 19, fontFamily: 'Inter_600SemiBold' },
   serviceName: { fontSize: 19, fontFamily: 'Inter_600SemiBold', marginTop: 14 },
   ticket: { marginTop: 14, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, gap: 8 },

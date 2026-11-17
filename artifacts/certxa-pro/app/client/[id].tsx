@@ -292,6 +292,8 @@ export default function ClientProfileScreen() {
           {client.preferredName ? <Text style={[styles.sub, { color: colors.mutedForeground }]}>Goes by {client.preferredName}</Text> : null}
           <View style={styles.badges}>
             <View style={[styles.badge, { backgroundColor: status === 'at_risk' ? colors.accent : colors.secondary }]}><Text style={[styles.badgeText, { color: status === 'at_risk' ? colors.accentForeground : colors.secondaryForeground }]}>{STATUS_LABEL[status]}</Text></View>
+            {/* The client has a saved card (owner, 2026-11-17); the brand and last 4 are in the details below. */}
+            {client.cardLast4 ? <View testID="client-card-badge" style={[styles.badge, { backgroundColor: colors.secondary }]}><Text style={[styles.badgeText, { color: colors.secondaryForeground }]}>Card on file</Text></View> : null}
             {client.tags.map((t) => (
               <View key={t.tagId} style={[styles.badge, { backgroundColor: colors.muted }]}><Text style={[styles.badgeText, { color: colors.foreground }]}>{t.tag.tagName}</Text></View>
             ))}
