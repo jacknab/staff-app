@@ -22,7 +22,8 @@ export type LoginResponse = {
   user: CertxaUser;
 };
 
-export type TerminalPaymentMethod = 'tap_to_pay' | 'm2' | 'card';
+/** card_on_file: the client's saved card; keyed: a card typed in on certxa.com/card-entry (2026-11-17). */
+export type TerminalPaymentMethod = 'tap_to_pay' | 'm2' | 'card' | 'card_on_file' | 'keyed';
 
 export type CreateTerminalPaymentIntentRequest = {
   amountCents: number;
@@ -42,6 +43,10 @@ export type CreateTerminalPaymentIntentResponse = {
   clientSecret: string;
   amount: number;
   currency: string;
+  status?: string;
+  /** keyed only: for the card-entry page, which takes the card on the business's own Stripe account. */
+  publishableKey?: string | null;
+  stripeAccount?: string | null;
 };
 
 export type CaptureTerminalPaymentIntentResponse = {

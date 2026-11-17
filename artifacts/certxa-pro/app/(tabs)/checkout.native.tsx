@@ -15,6 +15,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useStripeTerminal } from '@stripe/stripe-terminal-react-native';
+import * as WebBrowser from 'expo-web-browser';
 import { useColors } from '@/hooks/useColors';
 import { TipCheckout } from '@/components/TipCheckout';
 import { SelectField } from '@/components/SelectField';
@@ -31,6 +32,7 @@ import {
   registerTerminalReader,
   storePendingTerminalCapture,
   CertxaApiError,
+  CERTXA_API_BASE_URL,
 } from '@/lib/certxa-api';
 import { HelpTitle } from '@/components/HelpTitle';
 import { usePaymentsReady } from '@/lib/usePaymentsReady';
@@ -43,7 +45,7 @@ import { look, cardShadow } from '@/components/look/tokens';
 // Stripe M2 does not require that Apple entitlement.
 const TAP_TO_PAY_ENABLED = true;
 // Shown on the payment screen so a tester can tell which build is installed.
-const BUILD_LABEL = 'Build Nov 17 · E';
+const BUILD_LABEL = 'Build Nov 17 · F';
 const EXPO_GO_PREVIEW = process.env.EXPO_PUBLIC_EXPO_GO_PREVIEW === '1';
 
 type PaymentStep = 'idle' | 'tap_intro' | 'initializing' | 'discovering' | 'connecting' | 'ready' | 'processing' | 'capture_pending' | 'success' | 'error';
@@ -642,6 +644,71 @@ export default function CheckoutScreen() {
   const cardsOff = paymentsReady === false;
   const startCard = (mode: ReaderMode) => { if (!cardsOff) void startReader(mode); };
 
+  // ── Card on file and Enter new card (owner, 2026-11-17) ──
+  // Neither needs a reader: the card is held on the business's Stripe account like a reader payment, then the same
+  // capture records the whole sale (tip, discount, other payments, card fee).
+  const [savedCard, setSavedCard] = useState<{ brand: string | null; last4: string | null } | null>(null);
+  const [charging, setCharging] = useState<null | 'saved' | 'keyed'>(null);
+  const [splitOpen, setSplitOpen] = useState(false);
+  useEffect(() => {
+    const apptId = Number(appointmentId);
+    if (EXPO_GO_PREVIEW || isQuickSale || !Number.isInteger(apptId) || apptId <= 0) { setSavedCard(null); return; }
+    let cancelled = false;
+    api.get<{ card: { brand: string | null; last4: string | null } | null }>(`/api/payments/terminal/card-on-file?appointmentId=${apptId}`)
+      .then((r) => { if (!cancelled) setSavedCard(r?.card ?? null); }).catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [appointmentId, isQuickSale]);
+  const payWithoutReader = async (method: 'card_on_file' | 'keyed') => {
+    const apptId = Number(appointmentId);
+    const amountCents = Number(digits);
+    if (!Number.isInteger(apptId) || apptId <= 0) { setError('This payment has no booking to record it on.'); return; }
+    if (amountCents < 50) { setError('Card payments must be at least $0.50.'); return; }
+    setError(''); setCharging(method === 'card_on_file' ? 'saved' : 'keyed');
+    let created: { paymentIntentId: string } | null = null;
+    let captured = false;
+    try {
+      const token = await getStoredToken();
+      if (!token) throw new Error('Your Certxa session has expired. Please sign in again.');
+      const made = await createTerminalPaymentIntent(token, {
+        amountCents, appointmentId: apptId, clientName: clientName.trim() || undefined, method,
+        tipCents, discountCents, priorTenderedCents: depositCents + partialCents, clientFeeCents: feeCents,
+      });
+      created = made;
+      if (method === 'keyed') {
+        if (!made.publishableKey || !made.stripeAccount) throw new Error('Card entry is not available for this business right now.');
+        const ret = 'certxa-pro://card-entry';
+        const page = `${CERTXA_API_BASE_URL.replace(/\/$/, '')}/card-entry#${new URLSearchParams({
+          s: made.clientSecret, pk: made.publishableKey, acct: made.stripeAccount, amt: String(amountCents), biz: businessName.trim(), ret,
+        }).toString()}`;
+        const r = await WebBrowser.openAuthSessionAsync(page, ret);
+        if (r.type !== 'success' || !/[?&]pi=/.test(r.url)) throw new Error('The card was not entered, so nothing was charged.');
+      }
+      const done = await captureTerminalPaymentIntent(token, made.paymentIntentId, tenderString('card', amountCents));
+      captured = true;
+      setPaymentIntentId(made.paymentIntentId);
+      const cardName = method === 'card_on_file' ? `card on file${savedCard?.last4 ? ` ending ${savedCard.last4}` : ''}` : 'card';
+      setPaidSummary(partialCents > 0 ? partsSummary('Card', amountCents) : cardName);
+      setSales((current) => [{ amount: dollars(String(done.amount)), label: clientName.trim() || 'In-person service', time: 'Just now · Certxa' }, ...current]);
+      setStep('success');
+      setStatusText('Payment complete.');
+      void refreshBookings();
+    } catch (cause) {
+      if (created && !captured) {
+        try { await cancelTerminalPaymentIntent(await getStoredToken() || '', created.paymentIntentId); } catch { /* the first error matters more */ }
+      }
+      setError(cause instanceof CertxaApiError && cause.status === 401 ? 'Your Certxa session has expired. Please sign in again.' : errorMessage(cause));
+    } finally {
+      setCharging(null);
+    }
+  };
+  const payWithSavedCard = () => {
+    const card = savedCard?.last4 ? `${savedCard.brand ? `${savedCard.brand[0].toUpperCase()}${savedCard.brand.slice(1)} ` : ''}ending ${savedCard.last4}` : 'card on file';
+    Alert.alert(`Charge ${dollars(digits)}?`, `It will be charged to ${clientName.trim() || 'the client'}'s ${card}.`, [
+      { text: 'Not now', style: 'cancel' },
+      { text: `Charge ${dollars(digits)}`, onPress: () => void payWithoutReader('card_on_file') },
+    ]);
+  };
+
   const retryCapture = async () => {
     if (!pendingCaptureId) return;
 
@@ -809,25 +876,38 @@ export default function CheckoutScreen() {
                </View>
                {readerSetupText ? <Text style={[styles.setupText, { color: colors.primary }]}>{readerSetupText}</Text> : null}
              </View> : null}
-             <TouchableOpacity disabled={(!isReady && !isCapturePending && !isTapIntro) || isBusy || (isTapIntro && cardsOff)} testID={isTapIntro ? 'start-tap-to-pay' : isCapturePending ? 'retry-capture' : 'accept-payment'} onPress={isTapIntro ? () => startCard('tap_to_pay') : isCapturePending ? retryCapture : processPayment} style={[styles.primaryButton, { backgroundColor: (isReady || isCapturePending || (isTapIntro && !cardsOff)) && !isBusy ? colors.primary : colors.muted }]}><Feather name={isTapIntro ? 'radio' : isCapturePending ? 'refresh-cw' : 'radio'} size={19} color={(isReady || isCapturePending || (isTapIntro && !cardsOff)) && !isBusy ? colors.primaryForeground : colors.mutedForeground} /><Text style={[styles.primaryButtonText, { color: (isReady || isCapturePending || (isTapIntro && !cardsOff)) && !isBusy ? colors.primaryForeground : colors.mutedForeground }]}>{isBusy ? (step === 'processing' ? 'Payment in progress…' : 'Preparing…') : isTapIntro ? 'Start Tap to Pay' : isCapturePending ? 'Retry capture' : 'Accept payment'}</Text></TouchableOpacity>
-             {isTapIntro ? <TouchableOpacity testID="start-stripe-m2" disabled={isBusy || cardsOff} onPress={() => startCard('m2')} style={[styles.primaryButton, { marginTop: -12, backgroundColor: cardsOff ? colors.muted : colors.card, borderWidth: 1, borderColor: colors.border }]}><Feather name="credit-card" size={19} color={cardsOff ? colors.mutedForeground : colors.foreground} /><Text style={[styles.primaryButtonText, { color: cardsOff ? colors.mutedForeground : colors.foreground }]}>Use Stripe M2 reader</Text></TouchableOpacity> : null}
-             {isTapIntro && Number(appointmentId) > 0 ? <View testID="offline-payments" style={{ width: '100%', gap: 10 }}>
-               {creditBalanceCents > 0 && creditPaidCents === 0 && offlineDueCents > 0 ? <TouchableOpacity testID="pay-credit" disabled={recording || isBusy} onPress={() => void recordOfflinePayment('credit')} style={[styles.primaryButton, { marginTop: -4, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}><Feather name="award" size={19} color={colors.foreground} /><Text style={[styles.primaryButtonText, { color: colors.foreground }]}>{recording ? 'Recording…' : `Use credit · ${dollars(String(Math.min(creditBalanceCents, offlineDueCents)))}`}</Text></TouchableOpacity> : null}
-               {!cashOpen ? <TouchableOpacity testID="pay-cash" disabled={recording || isBusy} onPress={() => { setError(''); setCashGiven((offlineDueCents / 100).toFixed(2)); setCashOpen(true); setGiftOpen(false); }} style={[styles.primaryButton, { marginTop: -4, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}><Feather name="dollar-sign" size={19} color={colors.foreground} /><Text style={[styles.primaryButtonText, { color: colors.foreground }]}>{`Cash · ${dollars(String(offlineDueCents))}`}</Text></TouchableOpacity> : (
-                 <View testID="cash-block" style={styles.formField}>
-                   <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Cash the client gave you <Text style={{ color: colors.mutedForeground }}>(less pays part of it)</Text></Text>
-                   <TextInput testID="cash-given" keyboardType="decimal-pad" returnKeyType="done" value={cashGiven} onChangeText={setCashGiven} placeholder="0.00" placeholderTextColor={colors.mutedForeground} style={[styles.fieldInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
-                   <TouchableOpacity testID="cash-record" disabled={recording} onPress={() => void recordOfflinePayment('cash')} style={[styles.primaryButton, { backgroundColor: recording ? colors.muted : colors.primary }]}><Feather name="dollar-sign" size={19} color={recording ? colors.mutedForeground : colors.primaryForeground} /><Text style={[styles.primaryButtonText, { color: recording ? colors.mutedForeground : colors.primaryForeground }]}>{recording ? 'Recording…' : 'Record cash'}</Text></TouchableOpacity>
-                 </View>
-               )}
-               {!giftOpen ? <TouchableOpacity testID="pay-gift-card" disabled={recording || isBusy} onPress={() => { setError(''); setGiftOpen(true); setCashOpen(false); }} style={[styles.primaryButton, { marginTop: -4, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}><Feather name="gift" size={19} color={colors.foreground} /><Text style={[styles.primaryButtonText, { color: colors.foreground }]}>Gift card</Text></TouchableOpacity> : (
+             {!isTapIntro ? <TouchableOpacity disabled={(!isReady && !isCapturePending && !isTapIntro) || isBusy || (isTapIntro && cardsOff)} testID={isTapIntro ? 'start-tap-to-pay' : isCapturePending ? 'retry-capture' : 'accept-payment'} onPress={isTapIntro ? () => startCard('tap_to_pay') : isCapturePending ? retryCapture : processPayment} style={[styles.primaryButton, { backgroundColor: (isReady || isCapturePending || (isTapIntro && !cardsOff)) && !isBusy ? colors.primary : colors.muted }]}><Feather name={isTapIntro ? 'radio' : isCapturePending ? 'refresh-cw' : 'radio'} size={19} color={(isReady || isCapturePending || (isTapIntro && !cardsOff)) && !isBusy ? colors.primaryForeground : colors.mutedForeground} /><Text style={[styles.primaryButtonText, { color: (isReady || isCapturePending || (isTapIntro && !cardsOff)) && !isBusy ? colors.primaryForeground : colors.mutedForeground }]}>{isBusy ? (step === 'processing' ? 'Payment in progress…' : 'Preparing…') : isTapIntro ? 'Start Tap to Pay' : isCapturePending ? 'Retry capture' : 'Accept payment'}</Text></TouchableOpacity> : null}
+             {/* How the client pays (owner, 2026-11-17): one list of the ways to pay, then Split payment. */}
+             {isTapIntro ? <View testID="payment-methods" style={[styles.payList, { backgroundColor: colors.card, borderColor: colors.border }]}>
+               <MethodRow testID="start-tap-to-pay" icon="smartphone" title="Tap to Pay on iPhone" sub={cardsOff ? 'Set up card payments first' : 'Hold the card near this phone'} disabled={isBusy || cardsOff || !!charging} onPress={() => startCard('tap_to_pay')} colors={colors} />
+               <MethodRow testID="start-stripe-m2" icon="credit-card" title="Card reader" sub={connectedReader && readerMode === 'm2' ? `Connected${typeof (connectedReader as any).batteryLevel === 'number' ? ` · ${Math.round((connectedReader as any).batteryLevel * 100)}% battery` : ''}` : 'Stripe M2'} disabled={isBusy || cardsOff || !!charging} onPress={() => startCard('m2')} colors={colors} />
+               {savedCard ? <MethodRow testID="pay-card-on-file" icon="credit-card" title={`Card on file${savedCard.last4 ? ` (${savedCard.last4})` : ''}`} sub={charging === 'saved' ? 'Charging…' : undefined} disabled={isBusy || cardsOff || !!charging} onPress={payWithSavedCard} colors={colors} /> : null}
+               {Number(appointmentId) > 0 ? <MethodRow testID="pay-new-card" icon="edit-3" title="Enter new card" sub={charging === 'keyed' ? 'Waiting for the card…' : undefined} disabled={isBusy || cardsOff || !!charging} onPress={() => void payWithoutReader('keyed')} colors={colors} /> : null}
+               {Number(appointmentId) > 0 && creditBalanceCents > 0 && creditPaidCents === 0 && offlineDueCents > 0 ? <MethodRow testID="pay-credit" icon="award" title="Client credit" sub={recording ? 'Recording…' : dollars(String(Math.min(creditBalanceCents, offlineDueCents)))} disabled={recording || isBusy || !!charging} onPress={() => void recordOfflinePayment('credit')} colors={colors} /> : null}
+               {Number(appointmentId) > 0 ? <MethodRow testID="pay-gift-card" icon="gift" title="Gift card" disabled={recording || isBusy || !!charging} onPress={() => { setError(''); setGiftOpen((o) => !o); setCashOpen(false); }} colors={colors} /> : null}
+               {giftOpen ? <View style={styles.methodForm}>
                  <View testID="gift-card-block" style={styles.formField}>
                    <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Gift card code</Text>
                    <TextInput testID="gift-card-code" autoCapitalize="characters" autoCorrect={false} value={giftCardCode} onChangeText={setGiftCardCode} placeholder="Code on the gift card" placeholderTextColor={colors.mutedForeground} style={[styles.fieldInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
                    <TouchableOpacity testID="gift-card-use" disabled={recording || !giftCardCode.trim()} onPress={() => void recordOfflinePayment('gift_card')} style={[styles.primaryButton, { backgroundColor: giftCardCode.trim() && !recording ? colors.primary : colors.muted }]}><Feather name="gift" size={19} color={giftCardCode.trim() && !recording ? colors.primaryForeground : colors.mutedForeground} /><Text style={[styles.primaryButtonText, { color: giftCardCode.trim() && !recording ? colors.primaryForeground : colors.mutedForeground }]}>{recording ? 'Checking the card…' : 'Use gift card'}</Text></TouchableOpacity>
                  </View>
-               )}
+               </View> : null}
+               {Number(appointmentId) > 0 ? <MethodRow testID="pay-cash" icon="dollar-sign" title="Cash" sub={dollars(String(offlineDueCents))} disabled={recording || isBusy || !!charging} onPress={() => { setError(''); setSplitOpen(false); setCashGiven((offlineDueCents / 100).toFixed(2)); setCashOpen((o) => !o); setGiftOpen(false); }} colors={colors} last /> : null}
+               {cashOpen ? <View style={styles.methodForm}>
+                 <View testID="cash-block" style={styles.formField}>
+                   <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Cash the client gave you <Text style={{ color: colors.mutedForeground }}>(less pays part of it)</Text></Text>
+                   <TextInput testID="cash-given" keyboardType="decimal-pad" returnKeyType="done" value={cashGiven} onChangeText={setCashGiven} placeholder="0.00" placeholderTextColor={colors.mutedForeground} style={[styles.fieldInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
+                   <TouchableOpacity testID="cash-record" disabled={recording} onPress={() => void recordOfflinePayment('cash')} style={[styles.primaryButton, { backgroundColor: recording ? colors.muted : colors.primary }]}><Feather name="dollar-sign" size={19} color={recording ? colors.mutedForeground : colors.primaryForeground} /><Text style={[styles.primaryButtonText, { color: recording ? colors.mutedForeground : colors.primaryForeground }]}>{recording ? 'Recording…' : 'Record cash'}</Text></TouchableOpacity>
+                 </View>
+               </View> : null}
              </View> : null}
+             {isTapIntro && Number(appointmentId) > 0 ? <>
+               <View style={styles.orRow}><View style={[styles.orLine, { backgroundColor: colors.border }]} /><Text style={[styles.orText, { color: colors.mutedForeground }]}>or</Text><View style={[styles.orLine, { backgroundColor: colors.border }]} /></View>
+               <TouchableOpacity testID="split-payment" disabled={recording || isBusy || !!charging} onPress={() => { setError(''); setSplitOpen(true); setGiftOpen(false); setCashGiven(''); setCashOpen(true); }} style={[styles.splitButton, { backgroundColor: colors.muted }]}>
+                 <Text style={[styles.splitText, { color: colors.foreground }]}>Split payment</Text>
+               </TouchableOpacity>
+               {splitOpen ? <Text testID="split-note" style={[styles.setupText, { color: colors.mutedForeground, textAlign: 'center' }]}>Take part of the bill in cash (type the amount), or use a gift card or credit. Then choose how to pay the rest.</Text> : null}
+             </> : null}
              <Text testID="build-label" style={[styles.tapSub, { fontSize: 13, marginTop: 10, color: colors.mutedForeground }]}>{BUILD_LABEL}</Text>
           </ScrollView>
         )}
@@ -908,7 +988,36 @@ export default function CheckoutScreen() {
   );
 }
 
+/** One way to pay in the checkout list: icon, name, a short line under it, and an arrow. */
+function MethodRow({ testID, icon, title, sub, disabled, onPress, colors, last }: {
+  testID: string; icon: ComponentProps<typeof Feather>['name']; title: string; sub?: string; disabled?: boolean;
+  onPress: () => void; colors: ReturnType<typeof useColors>; last?: boolean;
+}) {
+  const tint = disabled ? colors.mutedForeground : colors.foreground;
+  return (
+    <TouchableOpacity testID={testID} disabled={disabled} onPress={onPress} accessibilityRole="button"
+      style={[styles.methodRow, !last ? { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border } : null]}>
+      <Feather name={icon} size={24} color={tint} />
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.methodTitle, { color: tint }]}>{title}</Text>
+        {sub ? <Text style={[styles.methodSub, { color: colors.mutedForeground }]}>{sub}</Text> : null}
+      </View>
+      <Feather name="chevron-right" size={22} color={colors.mutedForeground} />
+    </TouchableOpacity>
+  );
+}
+
 const styles = StyleSheet.create({
+  payList: { width: '100%', borderWidth: 1, borderRadius: 18, marginTop: 18, overflow: 'hidden' },
+  methodRow: { flexDirection: 'row', alignItems: 'center', gap: 16, minHeight: 68, paddingHorizontal: 18, paddingVertical: 12 },
+  methodTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
+  methodSub: { fontSize: 14, fontFamily: 'Inter_400Regular', marginTop: 2 },
+  methodForm: { paddingHorizontal: 18, paddingBottom: 16 },
+  orRow: { width: '100%', flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 18 },
+  orLine: { flex: 1, height: StyleSheet.hairlineWidth },
+  orText: { fontSize: 15, fontFamily: 'Inter_400Regular' },
+  splitButton: { width: '100%', height: 54, borderRadius: 27, alignItems: 'center', justifyContent: 'center', marginTop: 14 },
+  splitText: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
   root: { flex: 1 },
   pageContent: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 130 },
   topLine: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 23 },
