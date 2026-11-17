@@ -7,6 +7,7 @@ import { Tabs, useRouter, type Href } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePaymentsReady } from '@/lib/usePaymentsReady';
+import { ReviewAsk } from '@/components/ReviewAsk';
 
 function ClassicTabLayout() {
   const colors = useColors();
@@ -20,6 +21,7 @@ function ClassicTabLayout() {
   const paymentsReady = usePaymentsReady();
 
   return (
+    <>
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: colors.primary,
@@ -81,6 +83,9 @@ function ClassicTabLayout() {
           : <Feather name="grid" size={21} color={color} />,
       }} />
     </Tabs>
+    {/* The Google review request, once the account is 45 days old (components/ReviewAsk.tsx). */}
+    <ReviewAsk />
+    </>
   );
 }
 
