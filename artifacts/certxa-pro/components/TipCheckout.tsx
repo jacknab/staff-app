@@ -128,14 +128,16 @@ export function TipCheckout({ baseCents, serviceName, presets, defaultPercent, o
                 );
               })}
             </View>
-            <TouchableOpacity testID="tip-no-tip" onPress={() => choosePercent(0)} accessibilityRole="button" accessibilityState={{ selected: selectedPercent === 0 }} style={[styles.customButton, { backgroundColor: selectedPercent === 0 ? colors.secondary : colors.card, borderColor: selectedPercent === 0 ? colors.primary : colors.border }]}>
-              <Text style={[styles.customButtonText, { color: selectedPercent === 0 ? colors.primary : colors.foreground }]}>No tip</Text>
-            </TouchableOpacity>
-            <TouchableOpacity testID="custom-tip" onPress={() => setScreen('custom')} style={[styles.customButton, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Feather name="edit-3" size={18} color={colors.primary} />
-              <Text style={[styles.customButtonText, { color: colors.foreground }]}>Custom tip</Text>
-              <Feather name="chevron-right" size={19} color={colors.mutedForeground} />
-            </TouchableOpacity>
+            {/* No tip on the left, Custom tip on the right, one row (owner, 2026-11-17). */}
+            <View style={styles.choiceRow}>
+              <TouchableOpacity testID="tip-no-tip" onPress={() => choosePercent(0)} accessibilityRole="button" accessibilityState={{ selected: selectedPercent === 0 }} style={[styles.customButton, styles.choiceHalf, { backgroundColor: selectedPercent === 0 ? colors.secondary : colors.card, borderColor: selectedPercent === 0 ? colors.primary : colors.border }]}>
+                <Text numberOfLines={1} style={[styles.customButtonText, { color: selectedPercent === 0 ? colors.primary : colors.foreground }]}>No tip</Text>
+              </TouchableOpacity>
+              <TouchableOpacity testID="custom-tip" onPress={() => setScreen('custom')} accessibilityRole="button" style={[styles.customButton, styles.choiceHalf, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Feather name="edit-3" size={18} color={colors.primary} />
+                <Text numberOfLines={1} style={[styles.customButtonText, { color: colors.foreground }]}>Custom tip</Text>
+              </TouchableOpacity>
+            </View>
           </>
         ) : (
           <>
@@ -194,6 +196,8 @@ const styles = StyleSheet.create({
   tipAmount: { fontSize: 14, fontFamily: 'Inter_400Regular', marginTop: 3 },
   customButton: { minHeight: 52, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 9, marginTop: 10 },
   customButtonText: { flex: 1, fontSize: 16, fontFamily: 'Inter_500Medium' },
+  choiceRow: { flexDirection: 'row', gap: 9, marginTop: 10 },
+  choiceHalf: { flex: 1, marginTop: 0 },
   customAmountCard: { borderWidth: 1, borderRadius: 18, alignItems: 'center', paddingVertical: 19, marginTop: 26, ...cardShadow },
   amountCaption: { fontSize: 12, letterSpacing: 1.4, fontFamily: 'Inter_600SemiBold' },
   customAmount: { fontSize: 38, letterSpacing: -1, fontFamily: 'Inter_500Medium', marginTop: 7 },
