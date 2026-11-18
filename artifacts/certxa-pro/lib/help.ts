@@ -73,9 +73,9 @@ export const HELP: Record<string, HelpPage> = {
     intro: 'Your bookings and blocked time, on a 24-hour calendar.',
     sections: [
       { heading: 'Moving around', points: [
-        'Day, Week and Month switch the view.',
+        'The + button next to the title opens Add (New booking, Block time) and Calendar view: Day, Week or Month. The view you’re on says Showing now.',
+        'Under the title: the day you’re on and how many appointments it has.',
         'The arrows go to the previous or next day, week or month. Today jumps back to today.',
-        'Time grid (Day view, beside the date): a line and a label every 10, 15, 30 or 60 minutes. It’s kept on this phone.',
         'Day: tap a day in the strip at the top to see it. Week: the week’s dates and how many bookings, then each day with its bookings (time, status, client and service); tap a booking to open it, or a day to see it; No bookings when nothing is booked. Month: tap a day to open it.',
         'The refresh button reloads your calendar from Certxa.',
       ] },

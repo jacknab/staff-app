@@ -11,10 +11,11 @@ import { businessToday, zonedMinutes, zonedMoment } from '@/lib/businessTime';
 import { listBookingRequests } from '@/lib/bookingRequests';
 import { api } from '@/lib/live-api';
 import { HelpTitle } from '@/components/HelpTitle';
-import { SelectField } from '@/components/SelectField';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { AppBackground } from '@/components/look/AppBackground';
+import { MenuCard } from '@/components/look/MenuCard';
+import { SectionHeader } from '@/components/look/SectionHeader';
 import { look } from '@/components/look/tokens';
 type TimeBlock = { id: number; startsAt: string; endsAt: string; allDay: boolean; note: string | null };
 
@@ -208,7 +209,6 @@ export default function CalendarScreen() {
   // on this phone.
   const [gridMinutes, setGridMinutes] = useState(15);
   useEffect(() => { AsyncStorage.getItem('calendar.gridMinutes').then((v) => { if ([10, 15, 30, 60].includes(Number(v))) setGridMinutes(Number(v)); }).catch(() => undefined); }, []);
-  const pickGrid = (m: number) => { setGridMinutes(m); void AsyncStorage.setItem('calendar.gridMinutes', String(m)).catch(() => undefined); };
   const steps = Array.from({ length: 60 / gridMinutes }, (_, q) => q);
   const stepPx = HOUR_HEIGHT / steps.length;
   const [pendingDrop, setPendingDrop] = useState<{ item: AppointmentRecord; minutes: number } | null>(null);
@@ -261,11 +261,11 @@ export default function CalendarScreen() {
     { text: 'Remove', style: 'destructive', onPress: () => { void api.del(`/api/time-blocks/${b.id}`).then(loadBlocks).catch(() => undefined); } },
   ]);
   // + : a booking, or blocked time.
-  const addSomething = () => Alert.alert('Add to your calendar', undefined, [
-    { text: 'New booking', onPress: () => router.push({ pathname: '/booking', params: { day: selectedKey } }) },
-    { text: 'Block time', onPress: () => router.push({ pathname: '/block-time', params: { day: selectedKey } }) },
-    { text: 'Cancel', style: 'cancel' },
-  ]);
+  // The + button (owner, 2026-11-18): an overlay in the More page's style with what to add and the calendar views.
+  const [addOpen, setAddOpen] = useState(false);
+  const addSomething = () => setAddOpen(true);
+  const goAdd = (pathname: '/booking' | '/block-time') => { setAddOpen(false); router.push({ pathname, params: { day: selectedKey } }); };
+  const pickView = (mode: ViewMode) => { setAddOpen(false); setViewMode(mode); };
   const appointments = useMemo(() => bookingsByDay[selectedKey] ?? [], [bookingsByDay, selectedKey]);
   const columnsById = useMemo(() => overlapColumns(appointments), [appointments]);
   // The whole day, midnight to midnight (owner, 2026-11-03); opening a day scrolls to now / the first booking / 9 AM.
@@ -413,39 +413,55 @@ export default function CalendarScreen() {
     <View style={[styles.root, { backgroundColor: look.pageTop, paddingTop: topInset }]}>
       <AppBackground />
       <StatusBar barStyle="dark-content" />
+      <Modal visible={addOpen} transparent animationType="fade" onRequestClose={() => setAddOpen(false)}>
+        <TouchableOpacity activeOpacity={1} onPress={() => setAddOpen(false)} style={styles.overlayBackdrop} accessibilityLabel="Close">
+          <TouchableOpacity activeOpacity={1} onPress={() => undefined} testID="calendar-add-overlay" style={[styles.overlayPanel, { backgroundColor: look.pageTop, paddingBottom: Math.max(insets.bottom, 18) }]}>
+            <View style={styles.overlayHead}>
+              <Text style={[styles.overlayTitle, { color: look.heading }]}>Calendar</Text>
+              <TouchableOpacity testID="calendar-add-close" accessibilityLabel="Close" onPress={() => setAddOpen(false)} style={styles.iconButton}>
+                <Feather name="x" size={24} color={look.heading} />
+              </TouchableOpacity>
+            </View>
+            <RNScrollView contentContainerStyle={{ paddingBottom: 6 }} showsVerticalScrollIndicator={false}>
+              <SectionHeader title="Add" />
+              <View style={styles.overlayGroup}>
+                <MenuCard testID="calendar-add-booking" icon={{ feather: 'calendar' }} title="New booking" subtitle="Book a client on this day" onPress={() => goAdd('/booking')} />
+                <MenuCard testID="calendar-add-block" icon={{ feather: 'slash' }} title="Block time" subtitle="Time off, breaks or personal time" onPress={() => goAdd('/block-time')} />
+              </View>
+              <SectionHeader title="Calendar view" />
+              <View style={styles.overlayGroup}>
+                {([['Day', 'clock', 'One day, hour by hour'], ['Week', 'columns', 'Seven days, with every booking'], ['Month', 'grid', 'The whole month at a glance']] as const).map(([mode, icon, line]) => (
+                  <MenuCard key={mode} testID={`calendar-view-${mode.toLowerCase()}`} icon={{ feather: icon }} title={mode}
+                    subtitle={viewMode === mode ? `Showing now · ${line}` : line} onPress={() => pickView(mode)} />
+                ))}
+              </View>
+            </RNScrollView>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
       {/* Fixed header: it never scrolls. */}
       <View style={styles.fixedHeader}>
-        <HelpTitle help="calendar" style={[styles.pageTitle, { color: colors.foreground }]}>Calendar</HelpTitle>
+        <View style={styles.titleRow}>
+          <HelpTitle help="calendar" style={[styles.pageTitle, { color: colors.foreground }]}>Calendar</HelpTitle>
+          <View style={styles.headerActions}>
+            <TouchableOpacity testID="calendar-refresh" accessibilityLabel="Refresh calendar" onPress={() => void refresh()} style={styles.iconButton}>
+              <Feather name="refresh-cw" size={19} color={colors.primary} />
+            </TouchableOpacity>
+            <TouchableOpacity testID="add-appointment" accessibilityLabel="Add or change the view" onPress={addSomething} style={[styles.addButton, { backgroundColor: colors.primary }]}>
+              <Feather name="plus" size={24} color={colors.primaryForeground} />
+            </TouchableOpacity>
+          </View>
+        </View>
         {openRequests > 0 ? (
           <TouchableOpacity testID="calendar-requests-banner" onPress={() => router.push('/requests')} style={[styles.requestsBanner, { backgroundColor: colors.card, borderColor: colors.primary }]}>
             <Text style={[styles.requestsText, { color: colors.foreground }]}>{openRequests === 1 ? '1 booking request is waiting for you' : `${openRequests} booking requests are waiting for you`}</Text>
             <Feather name="chevron-right" size={19} color={colors.foreground} />
           </TouchableOpacity>
         ) : null}
-        <View style={styles.header}>
-          <View style={[styles.segmentedControl, { borderColor: colors.border, backgroundColor: colors.card }]}>
-            {(['Month', 'Week', 'Day'] as ViewMode[]).map((mode) => (
-              <TouchableOpacity
-                key={mode}
-                testID={`calendar-view-${mode.toLowerCase()}`}
-                accessibilityRole="button"
-                accessibilityState={{ selected: viewMode === mode }}
-                onPress={() => setViewMode(mode)}
-                style={[styles.segment, viewMode === mode && { backgroundColor: colors.primary }]}
-              >
-                <Text style={[styles.segmentText, { color: viewMode === mode ? colors.primaryForeground : colors.mutedForeground }]}>{mode}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          <View style={styles.headerActions}>
-            <TouchableOpacity testID="calendar-refresh" accessibilityLabel="Refresh calendar" onPress={() => void refresh()} style={styles.iconButton}>
-              <Feather name="refresh-cw" size={19} color={colors.primary} />
-            </TouchableOpacity>
-            <TouchableOpacity testID="add-appointment" accessibilityLabel="Add appointment" onPress={addSomething} style={[styles.addButton, { backgroundColor: colors.primary }]}>
-              <Feather name="plus" size={24} color={colors.primaryForeground} />
-            </TouchableOpacity>
-          </View>
-        </View>
+        {/* The chosen day where the view tabs were (the views are in the + overlay now). */}
+        <Text testID="calendar-day-summary" style={[styles.scheduleCount, styles.daySummary, { color: colors.mutedForeground }]}>
+          {selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })} · {appointments.length} {appointments.length === 1 ? 'appointment' : 'appointments'}
+        </Text>
 
         <View style={styles.dateHeader}>
           <TouchableOpacity testID="previous-calendar-period" accessibilityLabel="Previous period" onPress={() => shiftDate(-1)} style={styles.chevronButton}>
@@ -472,13 +488,6 @@ export default function CalendarScreen() {
                   </TouchableOpacity>
                 );
               })}
-            </View>
-            <View style={[styles.scheduleMeta, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }]}>
-              <Text style={[styles.scheduleCount, { color: colors.mutedForeground, flexShrink: 1 }]}>
-                {selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })} · {appointments.length} {appointments.length === 1 ? 'appointment' : 'appointments'}
-              </Text>
-              <SelectField compact testID="calendar-grid" title="Time grid" value={gridMinutes} onChange={pickGrid}
-                options={[10, 15, 30, 60].map((m) => ({ value: m, label: `${m} min` }))} />
             </View>
           </>
         )}
@@ -697,13 +706,17 @@ const styles = StyleSheet.create({
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8, marginLeft: 'auto' },
   iconButton: { width: 39, height: 39, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   addButton: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  segmentedControl: { flexDirection: 'row', borderWidth: 1, borderRadius: 9, padding: 2, flexShrink: 1 },
-  segment: { minWidth: 48, paddingVertical: 8, paddingHorizontal: 7, borderRadius: 7, alignItems: 'center' },
-  segmentText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
   todayHint: { fontSize: 15, fontFamily: 'Inter_500Medium', marginRight: 2 },
   dateHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   chevronButton: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   pageTitle: { fontSize: 38, fontFamily: 'Inter_700Bold', letterSpacing: -0.8, paddingTop: 6, paddingBottom: 10 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  daySummary: { marginBottom: 10 },
+  overlayBackdrop: { flex: 1, backgroundColor: 'rgba(17, 12, 34, 0.45)', justifyContent: 'flex-end' },
+  overlayPanel: { borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingHorizontal: 18, paddingTop: 14, maxHeight: '88%' },
+  overlayHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 },
+  overlayTitle: { fontSize: 26, fontFamily: 'Inter_700Bold' },
+  overlayGroup: { gap: 12 },
   monthTitle: { fontSize: 22, fontFamily: 'Inter_600SemiBold', letterSpacing: -0.35 },
   weekStrip: { flexDirection: 'row', justifyContent: 'space-between', paddingBottom: 10 },
   dayCell: { width: 42, alignItems: 'center', paddingVertical: 6, borderRadius: 14, gap: 5 },
@@ -754,7 +767,6 @@ const styles = StyleSheet.create({
   miniEventText: { color: '#1E2240', fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   noEvents: { fontSize: 15, fontFamily: 'Inter_400Regular' },
   // The hint drops under the date when both don't fit (they ran together on a phone, 2026-11-11).
-  scheduleMeta: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', columnGap: 12, rowGap: 2, marginBottom: 8 },
   scheduleCount: { fontSize: 15, fontFamily: 'Inter_500Medium' },
   syncNotice: { flexDirection: 'row', alignItems: 'center', gap: 7, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 10 },
   syncText: { fontSize: 13, fontFamily: 'Inter_500Medium', flex: 1 },
