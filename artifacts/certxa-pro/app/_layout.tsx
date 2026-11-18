@@ -77,6 +77,8 @@ function PushBridge() {
       else if (data.type === 'review') router.push('/reviews');
       else if (data.type === 'web_message' && Number((data as { threadId?: number }).threadId) > 0) router.push(`/inbox/${Number((data as { threadId?: number }).threadId)}` as Href);
       else if (data.type === 'waitlist') router.push('/waitlist');
+      // Notes after each visit (2026-11-18): Quick Notes for the visit that just ended.
+      else if (data.type === 'visit_notes' && Number(data.appointmentId) > 0) router.push({ pathname: '/quick-notes' as any, params: { appointmentId: String(data.appointmentId) } });
       // Plus: a missed call opens the client's profile (its phone button calls back); a text opens it in Messages.
       else if (data.type === 'plus_call' && Number((data as { clientId?: number }).clientId) > 0) router.push({ pathname: '/client/[id]', params: { id: String((data as { clientId?: number }).clientId) } });
       else if (data.type === 'plus_text') router.push({ pathname: '/messages', params: { phone: String((data as { phone?: string }).phone ?? ''), name: String((data as { name?: string }).name ?? '') } });
@@ -137,6 +139,7 @@ function RootLayoutNav() {
       <Stack.Screen name="appointments-report" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="revenue-goal" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="promo-codes" options={{ headerShown: false, presentation: 'card' }} />
+      <Stack.Screen name="invoices" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="block-time" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="messages" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="gift-cards" options={{ headerShown: false, presentation: 'card' }} />

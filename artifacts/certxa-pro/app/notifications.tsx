@@ -77,6 +77,13 @@ export default function NotificationsScreen() {
   // Win-back texts (owner, 2026-11-03): saved on their own, straight away (GET · PUT /api/win-back/settings).
   const [winBack, setWinBack] = useState<{ enabled: boolean; afterDays: number; dueNow?: number } | null>(null);
   useEffect(() => { api.get<{ enabled: boolean; afterDays: number; dueNow: number }>('/api/win-back/settings').then(setWinBack).catch(() => setWinBack(null)); }, []);
+  // Notes after each visit (owner, 2026-11-18, GlossGenius): a push to you as each visit ends, saved straight away.
+  const [visitNotes, setVisitNotes] = useState<boolean | null>(null);
+  useEffect(() => { api.get<{ visitNotesPrompt?: boolean } | null>('/api/calendar-settings').then((c) => setVisitNotes(!!c?.visitNotesPrompt)).catch(() => setVisitNotes(null)); }, []);
+  const saveVisitNotes = (on: boolean) => {
+    setVisitNotes(on);
+    void api.put('/api/calendar-settings', { visitNotesPrompt: on }).catch(() => { setVisitNotes(!on); setError('That setting could not be saved.'); });
+  };
   const saveWinBack = (next: { enabled?: boolean; afterDays?: number }) => {
     setWinBack((w) => (w ? { ...w, ...next } : w));
     void api.put('/api/win-back/settings', next).then(() => api.get<{ enabled: boolean; afterDays: number; dueNow: number }>('/api/win-back/settings').then(setWinBack))
@@ -229,6 +236,13 @@ export default function NotificationsScreen() {
                 ) : null}
               </Section>
             ) : null}
+
+            {visitNotes !== null ? (<>
+              <SectionTitle style={styles.group}>For you</SectionTitle>
+              <Section colors={colors} icon="edit-3" title="Notes after each visit" hint="As each visit ends, a notification reminds you to add notes about it, like a colour formula. Tap it to open Quick Notes for that visit.">
+                <ToggleRow colors={colors} id="visit-notes" icon="bell" label="Notification" value={visitNotes} onChange={saveVisitNotes} />
+              </Section>
+            </>) : null}
 
             <SectionTitle style={styles.group}>Replies and phone numbers</SectionTitle>
             <Section colors={colors} icon="x-circle" title="Cancellation replies" hint="Recognize clear cancellation requests in clients' text replies.">

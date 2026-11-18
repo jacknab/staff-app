@@ -122,6 +122,16 @@ export default function MoneyScreen() {
               </View>
               <Feather name="chevron-right" size={20} color={colors.mutedForeground} />
             </TouchableOpacity>
+            {/* Invoices (owner, 2026-11-18, GlossGenius; app/invoices.tsx). */}
+            <TouchableOpacity testID="money-invoices" onPress={() => router.push('/invoices' as any)}
+              style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 0, marginBottom: 14, flexDirection: 'row', alignItems: 'center', gap: 12 }]}>
+              <Feather name="file-text" size={22} color={colors.foreground} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.cardTitle, { color: colors.foreground }]}>Invoices</Text>
+                <Text style={[styles.muted, { color: colors.mutedForeground }]}>Bill a client with a link to pay by card</Text>
+              </View>
+              <Feather name="chevron-right" size={20} color={colors.mutedForeground} />
+            </TouchableOpacity>
             <SelectField testID="money-period" title="Period" value={period} options={PERIODS} onChange={setPeriod} />
             <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]} testID="money-taken">
               <Text style={[styles.label, { color: colors.mutedForeground }]}>{`Taken ${PERIODS.find((p) => p.value === period)!.label.toLowerCase()}`}</Text>

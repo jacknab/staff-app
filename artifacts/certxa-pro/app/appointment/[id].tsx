@@ -96,6 +96,7 @@ type AppointmentRouteParams = {
     totalPaidCents?: string;
     refundedCents?: string;
     cardOnFile?: string;
+    clientConfirmed?: string;
     clientCancelPending?: string;
     feePercent?: string;
     feeCents?: string;
@@ -141,7 +142,20 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { services, refresh, timeZone } = useBookingData();
+  const { services, refresh, timeZone, clients } = useBookingData();
+  // Change the client (owner, 2026-11-18, GlossGenius): the visit was booked or checked out under the wrong client.
+  const [changeOpen, setChangeOpen] = useState(false);
+  const [changeSearch, setChangeSearch] = useState('');
+  const changeMatches = changeSearch.trim().length < 2 ? [] : clients.filter((c) => String(c.customerId) !== String(params.customerId)
+    && [c.name, c.phone, c.email ?? ''].some((v) => v.toLowerCase().includes(changeSearch.trim().toLowerCase()))).slice(0, 8);
+  const changeClient = (to: { customerId: number; name: string }) => Alert.alert(`Change the client to ${to.name}?`, 'Only the client changes. The payment, date and services stay as they are.', [
+    { text: 'Cancel', style: 'cancel' },
+    { text: 'Change client', onPress: () => {
+      api.post(`/api/pro/appointments/${params.id}/client`, { customerId: to.customerId })
+        .then(() => { void refresh(); Alert.alert('Client changed', `This visit is now ${to.name}'s.`); router.back(); })
+        .catch((cause) => Alert.alert('Not changed', cause instanceof Error ? cause.message : 'Try again in a minute.'));
+    } },
+  ]);
   const originalDate = useMemo(() => params.dateIso ? new Date(params.dateIso) : new Date(), [params.dateIso]);
   // The date and time as the business sees them (its own time zone, not the phone's).
   const [day, setDay] = useState(() => zonedDay(originalDate, timeZone));
@@ -634,6 +648,7 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
               <SelectField compact testID="appointment-how-heard" title="How they heard about you" placeholder="Add how they heard about you" value={null as string | null}
                 options={['Social media', 'Web search', 'A friend', 'Other'].map((v) => ({ value: v, label: v }))} onChange={saveHowHeard} />
             </View> : null}
+            {params.clientConfirmed === '1' && !isPreview ? <View testID="appointment-confirmed-badge" style={[styles.cardBadge, { backgroundColor: colors.secondary }]}><Text style={[styles.cardBadgeText, { color: colors.secondaryForeground }]}>Confirmed by client</Text></View> : null}
             {params.cardOnFile === '1' && !isPreview ? <View testID="appointment-card-badge" style={[styles.cardBadge, { backgroundColor: colors.secondary }]}><Text style={[styles.cardBadgeText, { color: colors.secondaryForeground }]}>Card on file</Text></View> : null}
           </View>
 
@@ -729,6 +744,22 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
                   <Text style={[styles.secondaryActionText, { color: colors.foreground }]}>{refundable > 0 ? 'REFUND' : refundedCents > 0 ? 'REFUNDED' : 'NOTHING TO REFUND'}</Text>
                 </TouchableOpacity>
               )}
+              {!isPreview ? (changeOpen ? (
+                <View testID="appointment-change-client" style={{ marginTop: 12 }}>
+                  <TextInput testID="appointment-change-search" autoFocus value={changeSearch} onChangeText={setChangeSearch} placeholder="Find the right client: name, phone or e-mail" placeholderTextColor={colors.mutedForeground}
+                    autoCapitalize="none" style={[styles.notesRow, { color: colors.foreground, backgroundColor: colors.card, borderColor: colors.border, fontSize: 16 }]} />
+                  {changeMatches.map((c) => (
+                    <TouchableOpacity key={c.customerId} testID={`appointment-change-to-${c.customerId}`} onPress={() => changeClient(c)} style={styles.textAction}>
+                      <Text style={[styles.textActionText, { color: colors.foreground }]}>{c.name}{c.phone ? ` · ${c.phone}` : ''}</Text>
+                    </TouchableOpacity>
+                  ))}
+                  <TouchableOpacity onPress={() => { setChangeOpen(false); setChangeSearch(''); }} style={styles.textAction}><Text style={[styles.textActionText, { color: colors.mutedForeground }]}>Cancel</Text></TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity testID="appointment-change-client-open" onPress={() => setChangeOpen(true)} style={styles.textAction}>
+                  <Text style={[styles.textActionText, { color: colors.primary }]}>Change client</Text>
+                </TouchableOpacity>
+              )) : null}
             </>
           ) : clientCancelPending ? (
             <>

@@ -181,7 +181,7 @@ function DraggableAppointment({
         ) : null}
         <Text numberOfLines={1} style={styles.timelineClient}>{isDragging ? `${dragLabel} · ${item.name}` : item.name}</Text>
         {/* A short appointment only has room for the name, then the service; the length is shown when all three fit. */}
-        {height >= 40 && <Text numberOfLines={1} style={styles.timelineService}>{item.status === 'paid' ? `PAID · ${item.service}` : item.status === 'no_show' ? `NO-SHOW · ${item.service}` : item.depositDue ? `DEPOSIT DUE · ${item.service}` : item.service}</Text>}
+        {height >= 40 && <Text numberOfLines={1} style={styles.timelineService}>{item.status === 'paid' ? `PAID · ${item.service}` : item.status === 'no_show' ? `NO-SHOW · ${item.service}` : item.depositDue ? `DEPOSIT DUE · ${item.service}` : item.clientConfirmed ? `CONFIRMED · ${item.service}` : item.service}</Text>}
         {height >= 56 && <Text numberOfLines={1} style={styles.timelineDuration}>{item.duration}</Text>}
       </View>
     </GestureDetector>
@@ -553,7 +553,7 @@ export default function CalendarScreen() {
                     <View style={styles.weekCards}>
                       {dayAppointments.map((item) => {
                         const minutes = Number(String(item.duration).match(/\d+/)?.[0] ?? 60);
-                        const status = WEEK_STATUS[item.status] ?? WEEK_STATUS.pending;
+                        const status = item.status === 'pending' && item.clientConfirmed ? WEEK_STATUS.confirmed : WEEK_STATUS[item.status] ?? WEEK_STATUS.pending;
                         return (
                           <TouchableOpacity key={item.id} onPress={() => openAppointment(item)} style={[styles.weekCard, { backgroundColor: colors.card, borderColor: colors.border }]} testID={`week-appt-${item.appointmentId}`}>
                             <View style={[styles.weekStripe, { backgroundColor: item.serviceColor ?? colors.primary }]} />

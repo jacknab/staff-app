@@ -36,6 +36,8 @@ export type AppointmentRecord = {
   startMinutes: number;
   /** Held until the client pays the deposit (the payment link was texted); not confirmed yet. */
   depositDue?: boolean;
+  /** The client confirmed they're coming (their booking page or a "yes" text, 2026-11-18). */
+  clientConfirmed?: boolean;
   /** A deposit the client already paid: it comes off what checkout charges. */
   depositPaidCents?: number;
   /** Cancelled online by the client: within the policy (true) or late (false); null otherwise. */
@@ -141,7 +143,7 @@ type ApiCustomer = {
   allergies?: string | null; isVip?: boolean | null; tags?: string[] | null; avatarUrl?: string | null;
 };
 type ApiService = { id: number; parentServiceId?: number | null; isActive?: boolean | null; calendarColor?: string | null; categoryId?: number | null; offeredAt?: string | null; name?: string | null; duration?: number | string | null; price?: number | string | null };
-export type ApiAppointment = { processingStartMin?: number | null; processingMin?: number | null; clientCancelPending?: boolean | null; feeRetry?: { status: string; owedCents: number; collectedCents: number | null; error: string | null } | null; depositRefundRetry?: string | null; cancelledInPolicy?: boolean | null; depositRefundedCents?: number | null; depositRefundFailed?: boolean | null; cardOnFile?: boolean | null; feePercent?: number | null; feeCents?: number | null; feeChargedCents?: number | null; totalPaid?: number | null; refundedCents?: number | null; calendarHidden?: boolean | null; paymentStatus?: string | null; depositCollected?: number | null; visitAt?: string | null; clientAddress?: HouseCallAddress | null; travelFee?: number | null; appointmentAddons?: { addon?: { id?: number; name?: string | null; price?: number | string | null } | null }[] | null; customLines?: { label?: string; price?: number | string | null }[] | null; id: number; date: string; duration?: number | null; status?: string | null; notes?: string | null; customer?: ApiCustomer | null; service?: ApiService | null };
+export type ApiAppointment = { clientConfirmedAt?: string | null; processingStartMin?: number | null; processingMin?: number | null; clientCancelPending?: boolean | null; feeRetry?: { status: string; owedCents: number; collectedCents: number | null; error: string | null } | null; depositRefundRetry?: string | null; cancelledInPolicy?: boolean | null; depositRefundedCents?: number | null; depositRefundFailed?: boolean | null; cardOnFile?: boolean | null; feePercent?: number | null; feeCents?: number | null; feeChargedCents?: number | null; totalPaid?: number | null; refundedCents?: number | null; calendarHidden?: boolean | null; paymentStatus?: string | null; depositCollected?: number | null; visitAt?: string | null; clientAddress?: HouseCallAddress | null; travelFee?: number | null; appointmentAddons?: { addon?: { id?: number; name?: string | null; price?: number | string | null } | null }[] | null; customLines?: { label?: string; price?: number | string | null }[] | null; id: number; date: string; duration?: number | null; status?: string | null; notes?: string | null; customer?: ApiCustomer | null; service?: ApiService | null };
 
 const BookingContext = createContext<BookingContextValue | null>(null);
 
@@ -187,6 +189,7 @@ export function mapAppointment(appointment: ApiAppointment, timeZone: string): A
     phone: appointment.customer?.phone ?? undefined, email: appointment.customer?.email ?? undefined,
     avatarUrl: appointment.customer?.avatarUrl ?? null,
     depositDue: appointment.paymentStatus === 'awaiting_payment',
+    clientConfirmed: !!appointment.clientConfirmedAt,
     depositPaidCents: appointment.paymentStatus === 'awaiting_payment' ? 0 : Math.round((Number(appointment.depositCollected ?? 0) || 0) * 100),
     cancelledInPolicy: appointment.cancelledInPolicy ?? null,
     depositRefundedCents: appointment.depositRefundedCents != null ? Number(appointment.depositRefundedCents) : null,
@@ -322,6 +325,7 @@ export function appointmentParams(item: AppointmentRecord) {
       phone: item.phone ?? '',
       email: item.email ?? '',
       depositDue: item.depositDue ? '1' : '0',
+      clientConfirmed: item.clientConfirmed ? '1' : '0',
       depositPaidCents: String(item.depositPaidCents ?? 0),
       cancelledInPolicy: item.cancelledInPolicy == null ? '' : item.cancelledInPolicy ? '1' : '0',
       depositRefundedCents: item.depositRefundedCents != null ? String(item.depositRefundedCents) : '',

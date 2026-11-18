@@ -75,6 +75,7 @@ export const HELP: Record<string, HelpPage> = {
       { heading: 'Bookings', points: [
         'Tap a booking to open it: edit it, check out, mark it paid, cancel it or mark a no-show.',
         'A label on a booking shows when it’s PAID, a NO-SHOW or has a DEPOSIT DUE.',
+        'CONFIRMED on a booking (Confirmed in the Week view): the client confirmed they’re coming, with the Confirm I’ll be there button on their booking page (the link in their texts) or by replying yes to a text.',
         'A booking with processing time shows that part lighter, marked Processing; another booking can sit beside it then.',
         'A booking shows in its service’s calendar colour (Services › Calendar colour); one with several services takes the first one’s colour.',
         'To move a booking, press and hold it, then drag it to the new time. You’re shown the new time and choose whether to text the client about it (Notify client), or Cancel to leave it where it was.',
@@ -151,6 +152,7 @@ export const HELP: Record<string, HelpPage> = {
     intro: 'One booking and everything you can do with it.',
     sections: [
       { heading: 'What you see', points: [
+        'Confirmed by client: they tapped Confirm I’ll be there on their booking page or replied yes to a text.',
         'Add how they heard about you (when you ask it in Booking rules and the client hasn’t answered): choose Social media, Web search, A friend or Other.',
         'The client, with Text, Call and Email buttons. A Card on file badge under the name means the client (or this booking) has a saved card, so a no-show or late-cancel fee can be charged.',
         'The services, add-ons, date, time and total, and any deposit: paid, due (a link was texted), kept or refunded.',
@@ -176,6 +178,7 @@ export const HELP: Record<string, HelpPage> = {
       { heading: 'After', points: [
         'REBOOK books their next visit with the same services.',
         'Refund gives back all of a card payment, or part of it.',
+        'Change client (on a paid visit): if it was booked or checked out under the wrong client, find the right one and confirm. Only the client changes; the payment, date and services stay. History shows the change.',
         'Notes opens this client’s notes.',
       ] },
     ],
@@ -333,6 +336,7 @@ export const HELP: Record<string, HelpPage> = {
     intro: 'What you’ve taken and where it is.',
     sections: [
       { heading: 'Period', points: ['Today, This week, This month or Last month at the top picks the time the page shows.'] },
+      { heading: 'At the top', points: ['Appointments report: past, paid and cancelled bookings, as a list or a spreadsheet.', 'Invoices: bill a client with a link to pay by card.'] },
       { heading: 'What you see', points: [
         'Taken: everything clients paid in that time.',
         'How you were paid: the total for each way clients paid: cash, card, Tap to Pay, card reader (M2), gift card, package visit or split payment.',
@@ -561,6 +565,23 @@ export const HELP: Record<string, HelpPage> = {
       'Remove service takes it off your menu.',
     ] }],
   },
+  invoices: {
+    title: 'Invoices',
+    intro: 'Bill a client for anything, with a link to pay by card.',
+    sections: [
+      { heading: 'Making one', points: [
+        'Tap + and choose the client, give it a title, add the items (what each is for and its price), a due date (YYYY-MM-DD) and a memo if you like. Save draft keeps it without sending.',
+        'Send texts and e-mails the client the invoice with a link to pay by card (card payments need to be set up). Send again sends it once more.',
+      ] },
+      { heading: 'After it’s sent', points: [
+        'Each invoice shows Draft, Open, Past due (open after its due date), Paid or Cancelled.',
+        'When the client pays by the link, it shows Paid by itself.',
+        'Paid another way? Mark as paid records cash, a check, Venmo, Zelle, PayPal or other; the link stops working.',
+        'Cancel invoice stops the link. A draft can be edited or deleted instead.',
+        'A paid invoice can be refunded (all of it, or the amount you type) and you can text the client a receipt.',
+      ] },
+    ],
+  },
   promoCodes: {
     title: 'Promo codes',
     intro: 'Discount codes like SUMMER25, for checkout and your website.',
@@ -750,8 +771,12 @@ export const HELP: Record<string, HelpPage> = {
         'Review request: asks clients to review their visit. How often to text: a new client is asked after their first visit; after that, only once this many visits have passed.',
         'Rebooking reminder: one text with your booking link when a client hasn’t visited for the number of days you choose. Only to clients who agreed to marketing texts.',
       ] },
+      { heading: 'For you', points: [
+        'Notes after each visit: as each visit ends, a notification reminds you to add notes about it. Tap it to open Quick Notes for that visit. It saves as soon as you switch it.',
+      ] },
       { heading: 'Replies and phone numbers', points: [
         'Cancellation replies: when a client texts something clear like “Please cancel my appointment”, Certxa cancels their next appointment and confirms. Unclear messages stay for you to read.',
+        'Confirmation replies: a clear yes, like “Yes”, “Confirmed” or “See you then”, marks the client’s next booking in the coming week Confirmed. Nothing is texted back.',
         'Phone number verification: Verify phone numbers checks which client numbers are landlines, so texts aren’t wasted on them.',
       ] },
       { heading: 'Saving', points: ['Customize messages shows each text and e-mail so you can change the wording. Words in {braces}, like {customerName}, are filled in for each client.', 'Tap Save when you’re done; you’re asked before leaving with unsaved changes.'] },
