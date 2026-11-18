@@ -9,7 +9,7 @@ import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { useBookingData } from '@/contexts/BookingContext';
-import { zonedDay, zonedMoment, zonedTimeLabel } from '@/lib/businessTime';
+import { zonedDateLabel, zonedDay, zonedMoment, zonedTimeLabel } from '@/lib/businessTime';
 import { api, ApiError } from '@/lib/live-api';
 import { FormsPanel } from '@/components/FormsPanel';
 import { HelpTitle } from '@/components/HelpTitle';
@@ -95,6 +95,8 @@ type AppointmentRouteParams = {
     clientConfirmed?: string;
     clientCancelPending?: string;
     feeDecision?: string;
+    cancelledAt?: string;
+    cancelCutoffHours?: string;
     feePercent?: string;
     feeCents?: string;
     feeChargedCents?: string;
@@ -492,11 +494,23 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
   const feeAsk = `$${(feeCents / 100).toFixed(2)}`;
   // Mark it a no-show, collecting the fee or not (owner, 2026-11-18): asked when it opens, and the slider on the page.
   const [noShowChoice, setNoShowChoice] = useState<SliderSide | null>(null);
-  const askLateCancelFee = () => Alert.alert('Late cancellation',
-    `This booking was cancelled inside your cancellation policy. Mark it as a no-show and charge ${clientName}'s card on file the ${feeAsk} fee?`, [
-      { text: `No-show · collect ${feeAsk}`, style: 'destructive', onPress: () => void decideCancellation('no_show_fee') },
-      { text: 'No-show · no fee', onPress: () => void decideCancellation('no_show') },
-    ]);
+  // The notice when a late-cancelled booking opens (owner, 2026-11-18): large, and it only informs. When the booking was
+  // cancelled and how long before the appointment, in the business's time zone; the choice is the slider on the page.
+  const [lateNoticeOpen, setLateNoticeOpen] = useState(false);
+  const cancelledAt = params.cancelledAt ? new Date(params.cancelledAt) : null;
+  const lateNotice = (() => {
+    const base = 'This booking was cancelled inside your cancellation policy.';
+    if (!cancelledAt || Number.isNaN(cancelledAt.getTime())) return `${base} Mark it as a no-show below, with or without the ${feeAsk} fee.`;
+    const mins = Math.round((originalDate.getTime() - cancelledAt.getTime()) / 60000);
+    const span = mins < 60 ? `${Math.max(mins, 0)} minute${mins === 1 ? '' : 's'}`
+      : `${Math.floor(mins / 60)} hour${Math.floor(mins / 60) === 1 ? '' : 's'}${mins % 60 ? ` ${mins % 60} min` : ''}`;
+    const cutoff = Number(params.cancelCutoffHours) || 0;
+    const when = `${zonedDateLabel(cancelledAt, timeZone)} at ${zonedTimeLabel(cancelledAt, timeZone)}`;
+    const appt = `${zonedDateLabel(originalDate, timeZone)} at ${zonedTimeLabel(originalDate, timeZone)}`;
+    return `${base}\n\nIt was cancelled on ${when}, ${mins < 0 ? 'after the appointment started' : `${span} before the appointment`} (${appt}).`
+      + `${cutoff > 0 ? ` Your policy asks for ${cutoff} hour${cutoff === 1 ? '' : 's'} notice.` : ''}\n\nMark it as a no-show below, with or without the ${feeAsk} fee.`;
+  })();
+  const askLateCancelFee = () => setLateNoticeOpen(true);
   const asked = useRef(false);
   useEffect(() => {
     if (clientCancelPending && !asked.current) { asked.current = true; askLateCancelFee(); }
@@ -627,6 +641,19 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
     <View style={[styles.root, { backgroundColor: look.pageTop, paddingTop: topInset }]}>
       <AppBackground />
       <StatusBar barStyle="dark-content" />
+      <Modal visible={lateNoticeOpen} transparent animationType="fade" onRequestClose={() => setLateNoticeOpen(false)}>
+        <View style={styles.noticeBackdrop}>
+          <View testID="late-cancel-notice" style={[styles.noticeCard, { backgroundColor: colors.card }]}>
+            <Text style={[styles.noticeTitle, { color: colors.foreground }]}>Late cancellation</Text>
+            <Text style={[styles.noticeText, { color: colors.foreground }]}>{lateNotice}</Text>
+            <LinearGradient colors={[colors.primary, '#A855F7']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.checkoutGradient}>
+              <TouchableOpacity testID="late-cancel-notice-ok" onPress={() => setLateNoticeOpen(false)} style={styles.actionButton}>
+                <Text style={[styles.actionText, { color: colors.primaryForeground }]}>GOT IT</Text>
+              </TouchableOpacity>
+            </LinearGradient>
+          </View>
+        </View>
+      </Modal>
       <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
         <TouchableOpacity activeOpacity={1} onPress={() => setMenuOpen(false)} style={styles.menuBackdrop} accessibilityLabel="Close menu">
           <View testID="appointment-menu" style={[styles.menu, { top: topInset + 50, backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -1097,6 +1124,10 @@ const styles = StyleSheet.create({
   textActionText: { fontSize: 17, fontFamily: 'Inter_500Medium' },
   refundedNote: { fontSize: 15, fontFamily: 'Inter_500Medium', textAlign: 'center', marginTop: 14 },
   choiceBlock: { marginTop: 20 },
+  noticeBackdrop: { flex: 1, backgroundColor: 'rgba(17, 12, 34, 0.45)', alignItems: 'center', justifyContent: 'center', padding: 18 },
+  noticeCard: { width: '100%', maxWidth: 460, borderRadius: 22, padding: 24 },
+  noticeTitle: { fontSize: 25, fontFamily: 'Inter_700Bold', marginBottom: 12 },
+  noticeText: { fontSize: 18, lineHeight: 27, fontFamily: 'Inter_400Regular' },
   choiceLabels: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 4, marginBottom: 9 },
   choiceCaption: { fontSize: 13, letterSpacing: 0.75, fontFamily: 'Inter_700Bold' },
   choiceInstruction: { textAlign: 'center', fontSize: 13, lineHeight: 20, fontFamily: 'Inter_400Regular', marginTop: 9 },
