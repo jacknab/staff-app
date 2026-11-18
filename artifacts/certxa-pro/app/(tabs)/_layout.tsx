@@ -8,6 +8,7 @@ import { SymbolView } from 'expo-symbols';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePaymentsReady } from '@/lib/usePaymentsReady';
 import { ReviewAsk } from '@/components/ReviewAsk';
+import { TabletLauncher, useIsTablet } from '@/components/TabletLauncher';
 
 function ClassicTabLayout() {
   const colors = useColors();
@@ -19,6 +20,8 @@ function ClassicTabLayout() {
   const router = useRouter();
   // Payments not set up: the POS tab opens its Stripe page instead (owner, 2026-11-11; app/payments-pos.tsx).
   const paymentsReady = usePaymentsReady();
+  // Tablets (owner, 2026-11-19): no tab bar; the launcher button opens the app icons (components/TabletLauncher.tsx).
+  const isTablet = useIsTablet();
 
   return (
     <>
@@ -29,7 +32,7 @@ function ClassicTabLayout() {
         // Bigger text (owner, 2026-11-09): the tab names were the default 10 pt.
         tabBarLabelStyle: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
         headerShown: false,
-        tabBarStyle: {
+        tabBarStyle: isTablet ? { display: 'none' } : {
           position: 'absolute',
           backgroundColor: isIOS ? 'transparent' : colors.card,
           borderTopWidth: isWeb ? 1 : 0,
@@ -83,6 +86,7 @@ function ClassicTabLayout() {
           : <Feather name="grid" size={21} color={color} />,
       }} />
     </Tabs>
+    {isTablet ? <TabletLauncher /> : null}
     {/* The Google review request, once the account is 45 days old (components/ReviewAsk.tsx). */}
     <ReviewAsk />
     </>

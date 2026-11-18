@@ -20,6 +20,7 @@ import {
 import { Redirect, Stack, usePathname, useRouter, type Href } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { BookingProvider, useBookingData } from '@/contexts/BookingContext';
+import { TabletFrame } from '@/components/TabletFrame';
 import { onBookingPush, registerForBookingPushes } from '@/lib/push';
 import { setInboxLive } from '@/lib/inboxLive';
 import { prepareVoice, registerBusinessPhone } from '@/lib/voice';
@@ -210,7 +211,7 @@ export default function RootLayout() {
                 <GestureHandlerRootView>
                   <KeyboardProvider>
                     <PushBridge />
-                    <RootLayoutNav />
+                    <TabletFrame><RootLayoutNav /></TabletFrame>
                     {/* After the screens, so the "return to call" bar sits on top of them. */}
                     <CallScreen />
                     {/* The full-screen alarm (lib/alarm.ts): over every screen, the call screen included. */}

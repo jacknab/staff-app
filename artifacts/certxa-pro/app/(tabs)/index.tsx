@@ -23,6 +23,7 @@ import { HelpTitle } from '@/components/HelpTitle';
 
 import { AppBackground } from '@/components/look/AppBackground';
 import { SectionTitle } from '@/components/look/SectionHeader';
+import { APP_MAX_WIDTH } from '@/components/TabletFrame';
 import { look, cardShadow } from '@/components/look/tokens';
 type Ticket = ApiAppointment & { calendarHidden?: boolean | null };
 type Conversation = { clientPhone: string; clientName: string | null; lastMessage: string; lastMessageAt: string; unreadCount: number };
@@ -127,12 +128,14 @@ export default function HomeScreen() {
       <AppBackground />
       <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
         <TouchableOpacity activeOpacity={1} onPress={() => setMenuOpen(false)} style={styles.menuBackdrop} accessibilityLabel="Close menu">
-          <View testID="home-menu-list" style={[styles.menu, { top: topInset + 50, backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View pointerEvents="box-none" style={styles.menuColumn}>
+            <View testID="home-menu-list" style={[styles.menu, { top: topInset + 50, backgroundColor: colors.card, borderColor: colors.border }]}>
             {quickLinks.map((link) => (
               <TouchableOpacity key={link.key} testID={`home-menu-${link.key}`} onPress={() => { setMenuOpen(false); router.push(link.href); }} style={styles.menuItem}>
                 <Text style={[styles.menuText, { color: colors.foreground }]}>{link.label}</Text>
               </TouchableOpacity>
             ))}
+          </View>
           </View>
         </TouchableOpacity>
       </Modal>
@@ -279,6 +282,8 @@ const styles = StyleSheet.create({
   date: { fontSize: 14, letterSpacing: 1.2, fontFamily: 'Inter_700Bold' },
   headRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 4 },
   menuBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.08)' },
+  // Tablets: the menu stays inside the app's column (components/TabletFrame.tsx), under its button.
+  menuColumn: { flex: 1, width: '100%', maxWidth: APP_MAX_WIDTH, alignSelf: 'center' },
   menu: { position: 'absolute', right: 14, minWidth: 240, maxWidth: 320, borderWidth: 1, borderRadius: 14, paddingVertical: 6, ...cardShadow },
   menuItem: { paddingHorizontal: 16, paddingVertical: 13 },
   menuText: { fontSize: 17, fontFamily: 'Inter_500Medium' },

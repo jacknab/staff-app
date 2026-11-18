@@ -17,6 +17,7 @@ import { ChoiceSlider, type SliderSide } from '@/components/ChoiceSlider';
 import { SelectField } from '@/components/SelectField';
 
 import { AppBackground } from '@/components/look/AppBackground';
+import { APP_MAX_WIDTH } from '@/components/TabletFrame';
 import { look, cardShadow } from '@/components/look/tokens';
 import { usePaymentsReady } from '@/lib/usePaymentsReady';
 /** Every quarter hour of the working day, and the booking's own time when it is between them. */
@@ -658,13 +659,15 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
       </Modal>
       <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
         <TouchableOpacity activeOpacity={1} onPress={() => setMenuOpen(false)} style={styles.menuBackdrop} accessibilityLabel="Close menu">
-          <View testID="appointment-menu" style={[styles.menu, { top: topInset + 50, backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View pointerEvents="box-none" style={styles.menuColumn}>
+            <View testID="appointment-menu" style={[styles.menu, { top: topInset + 50, backgroundColor: colors.card, borderColor: colors.border }]}>
             {menuItems.map((m) => (
               <TouchableOpacity key={m.key} testID={`appointment-menu-${m.key}`} disabled={!m.on || saving} onPress={() => { setMenuOpen(false); m.run(); }} style={styles.menuItem}>
                 <Text style={[styles.menuText, { color: m.on ? colors.foreground : colors.mutedForeground }]}>{m.label}</Text>
                 {!m.on && m.why ? <Text style={[styles.menuWhy, { color: colors.mutedForeground }]}>{m.why}</Text> : null}
               </TouchableOpacity>
             ))}
+          </View>
           </View>
         </TouchableOpacity>
       </Modal>
@@ -1110,6 +1113,8 @@ function RefundSheet({ open, colors, appointmentId, refundableCents, onClose, on
 
 const styles = StyleSheet.create({
   menuBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.08)' },
+  // Tablets: the menu stays inside the app's column (components/TabletFrame.tsx), under its button.
+  menuColumn: { flex: 1, width: '100%', maxWidth: APP_MAX_WIDTH, alignSelf: 'center' },
   menu: { position: 'absolute', right: 14, minWidth: 260, maxWidth: 320, borderWidth: 1, borderRadius: 14, paddingVertical: 6, ...cardShadow },
   menuItem: { paddingHorizontal: 16, paddingVertical: 11 },
   menuText: { fontSize: 17, fontFamily: 'Inter_500Medium' },

@@ -29,6 +29,7 @@ import { HoldToDelete } from '@/components/HoldToDelete';
 import { AppBackground } from '@/components/look/AppBackground';
 import { SectionTitle } from '@/components/look/SectionHeader';
 import { MenuCard } from '@/components/look/MenuCard';
+import { APP_MAX_WIDTH } from '@/components/TabletFrame';
 import { look, cardShadow } from '@/components/look/tokens';
 type Note = { id: number; noteContent: string; createdAt: string; pinned?: boolean | null };
 type Tag = { id: number; tagName: string; tagColor?: string | null };
@@ -565,7 +566,7 @@ const styles = StyleSheet.create({
   headerButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   menuButton: { width: 42, height: 42, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   overlayBackdrop: { flex: 1, backgroundColor: 'rgba(17, 12, 34, 0.45)', justifyContent: 'flex-end' },
-  overlayPanel: { borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingHorizontal: 18, paddingTop: 14 },
+  overlayPanel: { width: '100%', maxWidth: APP_MAX_WIDTH, alignSelf: 'center', borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingHorizontal: 18, paddingTop: 14 },
   overlayHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 10 },
   overlayTitle: { flex: 1, fontSize: 24, fontFamily: 'Inter_700Bold' },
   overlayGroup: { gap: 12 },

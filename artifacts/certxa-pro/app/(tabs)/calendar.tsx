@@ -16,6 +16,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppBackground } from '@/components/look/AppBackground';
 import { MenuCard } from '@/components/look/MenuCard';
 import { SectionHeader } from '@/components/look/SectionHeader';
+import { APP_MAX_WIDTH } from '@/components/TabletFrame';
 import { look } from '@/components/look/tokens';
 type TimeBlock = { id: number; startsAt: string; endsAt: string; allDay: boolean; note: string | null };
 
@@ -728,7 +729,7 @@ const styles = StyleSheet.create({
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   daySummary: { fontSize: 16, fontFamily: 'Inter_400Regular', marginTop: 7, marginBottom: 12 },
   overlayBackdrop: { flex: 1, backgroundColor: 'rgba(17, 12, 34, 0.45)', justifyContent: 'flex-end' },
-  overlayPanel: { borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingHorizontal: 18, paddingTop: 14, maxHeight: '88%' },
+  overlayPanel: { width: '100%', maxWidth: APP_MAX_WIDTH, alignSelf: 'center', borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingHorizontal: 18, paddingTop: 14, maxHeight: '88%' },
   overlayHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 },
   overlayTitle: { fontSize: 26, fontFamily: 'Inter_700Bold' },
   overlayGroup: { gap: 12 },
