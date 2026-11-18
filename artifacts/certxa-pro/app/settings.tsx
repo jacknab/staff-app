@@ -595,7 +595,8 @@ export default function SettingsScreen() {
       {draft.advanceBookingEnabled ? withCurrent('advanceBookingMonths', [1, 3, 6, 12], (value) => `Up to ${value} ${value === 1 ? 'month' : 'months'} ahead`) : null}
 
       <SectionTitle style={styles.section}>Cancelling</SectionTitle>
-      {toggle('allowOnlineCancellation', 'Allow online cancellation', 'Clients can cancel their appointment online, up to your cancellation notice (Settings › Cancellation policy). After that, they have to contact you.')}
+      {/* Moving a booking online follows the same rule (owner, 2026-11-18, GlossGenius; api-server lib/clientReschedule.ts). */}
+      {toggle('allowOnlineCancellation', 'Allow online cancelling and rescheduling', 'Clients can cancel or move their appointment to another open time from the link in their texts, up to your cancellation notice (Settings › Cancellation policy). After that, they have to contact you. Only the day and time change; a deposit stays with the booking.')}
       {saveButton()}
     </>);
     if (screen === 'policy') return (<>
