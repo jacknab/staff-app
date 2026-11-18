@@ -860,7 +860,8 @@ const styles = StyleSheet.create({
   timelineDuration: { color: '#5B5F78', fontSize: 13, lineHeight: 17, fontFamily: 'Inter_500Medium', marginTop: 2 },
   timelineEmpty: { position: 'absolute', top: 120, left: 0, right: 0, alignItems: 'center', gap: 8 },
   timelineEmptyText: { color: '#A9ACC0', fontSize: 15, fontFamily: 'Inter_500Medium' },
-  currentTime: { position: 'absolute', left: 0, right: 0, height: 2 },
+  // Over the bookings (they sit at zIndex 1), so the time now shows across a booking too; under one being dragged (5).
+  currentTime: { position: 'absolute', left: 0, right: 0, height: 2, zIndex: 4, elevation: 4 },
   nowPill: { position: 'absolute', left: 4, right: 0, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
   nowPillText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(17, 21, 46, 0.42)', justifyContent: 'center', padding: 20 },
