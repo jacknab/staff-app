@@ -10,9 +10,9 @@ export type SliderSide = 'left' | 'right';
  * The two-way slider (first used for the deposit request when booking): slide the handle left or right, or tap a
  * side, to choose; the button below it then acts on the choice. Shared so every yes/no choice in the app looks the same.
  */
-export function ChoiceSlider({ choice, onChoice, leftLabel, rightLabel, accessibilityLabel, accessibilityHint, testID, strong }: {
+export function ChoiceSlider({ choice, onChoice, leftLabel, rightLabel, accessibilityLabel, accessibilityHint, testID, strong, allowMiddle }: {
   choice: SliderSide | null;
-  onChoice: (choice: SliderSide) => void;
+  onChoice: (choice: SliderSide | null) => void;
   leftLabel: string;
   rightLabel: string;
   accessibilityLabel: string;
@@ -20,13 +20,15 @@ export function ChoiceSlider({ choice, onChoice, leftLabel, rightLabel, accessib
   testID?: string;
   /** Larger, dark labels, for a choice the page is built around (the late-cancel fee). */
   strong?: boolean;
+  /** The handle can go back to the middle (no choice yet): tap it, or slide it there (owner, 2026-11-18). */
+  allowMiddle?: boolean;
 }) {
   const colors = useColors();
   const offset = useRef(new Animated.Value(0)).current;
   const startOffset = useRef(0);
   const maxTravel = useRef(0);
-  const animateTo = (next: SliderSide) => Animated.spring(offset, {
-    toValue: next === 'left' ? -maxTravel.current : maxTravel.current,
+  const animateTo = (next: SliderSide | null) => Animated.spring(offset, {
+    toValue: next === 'left' ? -maxTravel.current : next === 'right' ? maxTravel.current : 0,
     useNativeDriver: true, speed: 22, bounciness: 5,
   }).start();
   const responder = useMemo(() => PanResponder.create({
@@ -39,15 +41,20 @@ export function ChoiceSlider({ choice, onChoice, leftLabel, rightLabel, accessib
     },
     onPanResponderRelease: (_, gesture) => {
       if (Math.abs(gesture.dx) < 12) {
+        // A tap on the handle: back to the middle when that's allowed, else it stays where it was.
+        if (allowMiddle && choice) { onChoice(null); animateTo(null); return; }
         if (choice) animateTo(choice); else offset.setValue(0);
         return;
       }
-      const next: SliderSide = startOffset.current + gesture.dx < 0 ? 'left' : 'right';
+      const end = startOffset.current + gesture.dx;
+      // Let go near the middle: no choice yet.
+      if (allowMiddle && Math.abs(end) < maxTravel.current / 3) { onChoice(null); animateTo(null); return; }
+      const next: SliderSide = end < 0 ? 'left' : 'right';
       onChoice(next);
       animateTo(next);
     },
     onPanResponderTerminate: () => { if (choice) animateTo(choice); else offset.setValue(0); },
-  }), [choice, offset, onChoice]);
+  }), [choice, offset, onChoice, allowMiddle]);
 
   return (
     <View testID={testID} style={[styles.choiceSlider, { backgroundColor: colors.muted, borderColor: colors.border }]} onLayout={(event) => { maxTravel.current = Math.max(0, event.nativeEvent.layout.width / 2 - 31); }}>

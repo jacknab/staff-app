@@ -627,6 +627,8 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
   // A cancelled booking can be marked a no-show at any time; an open one once its time is over.
   const canNoShow = (isOpenBooking && visitOver) || status === 'cancelled';
   const menuItems: { key: string; label: string; why?: string; on: boolean; run: () => void }[] = [
+    // The client's notes (owner, 2026-11-18): from here instead of a row on the page.
+    { key: 'notes', label: 'Client notes', on: !isPreview, why: '', run: () => router.push({ pathname: '/notes', params: { customerId: params.customerId ?? '', clientName, appointmentId: String(appointmentId) } }) },
     { key: 'edit', label: 'Edit appointment', on: canEdit && !isPreview, why: 'Only an upcoming booking can be edited', run: openEdit },
     { key: 'complete', label: prepaid ? 'Mark as done' : 'Mark as completed', on: isOpenBooking, why: 'This booking is already closed', run: () => void markCompleted() },
     { key: 'no-show', label: 'No-show (no fee)', on: canNoShow && !isPreview, why: isOpenBooking ? 'After the appointment’s time is over' : 'This booking is already closed', run: () => noShowFee(false) },
@@ -727,14 +729,6 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
           </View>
           </>) : null}
 
-          <TouchableOpacity testID="appointment-notes" onPress={() => router.push({ pathname: '/notes', params: { customerId: params.customerId ?? '', clientName, appointmentId: String(appointmentId) } })} style={[styles.notesRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={styles.notesCopy}>
-              <Text style={[styles.sectionLabel, { color: colors.foreground }]}>Notes</Text>
-              {params.note ? <Text numberOfLines={1} style={[styles.notesPreview, { color: colors.mutedForeground }]}>{params.note}</Text> : null}
-            </View>
-            <Feather name="chevron-right" size={20} color={colors.mutedForeground} />
-          </TouchableOpacity>
-
           <View style={[styles.appointmentCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.appointmentMeta}>
               <View style={[styles.serviceIcon, { backgroundColor: colors.secondary }]}><Feather name="scissors" size={19} color={colors.primary} /></View>
@@ -744,11 +738,11 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
               </View>
               <Text style={[styles.amount, { color: colors.foreground }]}>${(amountCents / 100).toFixed(2)}</Text>
             </View>
-            <Text style={[styles.serviceName, { color: colors.foreground }]}>{serviceName}</Text>
+            <Text style={[styles.serviceName, styles.cardRegular, { color: colors.foreground }]}>{serviceName}</Text>
             <View style={styles.detailRows}>
               <View style={styles.visitWhenRow} testID="appointment-when">
                 <Feather name="calendar" size={19} color={colors.primary} />
-                <Text style={[styles.visitWhenText, { color: colors.foreground }]} numberOfLines={2}>
+                <Text style={[styles.visitWhenText, styles.cardRegular, { color: colors.foreground }]} numberOfLines={2}>
                   {day.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · {time} – {visitEnd} <Text style={{ color: colors.mutedForeground }}>({duration.replace(/ /g, '\u00A0')})</Text>
                 </Text>
               </View>
@@ -832,16 +826,13 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
                   bordered card, so it's the first thing the pro sees on the page (owner, 2026-11-18). */}
               <View testID="late-cancel-card" style={[styles.decisionCard, { backgroundColor: colors.card, borderColor: colors.primary }]}>
               <Text testID="client-cancel-note" style={[styles.decisionTitle, { color: colors.foreground }]}>
-                {`This booking was cancelled inside your cancellation policy. Mark it as a no-show, with or without the ${feeAsk} fee.`}
+                {`Mark as No-show, with or without the ${feeAsk} fee.`}
               </Text>
               <View style={styles.choiceBlock}>
-                <View style={styles.choiceLabels}>
-                  <Text style={[styles.choiceCaption, styles.strongCaption, { color: noShowChoice === 'left' ? colors.primary : colors.foreground }]}>{`COLLECT FEE · ${feeAsk}`}</Text>
-                  <Text style={[styles.choiceCaption, styles.strongCaption, { color: noShowChoice === 'right' ? colors.accentForeground : colors.foreground }]}>NO FEE</Text>
-                </View>
-                <ChoiceSlider strong testID="no-show-fee-slider" choice={noShowChoice} onChoice={setNoShowChoice} leftLabel="YES" rightLabel="NO"
+                {/* Back to the middle (tap the handle, or slide it there) when they want to decide later. */}
+                <ChoiceSlider strong allowMiddle testID="no-show-fee-slider" choice={noShowChoice} onChoice={setNoShowChoice} leftLabel="YES" rightLabel="NO"
                   accessibilityLabel="No-show fee choice" accessibilityHint={`Slide left to collect the ${feeAsk} fee. Slide right for no fee.`} />
-                <Text style={[styles.choiceInstruction, { color: colors.mutedForeground }]}>Slide the handle left for yes or right for no. You can also tap either side.</Text>
+                <Text style={[styles.choiceInstruction, { color: colors.mutedForeground }]}>You can also tap either side.</Text>
               </View>
               <View style={[styles.choiceOutcome, { backgroundColor: noShowChoice === 'left' ? colors.secondary : colors.accent }]}>
                 <Feather name={noShowChoice === 'left' ? 'credit-card' : 'check-circle'} size={19} color={noShowChoice === 'left' ? colors.primary : colors.accentForeground} />
@@ -1129,13 +1120,10 @@ const styles = StyleSheet.create({
   choiceBlock: { marginTop: 20 },
   decisionCard: { borderWidth: 2, borderRadius: 22, padding: 18, marginTop: 18, ...cardShadow, shadowOpacity: 0.16, shadowRadius: 18, elevation: 6 },
   decisionTitle: { fontSize: 18, lineHeight: 25, fontFamily: 'Inter_700Bold', textAlign: 'center' },
-  strongCaption: { fontSize: 15, letterSpacing: 0.9 },
   noticeBackdrop: { flex: 1, backgroundColor: 'rgba(17, 12, 34, 0.45)', alignItems: 'center', justifyContent: 'center', padding: 18 },
   noticeCard: { width: '100%', maxWidth: 460, borderRadius: 22, padding: 24 },
   noticeTitle: { fontSize: 25, fontFamily: 'Inter_700Bold', marginBottom: 12 },
   noticeText: { fontSize: 18, lineHeight: 27, fontFamily: 'Inter_400Regular' },
-  choiceLabels: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 4, marginBottom: 9 },
-  choiceCaption: { fontSize: 13, letterSpacing: 0.75, fontFamily: 'Inter_700Bold' },
   choiceInstruction: { textAlign: 'center', fontSize: 13, lineHeight: 20, fontFamily: 'Inter_400Regular', marginTop: 9 },
   choiceOutcome: { minHeight: 58, borderRadius: 14, paddingHorizontal: 13, paddingVertical: 11, flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 16 },
   choiceOutcomeText: { flex: 1, fontSize: 15, lineHeight: 20, fontFamily: 'Inter_500Medium' },
@@ -1168,9 +1156,7 @@ const styles = StyleSheet.create({
   quickIcon: { width: 37, height: 37, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   quickLabel: { fontSize: 13, fontFamily: 'Inter_500Medium' },
   notesRow: { minHeight: 58, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', ...cardShadow },
-  notesCopy: { flex: 1, paddingRight: 12 },
   sectionLabel: { fontSize: 17, fontFamily: 'Inter_500Medium' },
-  notesPreview: { fontSize: 14, marginTop: 4, fontFamily: 'Inter_400Regular' },
   appointmentCard: { borderWidth: 1, borderRadius: 17, padding: 15, marginTop: 12, ...cardShadow },
   appointmentMeta: { flexDirection: 'row', alignItems: 'center' },
   serviceIcon: { width: 43, height: 43, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
@@ -1185,6 +1171,8 @@ const styles = StyleSheet.create({
   cardBadgeText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
   amount: { fontSize: 19, fontFamily: 'Inter_600SemiBold' },
   serviceName: { fontSize: 19, fontFamily: 'Inter_600SemiBold', marginTop: 14 },
+  // The booking card's service and date/time in regular weight (owner, 2026-11-18).
+  cardRegular: { fontFamily: 'Inter_400Regular' },
   ticket: { marginTop: 14, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, gap: 8 },
   ticketRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
   ticketLabel: { flex: 1, fontSize: 17, fontFamily: 'Inter_400Regular' },
