@@ -100,6 +100,7 @@ export default function ExpensesScreen() {
       help="expenses"
       title={draft ? (draft.id > 0 ? 'Edit expense' : 'New expense') : 'Expenses'}
       onBack={() => (draft ? (setDraft(null), setError('')) : router.back())}
+      inner={!!draft}
       onAdd={draft ? undefined : () => { setError(''); setDraft({ id: 0, amount: '', date: toText(ymd(new Date())), category: 'Supplies', vendor: '', note: '', receipt: null, repeatsMonthly: false }); }}
       addLabel="Add an expense"
       testID="expenses"

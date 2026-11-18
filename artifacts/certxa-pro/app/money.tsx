@@ -25,6 +25,7 @@ import { businessToday } from '@/lib/businessTime';
 import { AppBackground } from '@/components/look/AppBackground';
 import { SectionTitle } from '@/components/look/SectionHeader';
 import { look, cardShadow } from '@/components/look/tokens';
+import { useInPane } from '@/components/TabletSplit';
 type Overview = {
   cards: {
     today: { amount: number }; week: { amount: number }; month: { amount: number };
@@ -57,6 +58,7 @@ function periodRange(period: Period, tz: string) {
 
 export default function MoneyScreen() {
   const colors = useColors();
+  const inPane = useInPane();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { timeZone } = useBookingData();
@@ -98,9 +100,9 @@ export default function MoneyScreen() {
     <View style={[styles.root, { backgroundColor: look.pageTop, paddingTop: topInset }]} testID="money-screen">
       <AppBackground />
       <View style={styles.nav}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.navSide} accessibilityLabel="Back" testID="money-back">
+        {!inPane ? <TouchableOpacity onPress={() => router.back()} style={styles.navSide} accessibilityLabel="Back" testID="money-back">
           <Feather name="arrow-left" size={24} color={colors.foreground} />
-        </TouchableOpacity>
+        </TouchableOpacity> : <View style={styles.navSide} />}
         <HelpTitle help="money" style={[styles.navTitle, { color: colors.foreground }]}>Money</HelpTitle>
         <View style={styles.navSide} />
       </View>

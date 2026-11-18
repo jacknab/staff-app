@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Feather } from '@expo/vector-icons';
 import { Alert, Image, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
@@ -15,9 +15,13 @@ import { api } from '@/lib/live-api';
 
 import { AppBackground } from '@/components/look/AppBackground';
 import { look, cardShadow } from '@/components/look/tokens';
+import { useIsTablet } from '@/components/TabletLauncher';
+import { TabletSplit } from '@/components/TabletSplit';
+import ClientProfileScreen from '../client/[id]';
 /**
  * Clients (owner, 2026-11-03; plans/certxa-pro-crm.md): search by name, phone or e-mail; filters by the website's
- * status rule (lib/clientStatus.ts) plus Upcoming; each row opens the client's profile (app/client/[id].tsx).
+ * status rule (lib/clientStatus.ts) plus Upcoming; each row opens the client's profile (app/client/[id].tsx). On a tablet
+ * the profile opens on the right of the list (owner, 2026-11-19; components/TabletSplit.tsx).
  */
 type Filter = 'all' | 'upcoming' | ClientStatus;
 const FILTERS: { key: Filter; label: string }[] = [
@@ -76,7 +80,11 @@ export default function ClientsScreen() {
     if (client.lastVisitAt) return `Last visit ${zonedDateLabel(client.lastVisitAt, timeZone)}${client.lastService ? ` · ${client.lastService}` : ''}`;
     return 'No visits yet';
   };
-  const open = (customerId: number) => router.push(`/client/${customerId}`);
+  const isTablet = useIsTablet();
+  const [picked, setPicked] = useState<number | null>(null);
+  const open = (customerId: number) => (isTablet ? setPicked(customerId) : router.push(`/client/${customerId}`));
+  // A tablet shows the first client's profile until another is chosen.
+  useEffect(() => { if (isTablet && picked == null && filtered[0]) setPicked(filtered[0].client.customerId); }, [isTablet, picked, filtered]);
 
   const saveClient = async () => {
     const trimmed = newName.trim();
@@ -90,7 +98,7 @@ export default function ClientsScreen() {
     finally { setSaving(false); }
   };
 
-  return (
+  const page = (
     <KeyboardAvoidingView style={[styles.root, { backgroundColor: look.pageTop, paddingTop: topInset }]} behavior="padding" keyboardVerticalOffset={0}>
       <AppBackground />
       {/* Fixed header (owner, 2026-11-18): only the list under All clients scrolls. */}
@@ -120,7 +128,7 @@ export default function ClientsScreen() {
       <ScrollView contentContainerStyle={styles.listContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={styles.clientList}>
           {filtered.map(({ client, status }) => (
-            <TouchableOpacity key={client.id} testID={`client-${client.customerId}`} onPress={() => open(client.customerId)} style={[styles.clientRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <TouchableOpacity key={client.id} testID={`client-${client.customerId}`} onPress={() => open(client.customerId)} style={[styles.clientRow, { backgroundColor: colors.card, borderColor: colors.border }, isTablet && picked === client.customerId && { borderColor: colors.primary, borderWidth: 2 }]}>
               {client.avatarUrl
                 ? <Image source={{ uri: client.avatarUrl }} style={styles.avatar} />
                 : <View style={[styles.avatar, { backgroundColor: colors.secondary }]}><Text style={[styles.initials, { color: colors.primary }]}>{client.initials}</Text></View>}
@@ -142,6 +150,8 @@ export default function ClientsScreen() {
       </ScrollView>
     </KeyboardAvoidingView>
   );
+  if (!isTablet) return page;
+  return <TabletSplit list={page} pane={picked != null ? { key: `client-${picked}`, Screen: ClientProfileScreen, params: { id: String(picked) } } : null} onClose={() => setPicked(null)} />;
 }
 
 const styles = StyleSheet.create({

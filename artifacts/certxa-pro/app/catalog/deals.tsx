@@ -97,6 +97,7 @@ export default function DealsScreen() {
       help="catalog.deals"
       title={draft ? (draft.id > 0 ? 'Edit deal' : 'New deal') : 'Deals'}
       onBack={() => (draft ? (setDraft(null), setError('')) : router.back())}
+      inner={!!draft}
       onAdd={draft ? undefined : () => { setError(''); setDraft({ id: 0, packageId: 0, title: '', description: '', dealPrice: '', capacity: '25', starts: dateText(new Date()), ends: dateText(inDays(30)), expiryDays: 30 }); }}
       addLabel="Add a deal"
       testID="deals"

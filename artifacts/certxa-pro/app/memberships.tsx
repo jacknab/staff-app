@@ -89,6 +89,7 @@ export default function MembershipsScreen() {
       help="memberships"
       title={draft ? (draft.id > 0 ? 'Edit membership' : 'New membership') : 'Memberships'}
       onBack={() => (draft ? (setDraft(null), setError('')) : router.back())}
+      inner={!!draft}
       onAdd={draft ? undefined : () => { setError(''); setDraft({ id: 0, name: '', description: '', price: '', interval: 'month', discount: '', includes: [{ serviceId: 0, visits: '1' }] }); }}
       addLabel="Add a membership"
       testID="memberships"

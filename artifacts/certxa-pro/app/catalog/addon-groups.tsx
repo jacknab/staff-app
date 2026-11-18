@@ -93,6 +93,7 @@ export default function AddonGroupsScreen() {
       help="catalog.addon-groups"
       title={draft ? (draft.id > 0 ? 'Edit group' : 'New group') : 'Add-on Groups'}
       onBack={() => (draft ? (setDraft(null), setError('')) : router.back())}
+      inner={!!draft}
       onAdd={draft ? undefined : () => { setError(''); setDraft({ id: 0, name: '', addonIds: [] }); }}
       addLabel="Add an add-on group"
       testID="addon-groups"

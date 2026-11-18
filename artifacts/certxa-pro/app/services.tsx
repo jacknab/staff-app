@@ -14,6 +14,7 @@ import { SERVICE_COLORS } from '@/lib/serviceColors';
 import { AppBackground } from '@/components/look/AppBackground';
 import { SectionTitle } from '@/components/look/SectionHeader';
 import { look, cardShadow } from '@/components/look/tokens';
+import { useInPane } from '@/components/TabletSplit';
 type OfferedAt = 'place' | 'client' | 'any';
 type Service = { id: number; name: string; duration: number; price: number; offeredAt: OfferedAt; categoryId: number | null; allowQuantity: boolean; color: string | null; processingStart: number | null; processing: number | null; parentId: number | null; optionLabel: string | null };
 type Category = { id: number; name: string; sortOrder: number };
@@ -30,6 +31,7 @@ function minutesLabel(minutes: number) {
 
 export default function ServicesScreen() {
   const colors = useColors();
+  const inPane = useInPane();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { refresh } = useBookingData();
@@ -164,7 +166,7 @@ export default function ServicesScreen() {
       <AppBackground />
       <StatusBar barStyle="dark-content" />
       <View style={styles.header}>
-        <TouchableOpacity testID="services-back" accessibilityLabel="Back" onPress={() => (draft ? (setDraft(null), setError('')) : router.back())} style={styles.headerButton}><Feather name="arrow-left" size={21} color={colors.foreground} /></TouchableOpacity>
+        {!inPane || !!draft ? <TouchableOpacity testID="services-back" accessibilityLabel="Back" onPress={() => (draft ? (setDraft(null), setError('')) : router.back())} style={styles.headerButton}><Feather name="arrow-left" size={21} color={colors.foreground} /></TouchableOpacity> : <View style={styles.headerButton} />}
         <HelpTitle help="services" style={[styles.headerTitle, { color: colors.foreground }]}>{draft ? (draft.id > 0 ? 'Edit service' : 'New service') : 'Services'}</HelpTitle>
         {draft ? <View style={styles.headerButton} /> : (
           <TouchableOpacity testID="services-add" accessibilityLabel="Add a service" onPress={() => { setError(''); setSavedGroupIds([]); setDraft({ id: 0, name: '', minutes: '', price: '', offeredAt: 'any', categoryId: null, allowQuantity: false, groupIds: [], color: null, processingOn: false, processingStart: '', processing: '', options: [] }); }} style={styles.headerButton}><Feather name="plus" size={22} color={colors.primary} /></TouchableOpacity>

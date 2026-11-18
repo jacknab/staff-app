@@ -97,6 +97,7 @@ export default function PackagesScreen() {
       help="catalog.packages"
       title={draft ? (draft.id > 0 ? 'Edit package' : 'New package') : 'Packages'}
       onBack={() => (draft ? (setDraft(null), setError('')) : router.back())}
+      inner={!!draft}
       onAdd={draft ? undefined : () => { setError(''); setDraft({ id: 0, name: '', description: '', imageUrl: null, fixed: false, fixedPrice: '', hiddenFromPublic: false, serviceIds: [], addonIds: [] }); }}
       addLabel="Add a package"
       testID="packages"

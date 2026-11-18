@@ -87,6 +87,7 @@ export default function CategoriesScreen() {
       help="catalog.categories"
       title={draft ? (draft.id > 0 ? 'Edit category' : 'New category') : 'Categories'}
       onBack={() => (draft ? (setDraft(null), setError('')) : router.back())}
+      inner={!!draft}
       onAdd={draft ? undefined : () => { setError(''); setDraft({ id: 0, name: '', color: null, imageUrl: null, hiddenFromPublic: false }); }}
       addLabel="Add a category"
       testID="categories"

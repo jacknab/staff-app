@@ -11,7 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Feather } from '@expo/vector-icons';
 import { ActivityIndicator, Alert, Image, Linking, Modal, ScrollView, StatusBar, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { callClient } from '@/lib/voice';
-import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { SelectField } from '@/components/SelectField';
@@ -31,6 +31,7 @@ import { SectionTitle } from '@/components/look/SectionHeader';
 import { MenuCard } from '@/components/look/MenuCard';
 import { APP_MAX_WIDTH } from '@/components/TabletFrame';
 import { look, cardShadow } from '@/components/look/tokens';
+import { useInPane, useScreenParams, usePaneClose } from '@/components/TabletSplit';
 type Note = { id: number; noteContent: string; createdAt: string; pinned?: boolean | null };
 type Tag = { id: number; tagName: string; tagColor?: string | null };
 type Prefs = { smsMarketingOptIn?: boolean | null; emailMarketingOptIn?: boolean | null; promotionalNotifications?: boolean | null; appointmentReminders?: boolean | null; reviewRequests?: boolean | null };
@@ -68,9 +69,11 @@ const STATUS_TEXT: Record<string, string> = { completed: 'Paid', cancelled: 'Can
 
 export default function ClientProfileScreen() {
   const colors = useColors();
+  const inPane = useInPane();
+  const closePane = usePaneClose();
   const insets = useSafeAreaInsets();
   const { timeZone, refresh: refreshBookings, clients } = useBookingData();
-  const params = useLocalSearchParams<{ id?: string }>();
+  const params = useScreenParams<{ id?: string }>();
   const clientId = Number(params.id);
   const [client, setClient] = useState<Client | null>(null);
   const [visits, setVisits] = useState<Visit[]>([]);
@@ -205,7 +208,7 @@ export default function ClientProfileScreen() {
   const deleteClient = () => run(async () => {
     await api.del(`/api/pro/clients/${clientId}`);
     void refreshBookings();
-    router.back();
+    closePane();
   }, 'Could not delete the client.');
 
   // ── Merge duplicate profiles into this one (owner, 2026-11-18, GlossGenius): this client keeps its details; the chosen
@@ -305,7 +308,7 @@ export default function ClientProfileScreen() {
         </TouchableOpacity>
       </Modal>
       <View style={styles.header}>
-        <TouchableOpacity testID="client-profile-back" accessibilityLabel="Back" onPress={() => router.back()} style={styles.headerButton}><Feather name="arrow-left" size={21} color={colors.foreground} /></TouchableOpacity>
+        {!inPane ? <TouchableOpacity testID="client-profile-back" accessibilityLabel="Back" onPress={() => router.back()} style={styles.headerButton}><Feather name="arrow-left" size={21} color={colors.foreground} /></TouchableOpacity> : <View style={styles.headerButton} />}
         <HelpTitle help="client" style={[styles.headerTitle, { color: colors.foreground }]}>Client</HelpTitle>
         {/* ⋮ like the calendar's + (owner, 2026-11-18): Edit profile, Notes, Photos, History. */}
         {client && !editing ? (

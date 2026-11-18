@@ -16,6 +16,7 @@ import { HelpTitle } from '@/components/HelpTitle';
 
 import { AppBackground } from '@/components/look/AppBackground';
 import { look } from '@/components/look/tokens';
+import { useInPane } from '@/components/TabletSplit';
 type Pack = { id: string; credits: number; priceCents: number };
 type Summary = { credits: number; unlimited: boolean; packs: Pack[]; card: { brand: string | null; last4: string | null } | null };
 
@@ -32,6 +33,7 @@ function Coin({ size }: { size: number }) {
 
 export default function CreditsScreen() {
   const colors = useColors();
+  const inPane = useInPane();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -89,9 +91,9 @@ export default function CreditsScreen() {
     <View style={[styles.root, { backgroundColor: look.pageTop, paddingTop: topInset }]} testID="credits-screen">
       <AppBackground />
       <View style={styles.nav}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.navSide} accessibilityLabel="Back" testID="credits-back">
+        {!inPane ? <TouchableOpacity onPress={() => router.back()} style={styles.navSide} accessibilityLabel="Back" testID="credits-back">
           <Feather name="arrow-left" size={24} color={colors.foreground} />
-        </TouchableOpacity>
+        </TouchableOpacity> : <View style={styles.navSide} />}
         <HelpTitle help="credits" style={[styles.navTitle, { color: colors.foreground }]}>Credit balance</HelpTitle>
         <View style={styles.navSide} />
       </View>

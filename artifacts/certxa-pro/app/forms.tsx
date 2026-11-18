@@ -125,6 +125,7 @@ export default function FormsScreen() {
       help="forms"
       title={draft ? (draft.id > 0 ? 'Edit form' : 'New form') : picking ? 'Start a form' : 'Forms & Waivers'}
       onBack={back}
+      inner={!!draft || picking}
       onAdd={draft || picking ? undefined : () => { setError(''); setPicking(true); }}
       addLabel="Add a form"
       testID="forms"

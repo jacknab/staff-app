@@ -15,6 +15,7 @@ import { SelectField } from '@/components/SelectField';
 
 import { AppBackground } from '@/components/look/AppBackground';
 import { look, cardShadow } from '@/components/look/tokens';
+import { useInPane } from '@/components/TabletSplit';
 export function money(value: number | string | null | undefined) {
   return `$${(Number(value) || 0).toFixed(2)}`;
 }
@@ -54,17 +55,23 @@ export function PhotoField({ label, uri, onPick, onRemove, testID }: { label: st
   );
 }
 
-export function CatalogScreen({ title, help, onBack, onAdd, addLabel, testID, children }: {
-  title: string; help: string; onBack: () => void; onAdd?: () => void; addLabel?: string; testID: string; children: ReactNode;
+export function CatalogScreen({ title, help, onBack, inner, onAdd, addLabel, testID, children }: {
+  title: string; help: string; onBack: () => void;
+  /** The back arrow closes something inside the page (a form being filled in), so it stays in a tablet's right side. */
+  inner?: boolean;
+  onAdd?: () => void; addLabel?: string; testID: string; children: ReactNode;
 }) {
   const colors = useColors();
+  const inPane = useInPane();
   const insets = useSafeAreaInsets();
   return (
     <KeyboardAvoidingView style={[styles.root, { backgroundColor: look.pageTop, paddingTop: insets.top }]} behavior="padding" keyboardVerticalOffset={0}>
       <AppBackground />
       <StatusBar barStyle="dark-content" />
       <View style={styles.header}>
-        <TouchableOpacity testID={`${testID}-back`} accessibilityLabel="Back" onPress={onBack} style={styles.headerButton}><Feather name="arrow-left" size={21} color={colors.foreground} /></TouchableOpacity>
+        {!inPane || inner
+          ? <TouchableOpacity testID={`${testID}-back`} accessibilityLabel="Back" onPress={onBack} style={styles.headerButton}><Feather name="arrow-left" size={21} color={colors.foreground} /></TouchableOpacity>
+          : <View style={styles.headerButton} />}
         <HelpTitle help={help} style={[styles.headerTitle, { color: colors.foreground }]}>{title}</HelpTitle>
         {onAdd ? (
           <TouchableOpacity testID={`${testID}-add`} accessibilityLabel={addLabel ?? 'Add'} onPress={onAdd} style={styles.headerButton}><Feather name="plus" size={22} color={colors.primary} /></TouchableOpacity>
@@ -97,10 +104,10 @@ export function SectionTitle({ children }: { children: string }) {
   return <Text style={[styles.section, { color: colors.mutedForeground }]}>{children}</Text>;
 }
 
-export function Row({ title, hint, right, onPress, testID, dim }: { title: string; hint?: string; right?: string; onPress: () => void; testID: string; dim?: boolean }) {
+export function Row({ title, hint, right, onPress, testID, dim, selected }: { title: string; hint?: string; right?: string; onPress: () => void; testID: string; dim?: boolean; selected?: boolean }) {
   const colors = useColors();
   return (
-    <TouchableOpacity testID={testID} onPress={onPress} style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border, opacity: dim ? 0.6 : 1 }]}>
+    <TouchableOpacity testID={testID} onPress={onPress} style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border, opacity: dim ? 0.6 : 1 }, selected && { borderColor: colors.primary, borderWidth: 2 }]}>
       <View style={{ flex: 1 }}>
         <Text numberOfLines={1} style={[styles.rowTitle, { color: colors.foreground }]}>{title}</Text>
         {hint ? <Text numberOfLines={2} style={[styles.rowHint, { color: colors.mutedForeground }]}>{hint}</Text> : null}

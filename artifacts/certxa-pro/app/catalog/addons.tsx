@@ -95,6 +95,7 @@ export default function AddonsScreen() {
       help="catalog.addons"
       title={draft ? (draft.id > 0 ? 'Edit add-on' : 'New add-on') : 'Add-Ons'}
       onBack={() => (draft ? (setDraft(null), setError('')) : router.back())}
+      inner={!!draft}
       onAdd={draft ? undefined : () => { setError(''); setDraft({ id: 0, name: '', description: '', minutes: '', price: '', hiddenFromPublic: false, allowQuantity: false, serviceIds: [] }); }}
       addLabel="Add an add-on"
       testID="addons"

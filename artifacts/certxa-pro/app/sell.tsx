@@ -12,8 +12,10 @@ import { MenuCard } from '@/components/look/MenuCard';
 import { look } from '@/components/look/tokens';
 import { usePaymentsReady } from '@/lib/usePaymentsReady';
 
+import { useInPane } from '@/components/TabletSplit';
 export default function SellScreen() {
   const router = useRouter();
+  const inPane = useInPane();
   const insets = useSafeAreaInsets();
   const topInset = Platform.OS === 'web' ? 67 : insets.top;
   // Payments not set up: each opens its Stripe page instead (owner, 2026-11-11; app/payments-gift-cards.tsx, -packages).
@@ -22,9 +24,9 @@ export default function SellScreen() {
     <View style={[styles.root, { paddingTop: topInset }]} testID="sell-screen">
       <AppBackground />
       <View style={styles.nav}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.navSide} accessibilityLabel="Back" testID="sell-back">
+        {!inPane ? <TouchableOpacity onPress={() => router.back()} style={styles.navSide} accessibilityLabel="Back" testID="sell-back">
           <Feather name="arrow-left" size={26} color={look.heading} />
-        </TouchableOpacity>
+        </TouchableOpacity> : <View style={styles.navSide} />}
         <HelpTitle help="sell" style={styles.navTitle}>Gift Cards & Packages</HelpTitle>
         <View style={styles.navSide} />
       </View>

@@ -1,8 +1,9 @@
 /**
  * Past 30 days (owner, 2026-11-18; Home › ⋮ menu): every booking from the last 30 days, newest first, by day, with how
- * it ended (Paid, Completed, Cancelled, No-show). Tap one to open it.
+ * it ended (Paid, Completed, Cancelled, No-show). Tap one to open it; on a tablet it opens on the right of the list
+ * (owner, 2026-11-19; components/TabletSplit.tsx).
  */
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -12,6 +13,9 @@ import { api } from '@/lib/live-api';
 import { useBookingData, type ApiAppointment } from '@/contexts/BookingContext';
 import { zonedDateLabel, zonedTimeLabel } from '@/lib/businessTime';
 import { cardShadow } from '@/components/look/tokens';
+import { useIsTablet } from '@/components/TabletLauncher';
+import { TabletSplit } from '@/components/TabletSplit';
+import AppointmentDetailScreen from './appointment/[id]';
 
 type Ticket = ApiAppointment & { calendarHidden?: boolean | null };
 const clientName = (t: Ticket) => t.customer?.fullName || t.customer?.name || [t.customer?.firstName, t.customer?.lastName].filter(Boolean).join(' ') || 'Walk-in';
@@ -50,8 +54,12 @@ export default function PastBookingsScreen() {
     return groups;
   }, [tickets, timeZone]);
   const card = { backgroundColor: colors.card, borderColor: colors.border };
+  const isTablet = useIsTablet();
+  const [picked, setPicked] = useState<string | null>(null);
+  // A tablet shows the newest booking until another is chosen.
+  useEffect(() => { if (isTablet && picked == null && tickets[0]) setPicked(String(tickets[0].id)); }, [isTablet, picked, tickets]);
 
-  return (
+  const page = (
     <CatalogScreen title="Past 30 days" help="pastBookings" onBack={() => router.back()} testID="past-bookings">
       {loading && tickets.length === 0 ? <ActivityIndicator style={{ marginTop: 24 }} color={colors.primary} />
         : error ? <Text style={[styles.rowSub, { color: colors.destructive, marginTop: 16 }]}>{error}</Text>
@@ -65,8 +73,8 @@ export default function PastBookingsScreen() {
                 const done = isPaid(t);
                 const closed = t.status === 'no_show' || t.status === 'cancelled';
                 return (
-                  <TouchableOpacity key={t.id} testID={`past-${t.id}`} onPress={() => router.push(`/appointment/${t.id}`)}
-                    style={[styles.row, index > 0 ? { borderTopColor: colors.border, borderTopWidth: StyleSheet.hairlineWidth } : null]}>
+                  <TouchableOpacity key={t.id} testID={`past-${t.id}`} onPress={() => (isTablet ? setPicked(String(t.id)) : router.push(`/appointment/${t.id}`))}
+                    style={[styles.row, index > 0 ? { borderTopColor: colors.border, borderTopWidth: StyleSheet.hairlineWidth } : null, isTablet && picked === String(t.id) && { backgroundColor: colors.secondary }]}>
                     <Text style={[styles.rowTime, { color: colors.foreground }]}>{zonedTimeLabel(t.date, timeZone)}</Text>
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.rowTitle, { color: colors.foreground }]} numberOfLines={1}>{clientName(t)}</Text>
@@ -83,6 +91,8 @@ export default function PastBookingsScreen() {
         ))}
     </CatalogScreen>
   );
+  if (!isTablet) return page;
+  return <TabletSplit list={page} pane={picked ? { key: `visit-${picked}`, Screen: AppointmentDetailScreen, params: { id: picked } } : null} onClose={() => { setPicked(null); void load(); }} />;
 }
 
 const styles = StyleSheet.create({

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ComponentType } from 'react';
 import Constants from 'expo-constants';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { ActivityIndicator, Alert, Image, Platform, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
@@ -13,6 +13,41 @@ import { MenuCard } from '@/components/look/MenuCard';
 import { PromoCarousel } from '@/components/look/PromoCarousel';
 import { SectionHeader } from '@/components/look/SectionHeader';
 import { look, cardShadow } from '@/components/look/tokens';
+import { useIsTablet } from '@/components/TabletLauncher';
+import { TabletSplit } from '@/components/TabletSplit';
+import MoneyScreen from '../money';
+import PhoneScreen from '../phone';
+import ExpensesScreen from '../expenses';
+import MembershipsScreen from '../memberships';
+import FormsScreen from '../forms';
+import WaitlistScreen from '../waitlist';
+import CampaignsScreen from '../campaigns';
+import PromoCodesScreen from '../promo-codes';
+import ReferralsScreen from '../referrals';
+import ReviewsScreen from '../reviews';
+import PortfolioScreen from '../portfolio';
+import BusinessAiScreen from '../ai';
+import SellScreen from '../sell';
+import CreditsScreen from '../credits';
+
+// On a tablet these pages open on the right of the menu (owner, 2026-11-19; components/TabletSplit.tsx); the rest open as
+// pages of their own.
+const PANE_PAGES: Record<string, ComponentType> = {
+  '/money': MoneyScreen,
+  '/phone': PhoneScreen,
+  '/expenses': ExpensesScreen,
+  '/memberships': MembershipsScreen,
+  '/forms': FormsScreen,
+  '/waitlist': WaitlistScreen,
+  '/campaigns': CampaignsScreen,
+  '/promo-codes': PromoCodesScreen,
+  '/referrals': ReferralsScreen,
+  '/reviews': ReviewsScreen,
+  '/portfolio': PortfolioScreen,
+  '/ai': BusinessAiScreen,
+  '/sell': SellScreen,
+  '/credits': CreditsScreen,
+};
 
 type DaySchedule = { day: string; short: string; enabled: boolean; hours: string };
 const initialHours: DaySchedule[] = [
@@ -61,6 +96,9 @@ export default function MoreScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams<{ screen?: string }>();
+  const isTablet = useIsTablet();
+  const [picked, setPicked] = useState<string>('/money');
+  const go = (to: string) => (isTablet && PANE_PAGES[to] ? setPicked(to) : router.push(to as never));
   const [stripeReady, setStripeReady] = useState(false);
   const [availability, setAvailability] = useState<DaySchedule[]>(initialHours);
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -131,7 +169,7 @@ export default function MoreScreen() {
     });
   };
 
-  return (
+  const page = (
     <View style={[styles.root, { backgroundColor: look.pageTop, paddingTop: topInset }]}>
       {/* The Certxa Pro look (owner, 2026-11-09; components/look): lavender page, white cards, violet-barred sections.
           Behind the whole screen, the status bar included. */}
@@ -259,30 +297,30 @@ export default function MoreScreen() {
 
           <SectionHeader title="Business" />
           <View style={styles.menuList}>
-            <MenuCard testID="menu-money" icon={{ feather: 'dollar-sign' }} title="Money" subtitle="Sales, payouts and payments" onPress={() => router.push('/money')} />
-            <MenuCard testID="menu-phone" icon={{ feather: 'phone' }} title="Business Phone" subtitle="Your business number for calls and texts" onPress={() => router.push('/phone')} />
-            <MenuCard testID="menu-expenses" icon={{ feather: 'file-minus' }} title="Expenses" subtitle="What you spend, receipts and taxes" onPress={() => router.push('/expenses' as any)} />
-            <MenuCard testID="menu-memberships" icon={{ feather: 'award' }} title="Memberships" subtitle="Monthly plans clients pay for" onPress={() => router.push('/memberships' as any)} />
-            <MenuCard testID="menu-forms" icon={{ feather: 'file-text' }} title="Forms & Waivers" subtitle="Intake forms and waivers clients sign" onPress={() => router.push('/forms' as any)} />
+            <MenuCard testID="menu-money" icon={{ feather: 'dollar-sign' }} title="Money" subtitle="Sales, payouts and payments" onPress={() => go('/money')} selected={isTablet && picked === '/money'} />
+            <MenuCard testID="menu-phone" icon={{ feather: 'phone' }} title="Business Phone" subtitle="Your business number for calls and texts" onPress={() => go('/phone')} selected={isTablet && picked === '/phone'} />
+            <MenuCard testID="menu-expenses" icon={{ feather: 'file-minus' }} title="Expenses" subtitle="What you spend, receipts and taxes" onPress={() => go('/expenses')} selected={isTablet && picked === '/expenses'} />
+            <MenuCard testID="menu-memberships" icon={{ feather: 'award' }} title="Memberships" subtitle="Monthly plans clients pay for" onPress={() => go('/memberships')} selected={isTablet && picked === '/memberships'} />
+            <MenuCard testID="menu-forms" icon={{ feather: 'file-text' }} title="Forms & Waivers" subtitle="Intake forms and waivers clients sign" onPress={() => go('/forms')} selected={isTablet && picked === '/forms'} />
           </View>
 
           <SectionHeader title="Client Growth" />
           <View style={styles.menuList}>
-            <MenuCard testID="menu-waitlist" icon={{ mci: 'calendar-clock-outline' }} title="Waitlist" subtitle="Clients waiting for a time" onPress={() => router.push('/waitlist')} />
-            <MenuCard testID="menu-campaigns" icon={{ mci: 'bullhorn-outline' }} title="Campaigns" subtitle="Text a special to clients" onPress={() => router.push('/campaigns')} />
-            <MenuCard testID="menu-promo-codes" icon={{ feather: 'tag' }} title="Promo Codes" subtitle="Discount codes for checkout and online booking" onPress={() => router.push('/promo-codes' as any)} />
-            <MenuCard testID="menu-referrals" icon={{ feather: 'users' }} title="Referrals" subtitle="Reward clients who send a friend" onPress={() => router.push('/referrals' as any)} />
-            <MenuCard testID="menu-reviews" icon={{ feather: 'star' }} title="Reviews" subtitle="See what clients said and reply" onPress={() => router.push('/reviews')} />
-            <MenuCard testID="menu-portfolio" icon={{ feather: 'image' }} title="Portfolio" subtitle="Photos of your work on your website" onPress={() => router.push('/portfolio')} />
+            <MenuCard testID="menu-waitlist" icon={{ mci: 'calendar-clock-outline' }} title="Waitlist" subtitle="Clients waiting for a time" onPress={() => go('/waitlist')} selected={isTablet && picked === '/waitlist'} />
+            <MenuCard testID="menu-campaigns" icon={{ mci: 'bullhorn-outline' }} title="Campaigns" subtitle="Text a special to clients" onPress={() => go('/campaigns')} selected={isTablet && picked === '/campaigns'} />
+            <MenuCard testID="menu-promo-codes" icon={{ feather: 'tag' }} title="Promo Codes" subtitle="Discount codes for checkout and online booking" onPress={() => go('/promo-codes')} selected={isTablet && picked === '/promo-codes'} />
+            <MenuCard testID="menu-referrals" icon={{ feather: 'users' }} title="Referrals" subtitle="Reward clients who send a friend" onPress={() => go('/referrals')} selected={isTablet && picked === '/referrals'} />
+            <MenuCard testID="menu-reviews" icon={{ feather: 'star' }} title="Reviews" subtitle="See what clients said and reply" onPress={() => go('/reviews')} selected={isTablet && picked === '/reviews'} />
+            <MenuCard testID="menu-portfolio" icon={{ feather: 'image' }} title="Portfolio" subtitle="Photos of your work on your website" onPress={() => go('/portfolio')} selected={isTablet && picked === '/portfolio'} />
           </View>
 
           <SectionHeader title="Account" />
           <View style={styles.menuList}>
-            <MenuCard testID="menu-business-ai" icon={{ feather: 'message-square' }} title="Business AI" subtitle="AI chat; ask questions and get help" onPress={() => router.push('/ai')} />
+            <MenuCard testID="menu-business-ai" icon={{ feather: 'message-square' }} title="Business AI" subtitle="AI chat; ask questions and get help" onPress={() => go('/ai')} selected={isTablet && picked === '/ai'} />
             {/* Gift cards and packages share one row (owner, 2026-11-09); app/sell.tsx offers the two. */}
-            <MenuCard testID="menu-gift-cards" icon={{ feather: 'gift' }} title="Gift Cards & Packages" subtitle="Sell gift cards and packages" onPress={() => router.push('/sell')} />
+            <MenuCard testID="menu-gift-cards" icon={{ feather: 'gift' }} title="Gift Cards & Packages" subtitle="Sell gift cards and packages" onPress={() => go('/sell')} selected={isTablet && picked === '/sell'} />
             {/* Not in the 2026-11-09 design, kept so the text credits can still be reached (app/credits.tsx). */}
-            <MenuCard testID="menu-credits" icon={{ feather: 'message-circle' }} title="Credit balance" subtitle="Text message credits · buy more" onPress={() => router.push('/credits')} />
+            <MenuCard testID="menu-credits" icon={{ feather: 'message-circle' }} title="Credit balance" subtitle="Text message credits · buy more" onPress={() => go('/credits')} selected={isTablet && picked === '/credits'} />
             <MenuCard testID="menu-settings" icon={{ feather: 'settings' }} title="Settings" subtitle="Account, preferences, billing" onPress={() => router.push('/settings')} />
             {/* The Certxa Pro Help Center (owner, 2026-11-19): certxa.com/pro-help, in the browser. */}
             <MenuCard testID="menu-help" icon={{ feather: 'help-circle' }} title="Help Center" subtitle="Guides and answers, with pictures of each screen" onPress={() => void WebBrowser.openBrowserAsync('https://certxa.com/pro-help')} />
@@ -292,6 +330,8 @@ export default function MoreScreen() {
       )}
     </View>
   );
+  if (!isTablet || showingAvailability) return page;
+  return <TabletSplit list={page} pane={PANE_PAGES[picked] ? { key: picked, Screen: PANE_PAGES[picked] } : null} onClose={() => setPicked('/money')} />;
 }
 
 const styles = StyleSheet.create({

@@ -18,10 +18,12 @@ import { HelpTitle } from '@/components/HelpTitle';
 
 import { AppBackground } from '@/components/look/AppBackground';
 import { cardShadow, look } from '@/components/look/tokens';
+import { useInPane } from '@/components/TabletSplit';
 type Photo = { id: number; url: string; caption: string | null; serviceId?: number | null };
 
 export default function PortfolioScreen() {
   const colors = useColors();
+  const inPane = useInPane();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { width } = useWindowDimensions();
@@ -78,7 +80,7 @@ export default function PortfolioScreen() {
     <View style={[styles.root, { backgroundColor: look.pageTop, paddingTop: topInset }]} testID="portfolio">
       <AppBackground />
       <View style={styles.nav}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.navSide} accessibilityLabel="Back"><Feather name="arrow-left" size={24} color={colors.foreground} /></TouchableOpacity>
+        {!inPane ? <TouchableOpacity onPress={() => router.back()} style={styles.navSide} accessibilityLabel="Back"><Feather name="arrow-left" size={24} color={colors.foreground} /></TouchableOpacity> : <View style={styles.navSide} />}
         <HelpTitle help="portfolio" style={[styles.navTitle, { color: colors.foreground }]}>Portfolio</HelpTitle>
         <TouchableOpacity onPress={choose} disabled={busy} style={[styles.navSide, { alignItems: 'flex-end' }]} accessibilityLabel="Add a photo" testID="portfolio-add">
           {busy ? <ActivityIndicator color={colors.primary} /> : <Feather name="plus" size={24} color={colors.primary} />}

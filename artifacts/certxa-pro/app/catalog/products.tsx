@@ -70,6 +70,7 @@ export default function ProductsScreen() {
       help="catalog.products"
       title={draft ? (draft.id > 0 ? 'Edit product' : 'New product') : 'Products'}
       onBack={() => (draft ? (setDraft(null), setError('')) : router.back())}
+      inner={!!draft}
       onAdd={draft ? undefined : () => { setError(''); setDraft({ id: 0, name: '', brand: '', price: '', stock: '', lowAt: '5' }); }}
       addLabel="Add a product"
       testID="products"

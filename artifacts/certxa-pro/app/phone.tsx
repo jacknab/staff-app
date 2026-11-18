@@ -8,7 +8,7 @@
  * file, the new number is bought and wired, and the old one is released (POST /api/pro/phone/change). A missed call is tapped to call back. Calls work on iPhone (lib/voice.ts).
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { ActivityIndicator, Alert, Platform, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -22,6 +22,7 @@ import { HelpTitle } from '@/components/HelpTitle';
 import { AppBackground } from '@/components/look/AppBackground';
 import { SectionTitle } from '@/components/look/SectionHeader';
 import { look, cardShadow } from '@/components/look/tokens';
+import { useInPane, useScreenParams } from '@/components/TabletSplit';
 type Line = { phoneNumber: string; ring: 'hours' | 'always'; billing?: { status: string; retryAt: string | null; heldUntil: string | null } };
 type Card = { brand: string | null; last4: string | null };
 const cardName = (c: Card) => (c.last4 ? `your ${c.brand ? c.brand[0].toUpperCase() + c.brand.slice(1) : 'card'} ending ${c.last4}` : 'your card on file');
@@ -32,9 +33,10 @@ const pretty = (n: string) => { const d = n.replace(/\D/g, '').slice(-10); retur
 
 export default function PhoneScreen() {
   const colors = useColors();
+  const inPane = useInPane();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const [changing, setChanging] = useState(useLocalSearchParams<{ change?: string }>().change === '1');
+  const [changing, setChanging] = useState(useScreenParams<{ change?: string }>().change === '1');
   const [line, setLine] = useState<Line | null | undefined>(undefined);
   /** No number yet: whether the first month is paid, so the numbers can be shown. */
   const [prepaid, setPrepaid] = useState<boolean | undefined>(undefined);
@@ -190,7 +192,7 @@ export default function PhoneScreen() {
     <View style={[styles.root, { backgroundColor: look.pageTop, paddingTop: topInset }]} testID="phone">
       <AppBackground />
       <View style={styles.nav}>
-        <TouchableOpacity onPress={() => (dialing ? setDialing(false) : changing ? (setChanging(false), setOffers(null)) : router.back())} style={styles.navSide} accessibilityLabel="Back"><Feather name="arrow-left" size={24} color={colors.foreground} /></TouchableOpacity>
+        {!inPane || dialing || changing ? <TouchableOpacity onPress={() => (dialing ? setDialing(false) : changing ? (setChanging(false), setOffers(null)) : router.back())} style={styles.navSide} accessibilityLabel="Back"><Feather name="arrow-left" size={24} color={colors.foreground} /></TouchableOpacity> : <View style={styles.navSide} />}
         <HelpTitle help="phone" style={[styles.navTitle, { color: colors.foreground }]}>{dialing ? 'Call a number' : changing ? 'Change number' : 'Business Phone'}</HelpTitle>
         <View style={styles.navSide} />
       </View>

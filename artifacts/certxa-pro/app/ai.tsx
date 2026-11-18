@@ -8,7 +8,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Feather } from '@expo/vector-icons';
 import { ActivityIndicator, FlatList, Keyboard, Linking, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { api, ApiError } from '@/lib/live-api';
@@ -16,6 +16,7 @@ import { HelpTitle } from '@/components/HelpTitle';
 
 import { AppBackground } from '@/components/look/AppBackground';
 import { look, cardShadow } from '@/components/look/tokens';
+import { useInPane, useScreenParams } from '@/components/TabletSplit';
 type Action = { id: number; summary: string; status: 'pending' | 'running' | 'done' | 'failed' | 'cancelled'; result?: string | null };
 type ClientLink = { id: number; name: string };
 type Draft = { clientId: number; name: string; phone: string; message: string };
@@ -38,6 +39,7 @@ function smsLink(phone: string, body: string) {
 
 export default function BusinessAiScreen() {
   const colors = useColors();
+  const inPane = useInPane();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const listRef = useRef<FlatList<ChatMessage>>(null);
@@ -54,7 +56,7 @@ export default function BusinessAiScreen() {
       .catch(() => setMessages([]))
       .finally(() => setLoading(false));
   }, []);
-  const params = useLocalSearchParams<{ start?: string }>();
+  const params = useScreenParams<{ start?: string }>();
   const started = useRef(false);
   const scrollDown = () => setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
 
@@ -149,10 +151,10 @@ export default function BusinessAiScreen() {
     <KeyboardAvoidingView style={[styles.root, { backgroundColor: look.pageTop }]} behavior="padding">
       <AppBackground />
       <View style={[styles.header, { paddingTop: topInset + 10 }]}>
-        <TouchableOpacity testID="business-ai-back" onPress={() => router.back()} style={styles.backButton}>
+        {!inPane ? <TouchableOpacity testID="business-ai-back" onPress={() => router.back()} style={styles.backButton}>
           <Feather name="arrow-left" size={19} color={colors.foreground} />
           <Text style={[styles.backText, { color: colors.foreground }]}>More</Text>
-        </TouchableOpacity>
+        </TouchableOpacity> : <View style={styles.backButton} />}
         <HelpTitle help="ai" style={[styles.title, { color: colors.foreground }]}>Business AI</HelpTitle>
         <View style={[styles.aiMark, { backgroundColor: colors.primary }]}><Feather name="zap" size={19} color={colors.primaryForeground} /></View>
       </View>

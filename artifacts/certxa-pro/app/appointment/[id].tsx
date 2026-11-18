@@ -5,7 +5,7 @@ import { Feather } from '@expo/vector-icons';
 import { ActivityIndicator, Alert, InputAccessoryView, Keyboard, Linking, Modal, Platform, ScrollView, Share, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { useBookingData } from '@/contexts/BookingContext';
@@ -20,6 +20,7 @@ import { AppBackground } from '@/components/look/AppBackground';
 import { APP_MAX_WIDTH } from '@/components/TabletFrame';
 import { look, cardShadow } from '@/components/look/tokens';
 import { usePaymentsReady } from '@/lib/usePaymentsReady';
+import { useInPane, usePaneClose, usePaneSetParams, useScreenParams } from '@/components/TabletSplit';
 /** Every quarter hour of the working day, and the booking's own time when it is between them. */
 function timeChoices(current: string): string[] {
   const label = (m: number) => `${((Math.floor(m / 60) + 11) % 12) + 1}:${String(m % 60).padStart(2, '0')} ${m < 720 ? 'AM' : 'PM'}`;
@@ -111,7 +112,7 @@ export default function AppointmentDetailScreen() {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<AppointmentRouteParams>();
+  const params = useScreenParams<AppointmentRouteParams>();
   const { timeZone } = useBookingData();
   // Fixed when the screen opens: saving an edit puts a few details in the address, not all of them.
   const [complete] = useState(!!params.dateIso || params.preview === '1');
@@ -140,6 +141,9 @@ export default function AppointmentDetailScreen() {
 
 function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
   const colors = useColors();
+  const inPane = useInPane();
+  const closePane = usePaneClose();
+  const setScreenParams = usePaneSetParams();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { services, refresh, timeZone, clients } = useBookingData();
@@ -152,7 +156,7 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
     { text: 'Cancel', style: 'cancel' },
     { text: 'Change client', onPress: () => {
       api.post(`/api/pro/appointments/${params.id}/client`, { customerId: to.customerId })
-        .then(() => { void refresh(); Alert.alert('Client changed', `This visit is now ${to.name}'s.`); router.back(); })
+        .then(() => { void refresh(); Alert.alert('Client changed', `This visit is now ${to.name}'s.`); closePane(); })
         .catch((cause) => Alert.alert('Not changed', cause instanceof Error ? cause.message : 'Try again in a minute.'));
     } },
   ]);
@@ -273,7 +277,7 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
       // The details page shows the booking as it now is.
       const cents = Math.round((chosen.reduce((sum, item) => sum + item.priceValue, 0) + addons.reduce((sum, a) => sum + a.priceValue, 0)
         + keptLines.reduce((sum, line) => sum + line.price, 0)) * 100) + travelFeeCents;
-      router.setParams({
+      setScreenParams({
         serviceId: String(chosen[0].id), serviceName: chosen.length > 1 ? `${chosen[0].name} + ${chosen.length - 1} more` : chosen[0].name,
         amountCents: String(cents), duration: `${minutes} min`, dateIso: nextDate.toISOString(),
         extraLines: JSON.stringify(lines), addonIds: addons.map((a) => a.id).join(','),
@@ -578,7 +582,7 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
               await api.del(`/api/appointments/${appointmentId}`);
               await refresh();
             }
-            router.back();
+            closePane();
           } catch (cause) {
             setError(cause instanceof Error ? cause.message : 'Could not delete appointment.');
             setSaving(false);
@@ -672,10 +676,10 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
         </TouchableOpacity>
       </Modal>
       <View style={styles.nav}>
-        <TouchableOpacity testID="appointment-back" onPress={() => router.back()} style={styles.navSide}>
+        {!inPane ? <TouchableOpacity testID="appointment-back" onPress={() => router.back()} style={styles.navSide}>
           <Feather name="arrow-left" size={20} color={colors.primary} />
           <Text style={[styles.backText, { color: colors.primary }]}>Back</Text>
-        </TouchableOpacity>
+        </TouchableOpacity> : <View style={styles.navSide} />}
         <HelpTitle help="appointment" style={[styles.navTitle, { color: colors.foreground }]}>Details</HelpTitle>
         {editing ? (
           <TouchableOpacity testID="appointment-edit" onPress={() => setEditing(false)} style={styles.navSide}>

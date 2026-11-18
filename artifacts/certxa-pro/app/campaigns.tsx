@@ -15,6 +15,7 @@ import { HelpTitle } from '@/components/HelpTitle';
 
 import { AppBackground } from '@/components/look/AppBackground';
 import { look, cardShadow } from '@/components/look/tokens';
+import { useInPane } from '@/components/TabletSplit';
 type Campaign = { id: number; name: string; status: string; audience: string; messageTemplate: string; sentCount: number | null; failedCount: number | null;
   rejectionReason?: string | null; sentAt: string | null; createdAt: string };
 const AUDIENCE = [
@@ -26,6 +27,7 @@ const STATUS: Record<string, string> = { draft: 'Draft', pending_review: 'Being 
 
 export default function CampaignsScreen() {
   const colors = useColors();
+  const inPane = useInPane();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [list, setList] = useState<Campaign[] | null>(null);
@@ -71,7 +73,7 @@ export default function CampaignsScreen() {
     <View style={[styles.root, { backgroundColor: look.pageTop, paddingTop: topInset }]} testID="campaigns">
       <AppBackground />
       <View style={styles.nav}>
-        <TouchableOpacity onPress={() => (writing ? setWriting(false) : router.back())} style={styles.navSide} accessibilityLabel="Back"><Feather name="arrow-left" size={24} color={colors.foreground} /></TouchableOpacity>
+        {!inPane || writing ? <TouchableOpacity onPress={() => (writing ? setWriting(false) : router.back())} style={styles.navSide} accessibilityLabel="Back"><Feather name="arrow-left" size={24} color={colors.foreground} /></TouchableOpacity> : <View style={styles.navSide} />}
         <HelpTitle help="campaigns" style={[styles.navTitle, { color: colors.foreground }]}>{writing ? 'New campaign' : 'Campaigns'}</HelpTitle>
         {!writing ? <TouchableOpacity onPress={() => setWriting(true)} style={[styles.navSide, { alignItems: 'flex-end' }]} accessibilityLabel="New campaign" testID="campaign-new"><Feather name="plus" size={24} color={colors.primary} /></TouchableOpacity> : <View style={styles.navSide} />}
       </View>

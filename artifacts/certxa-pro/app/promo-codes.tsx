@@ -15,6 +15,7 @@ import { SelectField } from '@/components/SelectField';
 import { AppBackground } from '@/components/look/AppBackground';
 import { look, cardShadow } from '@/components/look/tokens';
 
+import { useInPane } from '@/components/TabletSplit';
 type Code = { id: number; code: string; kind: 'percent' | 'amount'; value: number; appliesTo: 'all' | 'services' | 'products'; newClientsOnly: boolean;
   maxUses: number | null; maxPerClient: number | null; startsOn: string | null; endsOn: string | null; status: 'draft' | 'published' | 'ended'; uses: number };
 type Draft = { id: number; code: string; kind: 'percent' | 'amount'; value: string; appliesTo: 'all' | 'services' | 'products'; newClientsOnly: boolean;
@@ -28,6 +29,7 @@ const stateOf = (c: Code) => c.status === 'draft' ? 'Draft' : c.status === 'ende
 
 export default function PromoCodesScreen() {
   const colors = useColors();
+  const inPane = useInPane();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [codes, setCodes] = useState<Code[] | null>(null);
@@ -72,7 +74,7 @@ export default function PromoCodesScreen() {
     <View style={[styles.root, { backgroundColor: look.pageTop, paddingTop: topInset }]} testID="promo-codes-screen">
       <AppBackground />
       <View style={styles.nav}>
-        <TouchableOpacity onPress={back} style={styles.navSide} accessibilityLabel="Back" testID="promo-back"><Feather name="arrow-left" size={24} color={colors.foreground} /></TouchableOpacity>
+        {!inPane || !!draft || !!open ? <TouchableOpacity onPress={back} style={styles.navSide} accessibilityLabel="Back" testID="promo-back"><Feather name="arrow-left" size={24} color={colors.foreground} /></TouchableOpacity> : <View style={styles.navSide} />}
         <HelpTitle help="promoCodes" style={[styles.navTitle, { color: colors.foreground }]}>{draft ? (draft.id ? 'Edit draft' : 'New promo code') : open ? open.code : 'Promo codes'}</HelpTitle>
         {!draft && !open ? <TouchableOpacity testID="promo-add" accessibilityLabel="New promo code" onPress={() => { setError(''); setDraft({ ...blank }); }} style={styles.navSide}><Feather name="plus" size={24} color={colors.primary} /></TouchableOpacity> : <View style={styles.navSide} />}
       </View>

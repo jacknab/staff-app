@@ -22,6 +22,7 @@ import { getGoogleProfile, googleConnected, googleReviews, myStoreId, replyOnGoo
 
 import { AppBackground } from '@/components/look/AppBackground';
 import { look, cardShadow } from '@/components/look/tokens';
+import { useInPane } from '@/components/TabletSplit';
 type Review = {
   id: number; rating: number; comment?: string | null; customerName?: string | null; serviceName?: string | null;
   createdAt?: string | null; ownerResponse?: string | null; ownerResponseAt?: string | null; photoUrl?: string | null; appointmentId?: number | null; clientAvatarUrl?: string | null;
@@ -37,6 +38,7 @@ function dateLabel(value?: string | null) {
 
 export default function ReviewsScreen() {
   const colors = useColors();
+  const inPane = useInPane();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { timeZone } = useBookingData();
@@ -123,7 +125,7 @@ export default function ReviewsScreen() {
       <AppBackground />
       <StatusBar barStyle="dark-content" />
       <View style={styles.header}>
-        <TouchableOpacity testID="reviews-back" accessibilityLabel="Back" onPress={() => router.back()} style={styles.headerButton}><Feather name="arrow-left" size={21} color={colors.foreground} /></TouchableOpacity>
+        {!inPane ? <TouchableOpacity testID="reviews-back" accessibilityLabel="Back" onPress={() => router.back()} style={styles.headerButton}><Feather name="arrow-left" size={21} color={colors.foreground} /></TouchableOpacity> : <View style={styles.headerButton} />}
         <HelpTitle help="reviews" style={[styles.headerTitle, { color: colors.foreground }]}>Reviews</HelpTitle>
         <View style={styles.headerButton} />
       </View>

@@ -17,6 +17,7 @@ import { HelpTitle } from '@/components/HelpTitle';
 
 import { AppBackground } from '@/components/look/AppBackground';
 import { look, cardShadow } from '@/components/look/tokens';
+import { useInPane } from '@/components/TabletSplit';
 type Entry = { id: number; customerName: string; customerPhone: string | null; customerId: number | null; serviceId: number | null;
   preferredDate: string | null; preferredTimeStart: string | null; preferredTimeEnd: string | null; notes: string | null; status: string };
 const WHEN = [
@@ -30,6 +31,7 @@ const dayKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 
 export default function WaitlistScreen() {
   const colors = useColors();
+  const inPane = useInPane();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { clients, services, timeZone } = useBookingData();
@@ -80,7 +82,7 @@ export default function WaitlistScreen() {
     <View style={[styles.root, { backgroundColor: look.pageTop, paddingTop: topInset }]} testID="waitlist">
       <AppBackground />
       <View style={styles.nav}>
-        <TouchableOpacity onPress={() => (adding ? setAdding(false) : router.back())} style={styles.navSide} accessibilityLabel="Back"><Feather name="arrow-left" size={24} color={colors.foreground} /></TouchableOpacity>
+        {!inPane || adding ? <TouchableOpacity onPress={() => (adding ? setAdding(false) : router.back())} style={styles.navSide} accessibilityLabel="Back"><Feather name="arrow-left" size={24} color={colors.foreground} /></TouchableOpacity> : <View style={styles.navSide} />}
         <HelpTitle help="waitlist" style={[styles.navTitle, { color: colors.foreground }]}>{adding ? 'Add to waitlist' : 'Waitlist'}</HelpTitle>
         {!adding ? <TouchableOpacity onPress={() => setAdding(true)} style={[styles.navSide, { alignItems: 'flex-end' }]} accessibilityLabel="Add to waitlist" testID="waitlist-add"><Feather name="plus" size={24} color={colors.primary} /></TouchableOpacity> : <View style={styles.navSide} />}
       </View>

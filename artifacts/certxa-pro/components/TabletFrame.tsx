@@ -7,13 +7,14 @@ import { look } from '@/components/look/tokens';
  * Tablets (owner, 2026-11-19: pros use phones and tablets): every screen sits in a centered column no wider than a
  * large phone, on the app's lavender, instead of stretching across the tablet. Phones are narrower than the column,
  * so nothing changes on them. Home (Home and the Calendar side by side, app/(tabs)/index.tsx) and Settings (menu and
- * the chosen setting side by side, app/settings.tsx) use the whole tablet.
+ * the chosen setting side by side, app/settings.tsx) and the list screens of components/TabletSplit.tsx use the whole
+ * tablet.
  */
 export const APP_MAX_WIDTH = 720;
 
 export function TabletFrame({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const fullWidth = pathname === '/' || pathname === '/index' || pathname === '/settings';
+  const fullWidth = ['/', '/index', '/settings', '/clients', '/more', '/catalog', '/past-bookings'].includes(pathname);
   return (
     <View style={styles.outer}>
       <View style={[styles.inner, fullWidth && styles.full]}>{children}</View>
