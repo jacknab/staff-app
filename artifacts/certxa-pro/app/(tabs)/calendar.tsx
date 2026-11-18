@@ -272,7 +272,13 @@ export default function CalendarScreen() {
   const [addOpen, setAddOpen] = useState(false);
   const addSomething = () => setAddOpen(true);
   const goAdd = (pathname: '/booking' | '/block-time') => { setAddOpen(false); router.push({ pathname, params: { day: selectedKey } }); };
-  const pickView = (mode: ViewMode) => { setAddOpen(false); setViewMode(mode); };
+  const pickView = (mode: ViewMode) => { setAddOpen(false); setViewMode(mode); setMonthDay(null); };
+  // Month view (owner, 2026-11-19): the month grid with the month's bookings listed as the Week view lists them; a tapped
+  // day narrows the list to that day, tapping it again shows the whole month. Side by side when the calendar is wide
+  // enough (tablets), the list under the grid when it isn't (phones).
+  const [monthDay, setMonthDay] = useState<string | null>(null);
+  const [rootWidth, setRootWidth] = useState(0);
+  const monthSideBySide = rootWidth >= 700;
   const appointments = useMemo(() => bookingsByDay[selectedKey] ?? [], [bookingsByDay, selectedKey]);
   const columnsById = useMemo(() => overlapColumns(appointments), [appointments]);
   // The whole day, midnight to midnight (owner, 2026-11-03); opening a day scrolls to now / the first booking / 9 AM.
@@ -380,10 +386,16 @@ export default function CalendarScreen() {
 
   const shiftDate = (amount: number) => {
     const next = new Date(selectedDate);
-    if (viewMode === 'Month') next.setMonth(next.getMonth() + amount);
+    if (viewMode === 'Month') { next.setMonth(next.getMonth() + amount); setMonthDay(null); }
     else if (viewMode === 'Week') next.setDate(next.getDate() + amount * 7);
     else next.setDate(next.getDate() + amount);
     setCalendarDate(next);
+  };
+
+  const pickMonthDay = (date: Date) => {
+    if (monthDay === dateKey(date)) { setMonthDay(null); return; }
+    setCalendarDate(date);
+    setMonthDay(dateKey(date));
   };
 
   const selectDate = (date: Date, openDay = false) => {
@@ -415,9 +427,61 @@ export default function CalendarScreen() {
   };
 
   const nowTop = timelineTop(zonedMinutes(now, timeZone), timelineStart);
+  // One day as the Week view shows it: a date badge, the day's name and count, then its bookings as cards.
+  const dayGroup = (day: Date, index: number) => {
+    const dayAppointments = bookingsByDay[dateKey(day)] ?? [];
+    const isToday = dateKey(day) === todayKey;
+    const isPast = dateKey(day) < todayKey;
+    return (
+      <View key={dateKey(day)} style={[styles.weekDay, index > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
+        <TouchableOpacity onPress={() => selectDate(day, true)} style={[styles.weekDayHeader, { backgroundColor: isToday ? `${colors.primary}0D` : isPast ? colors.muted : colors.card }]}>
+          <View style={[styles.weekBadge, { backgroundColor: isToday ? colors.primary : colors.muted }]}>
+            <Text style={[styles.weekBadgeDay, { color: isToday ? colors.primaryForeground : colors.mutedForeground }]}>{day.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()}</Text>
+            <Text style={[styles.weekBadgeNumber, { color: isToday ? colors.primaryForeground : isPast ? colors.mutedForeground : colors.foreground }]}>{day.getDate()}</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.weekDayTitle, { color: isToday ? colors.primary : isPast ? colors.mutedForeground : colors.foreground }]}>
+              {isToday ? 'Today' : day.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+            </Text>
+            <Text style={[styles.weekDayCount, { color: colors.mutedForeground }]}>{dayAppointments.length === 0 ? 'No appointments' : `${dayAppointments.length} appointment${dayAppointments.length === 1 ? '' : 's'}`}</Text>
+          </View>
+          {isToday ? <View style={[styles.todayPill, { backgroundColor: colors.primary }]}><Text style={[styles.todayPillText, { color: colors.primaryForeground }]}>Today</Text></View> : null}
+        </TouchableOpacity>
+        {dayAppointments.length === 0 ? (
+          <View style={styles.weekEmpty}>
+            <View style={[styles.weekEmptyBar, { backgroundColor: colors.border }]} />
+            <Text style={[styles.weekEmptyText, { color: colors.mutedForeground }]}>No bookings</Text>
+          </View>
+        ) : (
+          <View style={styles.weekCards}>
+            {dayAppointments.map((item) => {
+              const minutes = Number(String(item.duration).match(/\d+/)?.[0] ?? 60);
+              const status = item.status === 'pending' && item.clientConfirmed ? WEEK_STATUS.confirmed : WEEK_STATUS[item.status] ?? WEEK_STATUS.pending;
+              return (
+                <TouchableOpacity key={item.id} onPress={() => openAppointment(item)} style={[styles.weekCard, { backgroundColor: colors.card, borderColor: colors.border }]} testID={`week-appt-${item.appointmentId}`}>
+                  <View style={[styles.weekStripe, { backgroundColor: item.serviceColor ?? colors.primary }]} />
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <View style={styles.weekCardTop}>
+                      <View style={styles.weekTime}>
+                        <Feather name="clock" size={12} color={colors.mutedForeground} />
+                        <Text style={[styles.weekTimeText, { color: colors.mutedForeground }]}>{formatClock(item.startMinutes)} – {formatClock(item.startMinutes + minutes)}</Text>
+                      </View>
+                      <View style={[styles.weekStatus, { backgroundColor: status.bg }]}><Text style={[styles.weekStatusText, { color: status.text }]}>{status.label}</Text></View>
+                    </View>
+                    <Text numberOfLines={1} style={[styles.weekName, { color: colors.foreground }]}>{item.name.split(' ')[0] || item.name}</Text>
+                    <Text numberOfLines={1} style={[styles.weekService, { color: colors.mutedForeground }]}>{item.service}</Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
+      </View>
+    );
+  };
 
   return (
-    <View style={[styles.root, { backgroundColor: look.pageTop, paddingTop: topInset }]}>
+    <View onLayout={(e) => setRootWidth(e.nativeEvent.layout.width)} style={[styles.root, { backgroundColor: look.pageTop, paddingTop: topInset }]}>
       <AppBackground />
       <StatusBar barStyle="dark-content" />
       <Modal visible={addOpen} transparent animationType="fade" onRequestClose={() => setAddOpen(false)}>
@@ -510,31 +574,58 @@ export default function CalendarScreen() {
       </View>
 
       {/* Scrolling body. */}
-      {viewMode === 'Month' ? (
-        <RNScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
-          <View style={[styles.monthGrid, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={styles.weekdayRow}>
-              {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((weekday, index) => <Text key={`${weekday}-${index}`} style={[styles.weekdayLabel, { color: colors.mutedForeground }]}>{weekday}</Text>)}
+      {viewMode === 'Month' ? (() => {
+        const grid = (
+    <View style={[styles.monthGrid, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <View style={styles.weekdayRow}>
+        {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((weekday, index) => <Text key={`${weekday}-${index}`} style={[styles.weekdayLabel, { color: colors.mutedForeground }]}>{weekday}</Text>)}
+      </View>
+      <View style={styles.monthCells}>
+        {cells.map((day) => {
+          const inMonth = day.getMonth() === selectedDate.getMonth();
+          const active = dateKey(day) === monthDay;
+          const isToday = dateKey(day) === todayKey;
+          const hasBookings = (bookingsByDay[dateKey(day)]?.length ?? 0) > 0;
+          return (
+            <TouchableOpacity key={dateKey(day)} testID={`month-day-${dateKey(day)}`} onPress={() => pickMonthDay(day)} style={styles.monthCell}>
+              <View style={[styles.monthNumber, active && { backgroundColor: colors.primary }]}>
+                <Text style={[styles.monthNumberText, { color: active ? colors.primaryForeground : isToday ? colors.primary : inMonth ? colors.foreground : colors.mutedForeground }]}>{day.getDate()}</Text>
+              </View>
+              <View style={[styles.monthDot, { backgroundColor: !hasBookings ? 'transparent' : active ? colors.primary : colors.primary }]} />
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+        );
+        const monthDays = monthDay ? [selectedDate] : cells.filter((day) => day.getMonth() === selectedDate.getMonth() && (bookingsByDay[dateKey(day)]?.length ?? 0) > 0);
+        const total = monthDays.reduce((sum, day) => sum + (bookingsByDay[dateKey(day)]?.length ?? 0), 0);
+        const list = (
+          <>
+            <View style={[styles.weekSummary, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Text style={[styles.weekSummaryTitle, { color: colors.foreground }]}>
+                {monthDay ? selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : selectedDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+              </Text>
+              <Text style={[styles.weekSummaryCount, { color: colors.mutedForeground }]}>
+                {total === 0 ? `No appointments ${monthDay ? 'this day' : 'this month'}` : `${total} appointment${total === 1 ? '' : 's'} ${monthDay ? 'this day' : 'this month'}`}
+              </Text>
             </View>
-            <View style={styles.monthCells}>
-              {cells.map((day) => {
-                const inMonth = day.getMonth() === selectedDate.getMonth();
-                const active = dateKey(day) === selectedKey;
-                const isToday = dateKey(day) === todayKey;
-                const hasBookings = (bookingsByDay[dateKey(day)]?.length ?? 0) > 0;
-                return (
-                  <TouchableOpacity key={dateKey(day)} onPress={() => selectDate(day, true)} style={styles.monthCell}>
-                    <View style={[styles.monthNumber, active && { backgroundColor: colors.primary }]}>
-                      <Text style={[styles.monthNumberText, { color: active ? colors.primaryForeground : isToday ? colors.primary : inMonth ? colors.foreground : colors.mutedForeground }]}>{day.getDate()}</Text>
-                    </View>
-                    <View style={[styles.monthDot, { backgroundColor: !hasBookings ? 'transparent' : active ? colors.primary : colors.primary }]} />
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+            {monthDays.length ? <View testID="calendar-month-list" style={[styles.weekList, { backgroundColor: colors.card, borderColor: colors.border }]}>{monthDays.map((day, index) => dayGroup(day, index))}</View> : null}
+          </>
+        );
+        return monthSideBySide ? (
+          <View style={styles.monthSplit}>
+            <RNScrollView style={styles.monthSplitGrid} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>{grid}</RNScrollView>
+            <RNScrollView style={styles.body} contentContainerStyle={[styles.bodyContent, { paddingLeft: 0 }]} showsVerticalScrollIndicator={false}>{list}</RNScrollView>
           </View>
-        </RNScrollView>
-      ) : viewMode === 'Week' ? (
+        ) : (
+          <RNScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
+            {grid}
+            <View style={{ height: 14 }} />
+            {list}
+          </RNScrollView>
+        );
+      })() : viewMode === 'Week' ? (
         // The week as the website's /calendar shows it (owner, 2026-11-11; booking WeeklyAgendaView.tsx): a summary line,
         // then each day with its date badge and its bookings as cards (time, status, client, service).
         <RNScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false} testID="calendar-week">
@@ -549,57 +640,7 @@ export default function CalendarScreen() {
             );
           })()}
           <View style={[styles.weekList, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            {days.map((day, index) => {
-              const dayAppointments = bookingsByDay[dateKey(day)] ?? [];
-              const isToday = dateKey(day) === todayKey;
-              const isPast = dateKey(day) < todayKey;
-              return (
-                <View key={dateKey(day)} style={[styles.weekDay, index > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
-                  <TouchableOpacity onPress={() => selectDate(day, true)} style={[styles.weekDayHeader, { backgroundColor: isToday ? `${colors.primary}0D` : isPast ? colors.muted : colors.card }]}>
-                    <View style={[styles.weekBadge, { backgroundColor: isToday ? colors.primary : colors.muted }]}>
-                      <Text style={[styles.weekBadgeDay, { color: isToday ? colors.primaryForeground : colors.mutedForeground }]}>{day.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()}</Text>
-                      <Text style={[styles.weekBadgeNumber, { color: isToday ? colors.primaryForeground : isPast ? colors.mutedForeground : colors.foreground }]}>{day.getDate()}</Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.weekDayTitle, { color: isToday ? colors.primary : isPast ? colors.mutedForeground : colors.foreground }]}>
-                        {isToday ? 'Today' : day.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-                      </Text>
-                      <Text style={[styles.weekDayCount, { color: colors.mutedForeground }]}>{dayAppointments.length === 0 ? 'No appointments' : `${dayAppointments.length} appointment${dayAppointments.length === 1 ? '' : 's'}`}</Text>
-                    </View>
-                    {isToday ? <View style={[styles.todayPill, { backgroundColor: colors.primary }]}><Text style={[styles.todayPillText, { color: colors.primaryForeground }]}>Today</Text></View> : null}
-                  </TouchableOpacity>
-                  {dayAppointments.length === 0 ? (
-                    <View style={styles.weekEmpty}>
-                      <View style={[styles.weekEmptyBar, { backgroundColor: colors.border }]} />
-                      <Text style={[styles.weekEmptyText, { color: colors.mutedForeground }]}>No bookings</Text>
-                    </View>
-                  ) : (
-                    <View style={styles.weekCards}>
-                      {dayAppointments.map((item) => {
-                        const minutes = Number(String(item.duration).match(/\d+/)?.[0] ?? 60);
-                        const status = item.status === 'pending' && item.clientConfirmed ? WEEK_STATUS.confirmed : WEEK_STATUS[item.status] ?? WEEK_STATUS.pending;
-                        return (
-                          <TouchableOpacity key={item.id} onPress={() => openAppointment(item)} style={[styles.weekCard, { backgroundColor: colors.card, borderColor: colors.border }]} testID={`week-appt-${item.appointmentId}`}>
-                            <View style={[styles.weekStripe, { backgroundColor: item.serviceColor ?? colors.primary }]} />
-                            <View style={{ flex: 1, minWidth: 0 }}>
-                              <View style={styles.weekCardTop}>
-                                <View style={styles.weekTime}>
-                                  <Feather name="clock" size={12} color={colors.mutedForeground} />
-                                  <Text style={[styles.weekTimeText, { color: colors.mutedForeground }]}>{formatClock(item.startMinutes)} – {formatClock(item.startMinutes + minutes)}</Text>
-                                </View>
-                                <View style={[styles.weekStatus, { backgroundColor: status.bg }]}><Text style={[styles.weekStatusText, { color: status.text }]}>{status.label}</Text></View>
-                              </View>
-                              <Text numberOfLines={1} style={[styles.weekName, { color: colors.foreground }]}>{item.name.split(' ')[0] || item.name}</Text>
-                              <Text numberOfLines={1} style={[styles.weekService, { color: colors.mutedForeground }]}>{item.service}</Text>
-                            </View>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-                  )}
-                </View>
-              );
-            })}
+            {days.map((day, index) => dayGroup(day, index))}
           </View>
         </RNScrollView>
       ) : (
@@ -739,6 +780,8 @@ const styles = StyleSheet.create({
   dayName: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   dayNumber: { fontSize: 17, fontFamily: 'Inter_700Bold' },
   dayDot: { width: 4, height: 4, borderRadius: 2 },
+  monthSplit: { flex: 1, flexDirection: 'row' },
+  monthSplitGrid: { flexGrow: 0, width: '48%', maxWidth: 480 },
   monthGrid: { borderWidth: 1, borderRadius: 18, padding: 11, overflow: 'hidden' },
   weekdayRow: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 5 },
   weekdayLabel: { width: '14.28%', textAlign: 'center', fontSize: 13, fontFamily: 'Inter_700Bold' },
