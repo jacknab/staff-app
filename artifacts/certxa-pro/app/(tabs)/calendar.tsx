@@ -209,6 +209,12 @@ export default function CalendarScreen() {
   // on this phone.
   const [gridMinutes, setGridMinutes] = useState(15);
   useEffect(() => { AsyncStorage.getItem('calendar.gridMinutes').then((v) => { if ([10, 15, 30, 60].includes(Number(v))) setGridMinutes(Number(v)); }).catch(() => undefined); }, []);
+  // Time grid (owner, 2026-11-19): a setting in the + overlay; kept on this phone.
+  const pickGrid = (m: number) => { setGridMinutes(m); void AsyncStorage.setItem('calendar.gridMinutes', String(m)).catch(() => undefined); };
+  const chooseGrid = () => Alert.alert('Time grid', 'How often the Day view draws a line and a time label.', [
+    ...[10, 15, 30, 60].map((m) => ({ text: `Every ${m} minutes${m === gridMinutes ? ' (now)' : ''}`, onPress: () => { setAddOpen(false); pickGrid(m); } })),
+    { text: 'Cancel', style: 'cancel' as const },
+  ]);
   const steps = Array.from({ length: 60 / gridMinutes }, (_, q) => q);
   const stepPx = HOUR_HEIGHT / steps.length;
   const [pendingDrop, setPendingDrop] = useState<{ item: AppointmentRecord; minutes: number } | null>(null);
@@ -434,6 +440,10 @@ export default function CalendarScreen() {
                   <MenuCard key={mode} testID={`calendar-view-${mode.toLowerCase()}`} icon={{ feather: icon }} title={mode}
                     subtitle={viewMode === mode ? `Showing now · ${line}` : line} onPress={() => pickView(mode)} />
                 ))}
+              </View>
+              <SectionHeader title="Settings" />
+              <View style={styles.overlayGroup}>
+                <MenuCard testID="calendar-time-grid" icon={{ feather: 'align-justify' }} title="Time grid" subtitle={`Every ${gridMinutes} minutes · the Day view’s lines and labels`} onPress={chooseGrid} />
               </View>
             </RNScrollView>
           </TouchableOpacity>

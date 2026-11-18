@@ -88,7 +88,7 @@ export const HELP: Record<string, HelpPage> = {
     intro: 'Your bookings and blocked time, on a 24-hour calendar.',
     sections: [
       { heading: 'Moving around', points: [
-        'The + button next to the title opens Add (New booking, Block time) and Calendar view: Day, Week or Month. The view you’re on says Showing now.',
+        'The + button next to the title opens Add (New booking, Block time), Calendar view (Day, Week or Month; the view you’re on says Showing now) and Settings: Time grid, how often the Day view draws a line and a time label (every 10, 15, 30 or 60 minutes, kept on this phone).',
         'Under the title: the day you’re on and how many appointments it has.',
         'The arrows go to the previous or next day, week or month. Today jumps back to today.',
         'Day: tap a day in the strip at the top to see it. Week: the week’s dates and how many bookings, then each day with its bookings (time, status, client and service); tap a booking to open it, or a day to see it; No bookings when nothing is booked. Month: tap a day to open it.',
