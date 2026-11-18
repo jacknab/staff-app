@@ -7,6 +7,7 @@ import {
   ScrollView,
   StatusBar,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -45,7 +46,7 @@ import { look, cardShadow } from '@/components/look/tokens';
 // Stripe M2 does not require that Apple entitlement.
 const TAP_TO_PAY_ENABLED = true;
 // Shown on the payment screen so a tester can tell which build is installed.
-const BUILD_LABEL = 'Build Nov 18 · K';
+const BUILD_LABEL = 'Build Nov 18 · L';
 const EXPO_GO_PREVIEW = process.env.EXPO_PUBLIC_EXPO_GO_PREVIEW === '1';
 
 type PaymentStep = 'idle' | 'tap_intro' | 'initializing' | 'discovering' | 'connecting' | 'ready' | 'processing' | 'capture_pending' | 'success' | 'error';
@@ -551,6 +552,7 @@ export default function CheckoutScreen() {
         discountCents,
         priorTenderedCents: depositCents + partialCents,
         clientFeeCents: feeCents,
+        saveCard: keepCard,
       });
       createdPaymentIntentId = created.paymentIntentId;
       setPaymentIntentId(created.paymentIntentId);
@@ -561,7 +563,8 @@ export default function CheckoutScreen() {
 
       setStatusText(readerMode === 'm2' ? 'Tap, insert, or swipe the card on the M2 reader…' : 'Hold the customer’s card near this phone…');
       phase = 'Read card';
-      const collected = await collectPaymentMethod({ paymentIntent: retrieved.paymentIntent });
+      // Saving the card needs the client's OK recorded with it (Stripe: allowRedisplay).
+      const collected = await collectPaymentMethod({ paymentIntent: retrieved.paymentIntent, ...(keepCard ? { allowRedisplay: 'always' as const } : {}) });
       if (collected.error || !collected.paymentIntent) throw new Error(collected.error?.message || 'Payment collection was not completed.');
 
       setStatusText('Confirming payment…');
@@ -730,6 +733,11 @@ export default function CheckoutScreen() {
   // capture records the whole sale (tip, discount, other payments, card fee).
   const [savedCard, setSavedCard] = useState<{ brand: string | null; last4: string | null } | null>(null);
   const [charging, setCharging] = useState<null | 'saved' | 'keyed'>(null);
+  // Save card on file (owner, 2026-11-18): a card paying a booking is kept on the client for later charges (no-show and
+  // late-cancel fees, Card on file), with the client's OK. Offered while the client has no card saved.
+  const [saveCard, setSaveCard] = useState(true);
+  const offerSave = !savedCard && Number(appointmentId) > 0 && !isQuickSale;
+  const keepCard = offerSave && saveCard;
   const [splitOpen, setSplitOpen] = useState(false);
   useEffect(() => {
     const apptId = Number(appointmentId);
@@ -753,6 +761,7 @@ export default function CheckoutScreen() {
       const made = await createTerminalPaymentIntent(token, {
         amountCents, appointmentId: apptId, clientName: clientName.trim() || undefined, method,
         tipCents, discountCents, priorTenderedCents: depositCents + partialCents, clientFeeCents: feeCents,
+        saveCard: method === 'keyed' && keepCard,
       });
       created = made;
       if (method === 'keyed') {
@@ -1005,6 +1014,13 @@ export default function CheckoutScreen() {
              </View> : null} */}
              {!isTapIntro ? <TouchableOpacity disabled={(!isReady && !isCapturePending && !isTapIntro) || isBusy || (isTapIntro && cardsOff)} testID={isTapIntro ? 'start-tap-to-pay' : isCapturePending ? 'retry-capture' : 'accept-payment'} onPress={isTapIntro ? () => startCard('tap_to_pay') : isCapturePending ? retryCapture : processPayment} style={[styles.primaryButton, { backgroundColor: (isReady || isCapturePending || (isTapIntro && !cardsOff)) && !isBusy ? colors.primary : colors.muted }]}><Feather name={isTapIntro ? 'radio' : isCapturePending ? 'refresh-cw' : 'radio'} size={19} color={(isReady || isCapturePending || (isTapIntro && !cardsOff)) && !isBusy ? colors.primaryForeground : colors.mutedForeground} /><Text style={[styles.primaryButtonText, { color: (isReady || isCapturePending || (isTapIntro && !cardsOff)) && !isBusy ? colors.primaryForeground : colors.mutedForeground }]}>{isBusy ? (step === 'processing' ? 'Payment in progress…' : 'Preparing…') : isTapIntro ? 'Start Tap to Pay' : isCapturePending ? 'Retry capture' : 'Accept payment'}</Text></TouchableOpacity> : null}
              {/* How the client pays (owner, 2026-11-17): one list of the ways to pay, then Split payment. */}
+             {isTapIntro && offerSave && !cardsOff ? <View testID="save-card-row" style={[styles.saveCardRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+               <View style={{ flex: 1 }}>
+                 <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Save card on file</Text>
+                 <Text style={[styles.saveCardSub, { color: colors.mutedForeground }]}>With the client’s OK. Used for no-show and late-cancel fees, and Card on file at checkout.</Text>
+               </View>
+               <Switch testID="save-card-switch" value={saveCard} onValueChange={setSaveCard} trackColor={{ true: colors.primary, false: colors.border }} accessibilityLabel="Save card on file" />
+             </View> : null}
              {isTapIntro ? <View testID="payment-methods" style={[styles.payList, { backgroundColor: colors.card, borderColor: colors.border }]}>
                <MethodRow testID="start-tap-to-pay" icon="smartphone" title="Tap to Pay on iPhone" sub={cardsOff ? 'Set up card payments first' : 'Hold the card near this phone'} disabled={isBusy || cardsOff || !!charging} onPress={() => startCard('tap_to_pay')} colors={colors} />
                <MethodRow testID="start-stripe-m2" icon="credit-card" title="Card reader" sub={connectedReader && readerMode === 'm2' ? `Connected${typeof (connectedReader as any).batteryLevel === 'number' ? ` · ${Math.round((connectedReader as any).batteryLevel * 100)}% battery` : ''}` : 'Stripe M2'} disabled={isBusy || cardsOff || !!charging} onPress={() => startCard('m2')} colors={colors} />
@@ -1098,6 +1114,8 @@ function MethodRow({ testID, icon, title, sub, disabled, onPress, colors, last }
 
 const styles = StyleSheet.create({
   payList: { width: '100%', borderWidth: 1, borderRadius: 18, marginTop: 18, overflow: 'hidden' },
+  saveCardRow: { width: '100%', flexDirection: 'row', alignItems: 'center', gap: 14, borderWidth: 1, borderRadius: 18, marginTop: 18, paddingHorizontal: 18, paddingVertical: 14 },
+  saveCardSub: { fontSize: 15, lineHeight: 20, marginTop: 4 },
   methodRow: { flexDirection: 'row', alignItems: 'center', gap: 16, minHeight: 68, paddingHorizontal: 18, paddingVertical: 12 },
   methodTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
   methodSub: { fontSize: 14, fontFamily: 'Inter_400Regular', marginTop: 2 },

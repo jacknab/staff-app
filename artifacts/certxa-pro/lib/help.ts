@@ -234,6 +234,7 @@ export const HELP: Record<string, HelpPage> = {
         'Other payment: a payment made outside Certxa, by Check, Venmo, Zelle, PayPal or Other (type its name). It is recorded on the visit for the amount due; nothing is charged and there is no card fee.',
         'Card on file (with the last 4 digits) shows when the client saved a card. Tap it and confirm to charge the bill to that card; no reader needed.',
         'Enter new card opens a secure Stripe page where you type the client’s card number. When it is accepted you come back here and the payment is finished.',
+        'Save card on file (above the list, while the client has no saved card): on by default. Ask the client first. The card they pay with by Tap to Pay, the card reader or Enter new card is kept on their profile, so you can charge a no-show or late-cancel fee later, or use Card on file at their next checkout. Turn it off when they say no.',
         'Card needs card payments set up; until then the card choices are switched off, and you take cash or a gift card.',
         'Cash: tap Cash, enter the cash the client gave you and tap Record cash (no card fee). More than the bill shows the change to give back; less pays part of it, and the rest is paid another way.',
         'Gift card: enter the code on a Certxa gift card. It pays what is on the card, up to the bill. If that isn’t enough, the rest is paid another way: card, cash or another gift card.',

@@ -36,6 +36,8 @@ export type CreateTerminalPaymentIntentRequest = {
   priorTenderedCents?: number;
   /** The client's card fee (Settings › Card reader & Checkout), part of amountCents. */
   clientFeeCents?: number;
+  /** Keep this card on the client for later (Save card on file at checkout). */
+  saveCard?: boolean;
 };
 
 export type CreateTerminalPaymentIntentResponse = {
