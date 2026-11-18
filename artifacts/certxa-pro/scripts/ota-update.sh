@@ -18,4 +18,4 @@ if [ "$CHANNEL" = "preview-dev" ]; then export EXPO_PUBLIC_APNS_ENV=development;
 # EAS requires --environment here. It names which of the project's EAS variables to load; the two above are in this shell.
 if [ "$CHANNEL" = "production" ]; then ENVIRONMENT=production; else ENVIRONMENT=preview; fi
 # iOS only: the app ships on iPhone, and the other platforms' bundles fail on the Stripe Terminal package.
-npx eas-cli@latest update --channel "$CHANNEL" --message "$MESSAGE" --environment "$ENVIRONMENT" --platform ios --non-interactive
+npx eas-cli@latest update --channel "$CHANNEL" --message "$MESSAGE" --environment "$ENVIRONMENT" --platform all --non-interactive

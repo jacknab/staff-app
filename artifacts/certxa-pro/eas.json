@@ -10,7 +10,10 @@
         "PNPM_CONFIG_STRICT_DEP_BUILDS": "false",
         "EXPO_PUBLIC_APNS_ENV": "production"
       },
-      "channel": "preview"
+      "channel": "preview",
+      "android": {
+        "buildType": "apk"
+      }
     },
     "production": {
       "distribution": "store",

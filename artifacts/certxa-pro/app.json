@@ -81,7 +81,15 @@
           "microphoneUsageDescription": "Certxa Pro uses the microphone for calls on your business number."
         }
       ],
-      "expo-audio"
+      "expo-audio",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 26
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
