@@ -15,6 +15,8 @@
  *   Card reader & Checkout       GET · PATCH /api/pos-settings/:storeId, GET · PUT /api/tip-presets
  *   Account                      POST /api/auth/forgot-password · DELETE /api/user/delete-account
  *                                (the password is checked first with POST /api/solo/login)
+ *
+ * Tablets (owner, 2026-11-19): the menu stays on the left and the chosen setting opens on the right.
  */
 import { useCallback, useEffect, useState, type ComponentProps, type ReactNode } from 'react';
 import { Feather } from '@expo/vector-icons';
@@ -37,6 +39,7 @@ import { AppBackground } from '@/components/look/AppBackground';
 import { SectionHeader, SectionTitle } from '@/components/look/SectionHeader';
 import { usePaymentsReady } from '@/lib/usePaymentsReady';
 import { look, cardShadow } from '@/components/look/tokens';
+import { useIsTablet } from '@/components/TabletLauncher';
 type Screen = 'menu' | 'business' | 'location' | 'places' | 'hours' | 'rules' | 'approval' | 'policy' | 'blocked' | 'phone' | 'website' | 'stripe' | 'readers' | 'deposits' | 'tax' | 'account';
 type Store = { id: number; name?: string | null; phone?: string | null; email?: string | null; category?: string | null; address?: string | null; city?: string | null; state?: string | null; postcode?: string | null; bookingSlug?: string | null; timezone?: string | null };
 type Hours = { dayOfWeek: number; openTime: string; closeTime: string; isClosed: boolean };
@@ -77,6 +80,7 @@ export default function SettingsScreen() {
   const { user, logout } = useAuth();
   const { setTimeZone, refresh: refreshCalendar, clients } = useBookingData();
   const [screen, setScreen] = useState<Screen>('menu');
+  const isTablet = useIsTablet();
   const [store, setStore] = useState<Store | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -97,9 +101,11 @@ export default function SettingsScreen() {
   // Done in website setup brings the pro back to the Settings menu (?done=<time>).
   const { done } = useLocalSearchParams<{ done?: string }>();
   useFocusEffect(useCallback(() => { void loadStore().catch(() => undefined); }, [loadStore]));
-  useEffect(() => { if (done) { setScreen('menu'); setError(''); setNotice(''); } }, [done]);
+  useEffect(() => { if (done) { if (!isTablet) setScreen('menu'); setError(''); setNotice(''); } }, [done]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const open = useCallback(async (next: Screen) => {
+    // On a tablet the menu is always on the left: "menu" just keeps the setting already open on the right.
+    if (next === 'menu' && isTablet && screen !== 'menu') { setError(''); setNotice(''); return; }
     // Payments not set up: Deposits opens its Stripe page instead (owner, 2026-11-11; app/payments-deposits.tsx).
     if (next === 'deposits' && paymentsReady === false) { router.push('/payments-deposits' as Href); return; }
     setScreen(next); setError(''); setNotice(''); setDraft({}); setLoading(true);
@@ -167,9 +173,10 @@ export default function SettingsScreen() {
       }
     } catch (cause) { setError(errorText(cause, 'Could not load this from Certxa.')); }
     finally { setLoading(false); }
-  }, [loadStore, store, paymentsReady]);
+  }, [loadStore, store, paymentsReady, isTablet, screen]);
 
-  useEffect(() => { void open('menu'); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // A tablet opens the first setting on the right; a phone starts on the menu.
+  useEffect(() => { void open(isTablet ? 'business' : 'menu'); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** Run a save: show progress, then "Saved" or the reason Certxa gave. */
   const run = async (work: () => Promise<void>, done = 'Saved to Certxa.') => {
@@ -359,7 +366,7 @@ export default function SettingsScreen() {
 
   // ── small building blocks ─────────────────────────────────────────────────
   const Row = ({ icon, title, hint, to }: { icon: FeatherName; title: string; hint: string; to: Screen }) => (
-    <TouchableOpacity testID={`settings-${to}`} onPress={() => void open(to)} style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}>
+    <TouchableOpacity testID={`settings-${to}`} onPress={() => void open(to)} style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }, isTablet && screen === to && { borderColor: colors.primary, borderWidth: 2 }]}>
       <View style={[styles.rowIcon, { backgroundColor: colors.secondary }]}><Feather name={icon} size={26} color={colors.primary} /></View>
       <View style={{ flex: 1 }}><Text style={[styles.rowTitle, { color: colors.foreground }]}>{title}</Text><Text numberOfLines={2} style={[styles.rowHint, { color: colors.mutedForeground }]}>{hint}</Text></View>
       <Feather name="chevron-right" size={20} color={colors.mutedForeground} />
@@ -408,7 +415,7 @@ export default function SettingsScreen() {
     }
   };
 
-  const body = () => {
+  const body = (screen: Screen) => {
     if (screen === 'menu') return (
       <>
         <Group title="My Business">
@@ -809,6 +816,42 @@ export default function SettingsScreen() {
     </>);
   };
 
+  const detail = (which: Screen) => (<>
+    {loading ? <ActivityIndicator style={{ marginTop: 40 }} color={colors.primary} /> : error && Object.keys(draft).length === 0 && which !== 'menu' && which !== 'website' && which !== 'account' ? null : body(which)}
+    {error ? <View style={[styles.banner, { backgroundColor: colors.accent }]}><Feather name="alert-circle" size={17} color={colors.accentForeground} /><Text style={[styles.bannerText, { color: colors.accentForeground }]}>{error}</Text></View> : null}
+    {notice ? <View style={[styles.banner, { backgroundColor: colors.secondary }]}><Feather name="check" size={17} color={colors.primary} /><Text style={[styles.bannerText, { color: colors.primary }]}>{notice}</Text></View> : null}
+  </>);
+
+  if (isTablet) return (
+    <KeyboardAvoidingView style={[styles.root, { backgroundColor: look.pageTop, paddingTop: insets.top }]} behavior="padding" keyboardVerticalOffset={0}>
+      <AppBackground />
+      <StatusBar barStyle="dark-content" />
+      <View style={styles.split}>
+        <View style={styles.menuPane}>
+          <View style={styles.header}>
+            <TouchableOpacity testID="settings-back" accessibilityLabel="Back" onPress={() => router.back()} style={styles.headerButton}><Feather name="arrow-left" size={21} color={colors.foreground} /></TouchableOpacity>
+            <HelpTitle help="settings" style={[styles.headerTitle, { color: colors.foreground }]}>Settings</HelpTitle>
+            <View style={styles.headerButton} />
+          </View>
+          <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]} showsVerticalScrollIndicator={false}>{body('menu')}</ScrollView>
+        </View>
+        <View style={styles.splitLine} />
+        <View style={{ flex: 1 }}>
+          <View style={styles.header}>
+            {screen === 'tax' && draft.editing
+              ? <TouchableOpacity testID="settings-detail-back" accessibilityLabel="Back" onPress={() => setDraft((d) => ({ ...d, ...d.saved, editing: null }))} style={styles.headerButton}><Feather name="arrow-left" size={21} color={colors.foreground} /></TouchableOpacity>
+              : <View style={styles.headerButton} />}
+            <HelpTitle help={`settings.${screen}`} style={[styles.headerTitle, { color: colors.foreground }]}>{TITLES[screen]}</HelpTitle>
+            <View style={styles.headerButton} />
+          </View>
+          <ScrollView testID="settings-detail" contentContainerStyle={[styles.content, styles.detailContent, { paddingBottom: insets.bottom + 40 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            {screen === 'menu' ? null : detail(screen)}
+          </ScrollView>
+        </View>
+      </View>
+    </KeyboardAvoidingView>
+  );
+
   return (
     <KeyboardAvoidingView style={[styles.root, { backgroundColor: look.pageTop, paddingTop: insets.top }]} behavior="padding" keyboardVerticalOffset={0}>
       <AppBackground />
@@ -819,9 +862,7 @@ export default function SettingsScreen() {
         <View style={styles.headerButton} />
       </View>
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        {loading ? <ActivityIndicator style={{ marginTop: 40 }} color={colors.primary} /> : error && Object.keys(draft).length === 0 && screen !== 'menu' && screen !== 'website' && screen !== 'account' ? null : body()}
-        {error ? <View style={[styles.banner, { backgroundColor: colors.accent }]}><Feather name="alert-circle" size={17} color={colors.accentForeground} /><Text style={[styles.bannerText, { color: colors.accentForeground }]}>{error}</Text></View> : null}
-        {notice ? <View style={[styles.banner, { backgroundColor: colors.secondary }]}><Feather name="check" size={17} color={colors.primary} /><Text style={[styles.bannerText, { color: colors.primary }]}>{notice}</Text></View> : null}
+        {detail(screen)}
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -829,6 +870,10 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  split: { flex: 1, flexDirection: 'row' },
+  menuPane: { width: '38%', minWidth: 320, maxWidth: 440 },
+  splitLine: { width: StyleSheet.hairlineWidth, backgroundColor: 'rgba(28, 22, 80, 0.14)' },
+  detailContent: { width: '100%', maxWidth: 680, alignSelf: 'center' },
   header: { minHeight: 52, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerButton: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: 18, fontFamily: 'Inter_600SemiBold' },
