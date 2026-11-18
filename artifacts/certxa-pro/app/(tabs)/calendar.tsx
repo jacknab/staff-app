@@ -441,8 +441,12 @@ export default function CalendarScreen() {
       </Modal>
       {/* Fixed header: it never scrolls. */}
       <View style={styles.fixedHeader}>
+        {/* The Clients page's heading style (owner, 2026-11-18): a small purple line above the big title. */}
         <View style={styles.titleRow}>
-          <HelpTitle help="calendar" style={[styles.pageTitle, { color: colors.foreground }]}>Calendar</HelpTitle>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.eyebrow, { color: colors.primary }]}>YOUR SCHEDULE</Text>
+            <HelpTitle help="calendar" style={[styles.pageTitle, { color: colors.foreground }]}>Calendar</HelpTitle>
+          </View>
           <View style={styles.headerActions}>
             <TouchableOpacity testID="calendar-refresh" accessibilityLabel="Refresh calendar" onPress={() => void refresh()} style={styles.iconButton}>
               <Feather name="refresh-cw" size={19} color={colors.primary} />
@@ -705,13 +709,14 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8, marginLeft: 'auto' },
   iconButton: { width: 39, height: 39, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  addButton: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  addButton: { width: 42, height: 42, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   todayHint: { fontSize: 15, fontFamily: 'Inter_500Medium', marginRight: 2 },
   dateHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   chevronButton: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
-  pageTitle: { fontSize: 38, fontFamily: 'Inter_700Bold', letterSpacing: -0.8, paddingTop: 6, paddingBottom: 10 },
+  pageTitle: { fontSize: 38, fontFamily: 'Inter_700Bold', letterSpacing: -0.8, marginTop: 2 },
+  eyebrow: { fontSize: 13, letterSpacing: 1.4, fontFamily: 'Inter_700Bold', paddingTop: 12 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  daySummary: { marginBottom: 10 },
+  daySummary: { fontSize: 16, fontFamily: 'Inter_400Regular', marginTop: 7, marginBottom: 12 },
   overlayBackdrop: { flex: 1, backgroundColor: 'rgba(17, 12, 34, 0.45)', justifyContent: 'flex-end' },
   overlayPanel: { borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingHorizontal: 18, paddingTop: 14, maxHeight: '88%' },
   overlayHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 },

@@ -93,7 +93,8 @@ export default function ClientsScreen() {
   return (
     <KeyboardAvoidingView style={[styles.root, { backgroundColor: look.pageTop, paddingTop: topInset }]} behavior="padding" keyboardVerticalOffset={0}>
       <AppBackground />
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      {/* Fixed header (owner, 2026-11-18): only the list under All clients scrolls. */}
+      <View style={styles.fixedHeader}>
         <View style={styles.topLine}>
           <View><Text style={[styles.eyebrow, { color: colors.primary }]}>YOUR PEOPLE</Text><HelpTitle help="clients" style={[styles.title, { color: colors.foreground }]}>Clients</HelpTitle></View>
           <TouchableOpacity testID="add-client" onPress={() => setAdding((value) => !value)} style={[styles.addButton, { backgroundColor: colors.primary }]}><Feather name={adding ? 'x' : 'plus'} size={21} color={colors.primaryForeground} /></TouchableOpacity>
@@ -116,6 +117,8 @@ export default function ClientsScreen() {
           </View>
         )}
         <View style={styles.countLine}><Text style={[styles.sectionTitle, { color: colors.foreground }]}>{FILTERS.find((f) => f.key === filter)?.key === 'all' ? 'All clients' : FILTERS.find((f) => f.key === filter)?.label}</Text><Text style={[styles.count, { color: colors.mutedForeground }]}>{filtered.length}</Text></View>
+      </View>
+      <ScrollView contentContainerStyle={styles.listContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={styles.clientList}>
           {filtered.map(({ client, status }) => (
             <TouchableOpacity key={client.id} testID={`client-${client.customerId}`} onPress={() => open(client.customerId)} style={[styles.clientRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -144,7 +147,8 @@ export default function ClientsScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  content: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 120 },
+  fixedHeader: { paddingHorizontal: 20, paddingTop: 16 },
+  listContent: { paddingHorizontal: 20, paddingTop: 2, paddingBottom: 120 },
   detailContent: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 100 },
   topLine: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   eyebrow: { fontSize: 13, letterSpacing: 1.4, fontFamily: 'Inter_700Bold' },
@@ -153,7 +157,7 @@ const styles = StyleSheet.create({
   addButton: { width: 42, height: 42, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   searchBox: { height: 48, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 10 },
   searchInput: { flex: 1, fontSize: 16, fontFamily: 'Inter_400Regular', paddingVertical: 0 },
-  countLine: { flexDirection: 'row', alignItems: 'center', gap: 9, marginTop: 26, marginBottom: 12 },
+  countLine: { flexDirection: 'row', alignItems: 'center', gap: 9, marginTop: 22, marginBottom: 10 },
   sectionTitle: { fontSize: 18, fontFamily: 'Inter_600SemiBold' },
   count: { fontSize: 14, fontFamily: 'Inter_500Medium' },
   clientList: { gap: 9 },
