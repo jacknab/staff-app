@@ -17,6 +17,7 @@ import { AppBackground } from '@/components/look/AppBackground';
 import { MenuCard } from '@/components/look/MenuCard';
 import { SectionHeader } from '@/components/look/SectionHeader';
 import { APP_MAX_WIDTH } from '@/components/TabletFrame';
+import { useIsTablet } from '@/components/TabletLauncher';
 import { look } from '@/components/look/tokens';
 type TimeBlock = { id: number; startsAt: string; endsAt: string; allDay: boolean; note: string | null };
 
@@ -270,7 +271,15 @@ export default function CalendarScreen() {
   // + : a booking, or blocked time.
   // The + button (owner, 2026-11-18): an overlay in the More page's style with what to add and the calendar views.
   const [addOpen, setAddOpen] = useState(false);
-  const addSomething = () => setAddOpen(true);
+  // Tablets (owner, 2026-11-19): a bigger + and a taller sheet that opens over the calendar's own side of the screen
+  // (the right half next to Home), not the middle.
+  const isTablet = useIsTablet();
+  const rootRef = useRef<View>(null);
+  const [sheetSpot, setSheetSpot] = useState<{ x: number; width: number } | null>(null);
+  const addSomething = () => {
+    if (isTablet) rootRef.current?.measureInWindow((x, _y, width) => setSheetSpot({ x, width }));
+    setAddOpen(true);
+  };
   const goAdd = (pathname: '/booking' | '/block-time') => { setAddOpen(false); router.push({ pathname, params: { day: selectedKey } }); };
   const pickView = (mode: ViewMode) => { setAddOpen(false); setViewMode(mode); setMonthDay(null); };
   // Month view (owner, 2026-11-19): the month grid with the month's bookings listed as the Week view lists them; a tapped
@@ -481,12 +490,13 @@ export default function CalendarScreen() {
   };
 
   return (
-    <View onLayout={(e) => setRootWidth(e.nativeEvent.layout.width)} style={[styles.root, { backgroundColor: look.pageTop, paddingTop: topInset }]}>
+    <View ref={rootRef} onLayout={(e) => setRootWidth(e.nativeEvent.layout.width)} style={[styles.root, { backgroundColor: look.pageTop, paddingTop: topInset }]}>
       <AppBackground />
       <StatusBar barStyle="dark-content" />
       <Modal visible={addOpen} transparent animationType="fade" onRequestClose={() => setAddOpen(false)}>
         <TouchableOpacity activeOpacity={1} onPress={() => setAddOpen(false)} style={styles.overlayBackdrop} accessibilityLabel="Close">
-          <TouchableOpacity activeOpacity={1} onPress={() => undefined} testID="calendar-add-overlay" style={[styles.overlayPanel, { backgroundColor: look.pageTop, paddingBottom: Math.max(insets.bottom, 18) }]}>
+          <TouchableOpacity activeOpacity={1} onPress={() => undefined} testID="calendar-add-overlay" style={[styles.overlayPanel, { backgroundColor: look.pageTop, paddingBottom: Math.max(insets.bottom, 18) }, isTablet && styles.overlayPanelTablet,
+            isTablet && sheetSpot ? { alignSelf: 'flex-start', marginLeft: sheetSpot.x, width: sheetSpot.width, maxWidth: sheetSpot.width } : null]}>
             <View style={styles.overlayHead}>
               <Text style={[styles.overlayTitle, { color: look.heading }]}>Calendar</Text>
               <TouchableOpacity testID="calendar-add-close" accessibilityLabel="Close" onPress={() => setAddOpen(false)} style={styles.iconButton}>
@@ -526,8 +536,8 @@ export default function CalendarScreen() {
             <TouchableOpacity testID="calendar-refresh" accessibilityLabel="Refresh calendar" onPress={() => void refresh()} style={styles.iconButton}>
               <Feather name="refresh-cw" size={19} color={colors.primary} />
             </TouchableOpacity>
-            <TouchableOpacity testID="add-appointment" accessibilityLabel="Add or change the view" onPress={addSomething} style={[styles.addButton, { backgroundColor: colors.primary }]}>
-              <Feather name="plus" size={24} color={colors.primaryForeground} />
+            <TouchableOpacity testID="add-appointment" accessibilityLabel="Add or change the view" onPress={addSomething} style={[styles.addButton, isTablet && styles.addButtonTablet, { backgroundColor: colors.primary }]}>
+              <Feather name="plus" size={isTablet ? 32 : 24} color={colors.primaryForeground} />
             </TouchableOpacity>
           </View>
         </View>
@@ -762,6 +772,7 @@ const styles = StyleSheet.create({
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8, marginLeft: 'auto' },
   iconButton: { width: 39, height: 39, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   addButton: { width: 42, height: 42, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  addButtonTablet: { width: 58, height: 58, borderRadius: 20 },
   todayHint: { fontSize: 15, fontFamily: 'Inter_500Medium', marginRight: 2 },
   dateHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   chevronButton: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
@@ -771,6 +782,7 @@ const styles = StyleSheet.create({
   daySummary: { fontSize: 16, fontFamily: 'Inter_400Regular', marginTop: 7, marginBottom: 12 },
   overlayBackdrop: { flex: 1, backgroundColor: 'rgba(17, 12, 34, 0.45)', justifyContent: 'flex-end' },
   overlayPanel: { width: '100%', maxWidth: APP_MAX_WIDTH, alignSelf: 'center', borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingHorizontal: 18, paddingTop: 14, maxHeight: '88%' },
+  overlayPanelTablet: { maxHeight: '97%' },
   overlayHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 },
   overlayTitle: { fontSize: 26, fontFamily: 'Inter_700Bold' },
   overlayGroup: { gap: 12 },
