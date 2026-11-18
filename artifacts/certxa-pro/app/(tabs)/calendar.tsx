@@ -573,7 +573,7 @@ export default function CalendarScreen() {
                 const booked = (bookingsByDay[dateKey(day)]?.length ?? 0) > 0;
                 return (
                   <TouchableOpacity key={dateKey(day)} testID={`calendar-day-${day.getDate()}`} onPress={() => selectDate(day)} style={[styles.dayCell, tb.dayCell, active && { backgroundColor: colors.primary }]}>
-                    <Text style={[styles.dayName, tb.dayName, { color: active ? colors.primaryForeground : today ? colors.primary : colors.mutedForeground }]}>{day.toLocaleDateString('en-US', { weekday: 'short' }).slice(0, 1)}</Text>
+                    <Text style={[styles.dayName, tb.dayName, { color: active ? colors.primaryForeground : today ? colors.primary : colors.mutedForeground }]}>{isTablet ? day.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase() : day.toLocaleDateString('en-US', { weekday: 'short' }).slice(0, 1)}</Text>
                     <Text style={[styles.dayNumber, tb.dayNumber, { color: active ? colors.primaryForeground : today ? colors.primary : colors.foreground }]}>{day.getDate()}</Text>
                     <View style={[styles.dayDot, { backgroundColor: !booked ? 'transparent' : active ? colors.primaryForeground : colors.primary }]} />
                   </TouchableOpacity>
@@ -590,7 +590,7 @@ export default function CalendarScreen() {
         const grid = (
     <View style={[styles.monthGrid, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <View style={styles.weekdayRow}>
-        {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((weekday, index) => <Text key={`${weekday}-${index}`} style={[styles.weekdayLabel, tb.weekdayLabel, { color: colors.mutedForeground }]}>{weekday}</Text>)}
+        {(isTablet ? ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'] : ['M', 'T', 'W', 'T', 'F', 'S', 'S']).map((weekday, index) => <Text key={`${weekday}-${index}`} style={[styles.weekdayLabel, tb.weekdayLabel, { color: colors.mutedForeground }]}>{weekday}</Text>)}
       </View>
       <View style={styles.monthCells}>
         {cells.map((day) => {
