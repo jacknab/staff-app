@@ -284,6 +284,8 @@ export default function MoreScreen() {
             {/* Not in the 2026-11-09 design, kept so the text credits can still be reached (app/credits.tsx). */}
             <MenuCard testID="menu-credits" icon={{ feather: 'message-circle' }} title="Credit balance" subtitle="Text message credits · buy more" onPress={() => router.push('/credits')} />
             <MenuCard testID="menu-settings" icon={{ feather: 'settings' }} title="Settings" subtitle="Account, preferences, billing" onPress={() => router.push('/settings')} />
+            {/* The Certxa Pro Help Center (owner, 2026-11-19): certxa.com/pro-help, in the browser. */}
+            <MenuCard testID="menu-help" icon={{ feather: 'help-circle' }} title="Help Center" subtitle="Guides and answers, with pictures of each screen" onPress={() => void WebBrowser.openBrowserAsync('https://certxa.com/pro-help')} />
           </View>
           <Text style={[styles.version, { color: colors.mutedForeground }]}>LIVE · {Constants.expoConfig?.version ?? ''}</Text>
         </ScrollView>

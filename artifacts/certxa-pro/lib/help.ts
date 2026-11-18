@@ -292,7 +292,7 @@ export const HELP: Record<string, HelpPage> = {
       { heading: 'Menu', points: [
         'Business: Money (sales, payouts and payments), Business Phone, Expenses, Memberships and Forms & Waivers.',
         'Client Growth: Waitlist, Campaigns, Promo Codes, Referrals, Reviews and Portfolio.',
-        'Account: Business AI, Gift Cards & Packages, Credit balance and Settings.',
+        'Account: Business AI, Gift Cards & Packages, Credit balance, Settings, and Help Center (guides with pictures of each screen, at certxa.com/pro-help).',
         'The person button at the top opens About you.',
       ] },
     ],
