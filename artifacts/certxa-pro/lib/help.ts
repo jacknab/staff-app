@@ -55,7 +55,7 @@ export const HELP: Record<string, HelpPage> = {
       ] },
       { heading: 'Next up and today', points: [
         'Next up: your next appointment that isn’t paid yet. Tap it to open the booking.',
-        'Today’s appointments: everything booked today with its status: Booked, In progress, Completed (done, not paid yet: open it to check out), Paid, No-show or Cancelled. Tap one to open it.',
+        'Today’s Appointments: everything booked today and the next 6 days, by day, with its status: Booked, In progress, Completed (done, not paid yet: open it to check out), Paid, No-show or Cancelled. Tap one to open it.',
         'Calendar opens the calendar to see other days.',
       ] },
       { heading: 'Tip', points: ['Pull down to refresh.'] },

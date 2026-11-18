@@ -59,7 +59,8 @@ export default function HomeScreen() {
     try {
       const day = businessToday(timeZone);
       const from = zonedMoment(day, 0, timeZone);
-      const next = new Date(day); next.setDate(next.getDate() + 1);
+      // Today and the next 6 days (owner, 2026-11-18): the list shows the week; the takings and Next up stay today's.
+      const next = new Date(day); next.setDate(next.getDate() + 7);
       const to = new Date(zonedMoment(next, 0, timeZone).getTime() - 1);
       const rows = await api.get<Ticket[]>(`/api/appointments?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}${ownStaffId ? `&staffId=${ownStaffId}` : ''}`);
       setTickets(Array.isArray(rows) ? rows : []);
@@ -95,11 +96,24 @@ export default function HomeScreen() {
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const firstName = typeof user?.firstName === 'string' && user.firstName.trim() ? user.firstName.trim() : '';
 
-  const paid = tickets.filter(isPaid);
-  const takenCents = paid.reduce((sum, t) => sum + Math.round(Number(t.totalPaid ?? 0) * 100) - Number(t.refundedCents ?? 0), 0);
-  const appointments = useMemo(() => tickets
+  const todayLabel = zonedDateLabel(now, timeZone);
+  const week = useMemo(() => tickets
     .filter((t) => (!t.calendarHidden || t.paymentStatus === 'awaiting_payment') && t.status !== 'cancelled')
     .sort((a, b) => +new Date(a.date) - +new Date(b.date)), [tickets]);
+  const todayTickets = tickets.filter((t) => zonedDateLabel(t.date, timeZone) === todayLabel);
+  const paid = todayTickets.filter(isPaid);
+  const takenCents = paid.reduce((sum, t) => sum + Math.round(Number(t.totalPaid ?? 0) * 100) - Number(t.refundedCents ?? 0), 0);
+  const appointments = week.filter((t) => zonedDateLabel(t.date, timeZone) === todayLabel);
+  // The week's appointments by day: today first, then each day that has something booked.
+  const days = useMemo(() => {
+    const groups: { label: string; items: Ticket[] }[] = [];
+    for (const t of week) {
+      const label = zonedDateLabel(t.date, timeZone);
+      const last = groups[groups.length - 1];
+      if (last && last.label === label) last.items.push(t); else groups.push({ label, items: [t] });
+    }
+    return groups;
+  }, [week, timeZone]);
   // Next up: the first visit not paid yet that hasn't ended.
   const nextUp = appointments.find((t) => !['completed', 'paid', 'no_show'].includes(String(t.status))
     && zonedMinutes(t.date, timeZone) + Number(t.duration ?? 60) > nowMinutes);
@@ -197,16 +211,18 @@ export default function HomeScreen() {
       ) : null}
 
       <View style={styles.sectionLine}>
-        <SectionTitle style={[styles.section]}>Today's appointments</SectionTitle>
+        <SectionTitle style={[styles.section]}>Today's Appointments</SectionTitle>
         <TouchableOpacity testID="home-open-calendar" onPress={() => router.push('/calendar')}><Text style={[styles.link, { color: colors.primary }]}>Calendar</Text></TouchableOpacity>
       </View>
       {loading ? <ActivityIndicator style={{ marginTop: 20 }} color={colors.primary} /> : error ? (
         <Text style={[styles.rowSub, { color: colors.destructive }]}>{error}</Text>
-      ) : appointments.length === 0 ? (
-        <View style={[styles.empty, card]}><Feather name="sun" size={20} color={colors.mutedForeground} /><Text style={[styles.rowSub, { color: colors.mutedForeground }]}>Nothing booked today.</Text></View>
-      ) : (
-        <View style={[styles.list, card]}>
-          {appointments.map((t, index) => {
+      ) : days.length === 0 ? (
+        <View style={[styles.empty, card]}><Feather name="sun" size={20} color={colors.mutedForeground} /><Text style={[styles.rowSub, { color: colors.mutedForeground }]}>Nothing booked in the next 7 days.</Text></View>
+      ) : days.map((group) => (
+        <View key={group.label} testID={`home-day-${group.label}`}>
+          <Text style={[styles.dayLabel, { color: colors.mutedForeground }]}>{group.label === todayLabel ? 'Today' : group.label}</Text>
+          <View style={[styles.list, card]}>
+          {group.items.map((t, index) => {
             const done = isPaid(t);
             const isNext = nextUp?.id === t.id;
             return (
@@ -223,8 +239,9 @@ export default function HomeScreen() {
               </TouchableOpacity>
             );
           })}
+          </View>
         </View>
-      )}
+      ))}
     </ScrollView>
     </View>
   );
@@ -232,6 +249,7 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   content: { paddingHorizontal: 20, paddingBottom: 120 },
+  dayLabel: { fontSize: 15, fontFamily: 'Inter_600SemiBold', marginTop: 14, marginBottom: 8 },
   date: { fontSize: 14, letterSpacing: 1.2, fontFamily: 'Inter_700Bold' },
   headRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   inboxButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
