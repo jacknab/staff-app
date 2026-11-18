@@ -250,9 +250,11 @@ export default function SettingsScreen() {
       // The no-show / late-cancel fee: a % of the booking, charged to the client's card on file only when the pro taps it.
       const fee = String(draft.feePercent ?? '').trim() === '' ? 0 : Number(String(draft.feePercent).replace(/[^0-9.]/g, ''));
       if (!(fee >= 0 && fee <= 100)) throw new Error('Enter a fee from 0 to 100 percent.');
-      await api.put('/api/booking-policies', { cancellationPolicyText: draft.cancellationPolicyText, cancellationPolicyRequired: draft.cancellationPolicyRequired,
+      const saved = await api.put<{ cancellationPolicyText?: string }>('/api/booking-policies', { cancellationPolicyText: draft.cancellationPolicyText, cancellationPolicyRequired: draft.cancellationPolicyRequired,
         cancellationHoursCutoff: draft.cancellationHoursCutoff,
         cancellationFeeType: fee > 0 ? 'percentage' : null, cancellationFeeValue: fee > 0 ? fee : null });
+      // The server writes the fee % and hours into the policy wording (2026-11-18): show it as saved.
+      if (typeof saved?.cancellationPolicyText === 'string') setDraft((d: any) => ({ ...d, cancellationPolicyText: saved.cancellationPolicyText }));
     });
     if (screen === 'tax') return run(async () => {
       const percent = (key: string, max: number, what: string) => {
@@ -619,7 +621,7 @@ export default function SettingsScreen() {
           <Feather name="chevron-right" size={20} color={colors.mutedForeground} />
         </TouchableOpacity>
       ) : <>
-        {field('feePercent', 'Percent of the booking, e.g. 50 (empty = no fee)', { keyboardType: 'decimal-pad' })}        <Help>Protects your time from no-shows. Most pros set 20–30% of the appointment price. It's charged to the client's card on file, only when you tap Charge fee on a no-show or cancelled booking. Ask for a card on file in Settings › Deposits.</Help>
+        {field('feePercent', 'Percent of the booking, e.g. 50 (empty = no fee)', { keyboardType: 'decimal-pad' })}        <Help>Protects your time from no-shows. Most pros set 20–30% of the appointment price. It's charged to the client's card on file, only when you tap Charge fee on a no-show or cancelled booking. Ask for a card on file in Settings › Deposits. When you save, the policy above is updated to say this % and your cancellation hours.</Help>
       </>}
       {saveButton()}
     </>);
