@@ -2,22 +2,23 @@ import { useCallback, useEffect, useState } from 'react';
 import { Feather } from '@expo/vector-icons';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, Alert, ScrollView, StatusBar, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, Share, StatusBar, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { SelectField } from '@/components/SelectField';
 import { useBookingData } from '@/contexts/BookingContext';
 import { api } from '@/lib/live-api';
 import { HelpTitle } from '@/components/HelpTitle';
+import { SERVICE_COLORS } from '@/lib/serviceColors';
 
 import { AppBackground } from '@/components/look/AppBackground';
 import { SectionTitle } from '@/components/look/SectionHeader';
 import { look, cardShadow } from '@/components/look/tokens';
 type OfferedAt = 'place' | 'client' | 'any';
-type Service = { id: number; name: string; duration: number; price: number; offeredAt: OfferedAt; categoryId: number | null; allowQuantity: boolean };
+type Service = { id: number; name: string; duration: number; price: number; offeredAt: OfferedAt; categoryId: number | null; allowQuantity: boolean; color: string | null };
 type Category = { id: number; name: string; sortOrder: number };
 /** The service being added (id 0) or changed, as typed. */
-type Draft = { id: number; name: string; minutes: string; price: string; offeredAt: OfferedAt; categoryId: number | null; allowQuantity: boolean; groupIds: number[] };
+type Draft = { id: number; name: string; minutes: string; price: string; offeredAt: OfferedAt; categoryId: number | null; allowQuantity: boolean; groupIds: number[]; color: string | null };
 /** An add-on group (Catalog › Add-on Groups): every add-on in it is offered with the services that have it. */
 type AddonGroup = { id: number; name: string; addonCount: number };
 
@@ -46,7 +47,7 @@ export default function ServicesScreen() {
   const load = useCallback(async () => {
     try {
       const [rows, cats] = await Promise.all([api.get<any[]>('/api/services'), api.get<any[]>('/api/service-categories')]);
-      setServices((Array.isArray(rows) ? rows : []).map((row) => ({ id: Number(row.id), name: String(row.name ?? 'Service'), duration: Number(row.duration) || 0, price: Number(row.price) || 0, allowQuantity: Boolean(row.allowQuantity), offeredAt: row.offeredAt === 'place' || row.offeredAt === 'client' ? row.offeredAt : 'any', categoryId: row.categoryId == null ? null : Number(row.categoryId) })));
+      setServices((Array.isArray(rows) ? rows : []).map((row) => ({ id: Number(row.id), name: String(row.name ?? 'Service'), duration: Number(row.duration) || 0, price: Number(row.price) || 0, allowQuantity: Boolean(row.allowQuantity), offeredAt: row.offeredAt === 'place' || row.offeredAt === 'client' ? row.offeredAt : 'any', categoryId: row.categoryId == null ? null : Number(row.categoryId), color: row.calendarColor ? String(row.calendarColor) : null })));
       setCategories((Array.isArray(cats) ? cats : []).map((row) => ({ id: Number(row.id), name: String(row.name ?? ''), sortOrder: Number(row.sortOrder) || 0 })).sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id));
       const list = await api.get<any[]>('/api/addon-groups').catch(() => []);
       setAddonGroups((Array.isArray(list) ? list : []).map((row) => ({ id: Number(row.id), name: String(row.name ?? ''), addonCount: (row.addonIds ?? []).length })));
@@ -58,6 +59,14 @@ export default function ServicesScreen() {
     }
   }, []);
   useEffect(() => { void load(); }, [load]);
+  // The booking website, for each service's own booking link (owner, 2026-11-18, GlossGenius direct service links).
+  const [siteSlug, setSiteSlug] = useState('');
+  useEffect(() => {
+    api.get<{ bookingSlug?: string | null }[]>('/api/stores').then((rows) => setSiteSlug(String((Array.isArray(rows) ? rows[0]?.bookingSlug : '') ?? ''))).catch(() => undefined);
+  }, []);
+  const shareLink = (service: Service) => {
+    void Share.share({ message: `Book ${service.name}: https://${siteSlug}.certxa.com/?serviceId=${service.id}` });
+  };
   useEffect(() => {
     api.get<{ eligible?: boolean; ownPlace?: string; houseCalls?: boolean }>('/api/work-places')
       .then((p) => {
@@ -79,7 +88,7 @@ export default function ServicesScreen() {
     setError('');
     try {
       const category = categories.find((row) => row.id === draft.categoryId);
-      const body = { name, duration: minutes, price: price.toFixed(2), categoryId: category?.id ?? null, category: category?.name ?? 'General', allowQuantity: draft.allowQuantity, ...(offersBoth ? { offeredAt: draft.offeredAt } : {}) };
+      const body = { name, duration: minutes, price: price.toFixed(2), categoryId: category?.id ?? null, category: category?.name ?? 'General', allowQuantity: draft.allowQuantity, calendarColor: draft.color, ...(offersBoth ? { offeredAt: draft.offeredAt } : {}) };
       let serviceId = draft.id;
       if (draft.id > 0) await api.patch(`/api/services/${draft.id}`, body);
       else serviceId = Number((await api.post<{ id: number }>('/api/services', body))?.id) || 0;
@@ -118,7 +127,7 @@ export default function ServicesScreen() {
   const openService = (service: Service) => {
     setError('');
     setSavedGroupIds([]);
-    setDraft({ id: service.id, name: service.name, minutes: String(service.duration), price: service.price.toFixed(2), offeredAt: service.offeredAt, allowQuantity: service.allowQuantity, categoryId: service.categoryId, groupIds: [] });
+    setDraft({ id: service.id, name: service.name, minutes: String(service.duration), price: service.price.toFixed(2), offeredAt: service.offeredAt, allowQuantity: service.allowQuantity, categoryId: service.categoryId, groupIds: [], color: service.color });
     if (addonGroups.length === 0) return;
     api.get<{ groupIds: number[] }>(`/api/services/${service.id}/addon-groups`)
       .then((r) => {
@@ -145,7 +154,7 @@ export default function ServicesScreen() {
         <TouchableOpacity testID="services-back" accessibilityLabel="Back" onPress={() => (draft ? (setDraft(null), setError('')) : router.back())} style={styles.headerButton}><Feather name="arrow-left" size={21} color={colors.foreground} /></TouchableOpacity>
         <HelpTitle help="services" style={[styles.headerTitle, { color: colors.foreground }]}>{draft ? (draft.id > 0 ? 'Edit service' : 'New service') : 'Services'}</HelpTitle>
         {draft ? <View style={styles.headerButton} /> : (
-          <TouchableOpacity testID="services-add" accessibilityLabel="Add a service" onPress={() => { setError(''); setSavedGroupIds([]); setDraft({ id: 0, name: '', minutes: '', price: '', offeredAt: 'any', categoryId: null, allowQuantity: false, groupIds: [] }); }} style={styles.headerButton}><Feather name="plus" size={22} color={colors.primary} /></TouchableOpacity>
+          <TouchableOpacity testID="services-add" accessibilityLabel="Add a service" onPress={() => { setError(''); setSavedGroupIds([]); setDraft({ id: 0, name: '', minutes: '', price: '', offeredAt: 'any', categoryId: null, allowQuantity: false, groupIds: [], color: null }); }} style={styles.headerButton}><Feather name="plus" size={22} color={colors.primary} /></TouchableOpacity>
         )}
       </View>
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
@@ -171,6 +180,14 @@ export default function ServicesScreen() {
                   onChange={(id) => setDraft({ ...draft, categoryId: id || null })} />
               </>
             ) : null}
+            <Text style={[styles.label, { color: colors.foreground }]}>Calendar colour</Text>
+            <View style={styles.pair}>
+              <View style={{ flex: 1 }}>
+                <SelectField testID="service-color" title="Calendar colour" value={draft.color ?? ''}
+                  options={[{ value: '', label: 'Default' }, ...SERVICE_COLORS]} onChange={(color) => setDraft({ ...draft, color: color || null })} />
+              </View>
+              <View testID="service-color-swatch" style={[styles.swatch, { backgroundColor: draft.color ?? colors.card, borderColor: colors.border }]} />
+            </View>
             <View style={styles.quantityRow}>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.rowTitle, { color: colors.foreground }]}>Clients choose how many</Text>
@@ -214,6 +231,11 @@ export default function ServicesScreen() {
             <TouchableOpacity testID="service-save" disabled={saving} onPress={() => void save()} style={[styles.button, { backgroundColor: saving ? colors.muted : colors.primary }]}>
               <Text style={[styles.buttonText, { color: saving ? colors.mutedForeground : colors.primaryForeground }]}>{saving ? 'Saving…' : 'Save'}</Text>
             </TouchableOpacity>
+            {editing && siteSlug ? (
+              <TouchableOpacity testID="service-share-link" onPress={() => shareLink(editing)} style={[styles.button, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}>
+                <Text style={[styles.buttonText, { color: colors.foreground }]}>Share booking link</Text>
+              </TouchableOpacity>
+            ) : null}
             {editing ? (
               <TouchableOpacity testID="service-remove" disabled={saving} onPress={() => remove(editing)} style={styles.removeButton}>
                 <Text style={[styles.buttonText, { color: colors.destructive }]}>Remove service</Text>
@@ -265,6 +287,7 @@ const styles = StyleSheet.create({
   label: { fontSize: 15, fontFamily: 'Inter_600SemiBold', marginTop: 18, marginBottom: 8 },
   input: { borderWidth: 1, borderRadius: 14, height: 52, paddingHorizontal: 14, fontSize: 17, fontFamily: 'Inter_400Regular' },
   pair: { flexDirection: 'row', gap: 10 },
+  swatch: { width: 52, height: 52, borderRadius: 14, borderWidth: 1 },
   chip: { flex: 1, borderWidth: 1, borderRadius: 12, height: 44, alignItems: 'center', justifyContent: 'center' },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   wrapChip: { borderWidth: 1, borderRadius: 12, minHeight: 40, paddingHorizontal: 14, alignItems: 'center', justifyContent: 'center' },

@@ -500,13 +500,26 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
 
   // ── History (owner, 2026-11-17): every change to this booking, who made it, and the old and new values ──
   const [history, setHistory] = useState<{ at: string; text: string }[] | null>(null);
+  const [historyTick, setHistoryTick] = useState(0);
+  // ── Resend appointment details (owner, 2026-11-18, GlossGenius): the booking confirmation again, text and/or e-mail ──
+  const [resending, setResending] = useState(false);
+  const resendDetails = async () => {
+    setResending(true);
+    try {
+      const r = await api.post<{ text: boolean; email: boolean }>(`/api/pro/appointments/${appointmentId}/resend`, {});
+      Alert.alert('Details sent', `${clientName} got the booking details again by ${r.text && r.email ? 'text and e-mail' : r.text ? 'text' : 'e-mail'}.`);
+      setHistoryTick((n) => n + 1);
+    } catch (cause) {
+      Alert.alert('Not sent', cause instanceof Error ? cause.message : 'Try again in a minute.');
+    } finally { setResending(false); }
+  };
   useEffect(() => {
     if (isPreview) return;
     let cancelled = false;
     api.get<{ history: { at: string; text: string }[] }>(`/api/pro/appointments/${appointmentId}/history`)
       .then((r) => { if (!cancelled) setHistory(r?.history ?? []); }).catch(() => undefined);
     return () => { cancelled = true; };
-  }, [appointmentId, isPreview, status, feeCharged]);
+  }, [appointmentId, isPreview, status, feeCharged, historyTick]);
 
   const deleteAppointment = () => Alert.alert(
     'Delete appointment?',
@@ -790,6 +803,11 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
                   <Text style={[styles.secondaryActionText, { color: colors.destructive }]}>CANCEL</Text>
                 </TouchableOpacity>
               </View>
+              ) : null}
+              {!isPreview && canEdit && !visitOver ? (
+                <TouchableOpacity testID="appointment-resend" disabled={resending} onPress={() => void resendDetails()} style={styles.textAction}>
+                  <Text style={[styles.textActionText, { color: colors.primary }]}>{resending ? 'Sending…' : 'Resend appointment details'}</Text>
+                </TouchableOpacity>
               ) : null}
               {/* Texting a payment link needs card payments (owner, 2026-11-11): hidden until Stripe is set up. */}
               {!isPreview && !prepaid && paymentsReady !== false ? (

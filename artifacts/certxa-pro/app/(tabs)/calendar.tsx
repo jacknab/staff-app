@@ -11,6 +11,8 @@ import { businessToday, zonedMinutes, zonedMoment } from '@/lib/businessTime';
 import { listBookingRequests } from '@/lib/bookingRequests';
 import { api } from '@/lib/live-api';
 import { HelpTitle } from '@/components/HelpTitle';
+import { SelectField } from '@/components/SelectField';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { AppBackground } from '@/components/look/AppBackground';
 import { look } from '@/components/look/tokens';
@@ -37,7 +39,6 @@ const LONG_PRESS_MS = 300;
 const TIMELINE_BOTTOM_PADDING = 110;
 // Room for a label at every quarter hour (owner, 2026-11-11: 11am, 15, 30, 45 down the side, well spaced).
 const HOUR_HEIGHT = 160;
-const QUARTER = HOUR_HEIGHT / 4;
 const SNAP_MINUTES = 5;
 
 function dateKey(date: Date) {
@@ -196,6 +197,13 @@ export default function CalendarScreen() {
   }, []);
   const todayKey = dateKey(businessToday(timeZone));
   const [viewMode, setViewMode] = useState<ViewMode>('Day');
+  // The Day view's time grid (owner, 2026-11-18, GlossGenius): a line and a label every 10, 15, 30 or 60 minutes. Kept
+  // on this phone.
+  const [gridMinutes, setGridMinutes] = useState(15);
+  useEffect(() => { AsyncStorage.getItem('calendar.gridMinutes').then((v) => { if ([10, 15, 30, 60].includes(Number(v))) setGridMinutes(Number(v)); }).catch(() => undefined); }, []);
+  const pickGrid = (m: number) => { setGridMinutes(m); void AsyncStorage.setItem('calendar.gridMinutes', String(m)).catch(() => undefined); };
+  const steps = Array.from({ length: 60 / gridMinutes }, (_, q) => q);
+  const stepPx = HOUR_HEIGHT / steps.length;
   const [pendingDrop, setPendingDrop] = useState<{ item: AppointmentRecord; minutes: number } | null>(null);
   const [notifyClient, setNotifyClient] = useState(true);
   const [savingDrop, setSavingDrop] = useState(false);
@@ -458,10 +466,12 @@ export default function CalendarScreen() {
                 );
               })}
             </View>
-            <View style={styles.scheduleMeta}>
-              <Text style={[styles.scheduleCount, { color: colors.mutedForeground }]}>
+            <View style={[styles.scheduleMeta, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }]}>
+              <Text style={[styles.scheduleCount, { color: colors.mutedForeground, flexShrink: 1 }]}>
                 {selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })} · {appointments.length} {appointments.length === 1 ? 'appointment' : 'appointments'}
               </Text>
+              <SelectField compact testID="calendar-grid" title="Time grid" value={gridMinutes} onChange={pickGrid}
+                options={[10, 15, 30, 60].map((m) => ({ value: m, label: `${m} min` }))} />
             </View>
           </>
         )}
@@ -539,7 +549,7 @@ export default function CalendarScreen() {
                         const status = WEEK_STATUS[item.status] ?? WEEK_STATUS.pending;
                         return (
                           <TouchableOpacity key={item.id} onPress={() => openAppointment(item)} style={[styles.weekCard, { backgroundColor: colors.card, borderColor: colors.border }]} testID={`week-appt-${item.appointmentId}`}>
-                            <View style={[styles.weekStripe, { backgroundColor: colors.primary }]} />
+                            <View style={[styles.weekStripe, { backgroundColor: item.serviceColor ?? colors.primary }]} />
                             <View style={{ flex: 1, minWidth: 0 }}>
                               <View style={styles.weekCardTop}>
                                 <View style={styles.weekTime}>
@@ -573,11 +583,11 @@ export default function CalendarScreen() {
           >
             <View style={[styles.timeline, { height: timelineHeight }]}>
               <View style={[styles.timelineLabels, { backgroundColor: colors.card }]}>
-                {/* A label on every quarter-hour line: the hour as "11am", then 15, 30, 45. */}
-                {timelineHours.flatMap((time, index) => [0, 1, 2, 3].map((q) => (
+                {/* A label on every grid line: the hour as "11am", then the minutes (15, 30, 45 on a 15-minute grid). */}
+                {timelineHours.flatMap((time, index) => steps.map((q) => (
                   // A label under the time-now pill is left out.
-                  todayIsSelected && Math.abs((index * 4 + q) * QUARTER - nowTop) < 18 ? null : <Text key={`${time}-${q}`} style={[styles.timelineLabel, q === 0 ? styles.timelineHourLabel : { color: colors.mutedForeground }, { top: Math.max(0, (index * 4 + q) * QUARTER - 8) }]}>
-                    {q === 0 ? `${time / 60 % 12 || 12}${time / 60 >= 12 ? 'pm' : 'am'}` : String(q * 15)}
+                  todayIsSelected && Math.abs(index * HOUR_HEIGHT + q * stepPx - nowTop) < 18 ? null : <Text key={`${time}-${q}`} style={[styles.timelineLabel, q === 0 ? styles.timelineHourLabel : { color: colors.mutedForeground }, { top: Math.max(0, index * HOUR_HEIGHT + q * stepPx - 8) }]}>
+                    {q === 0 ? `${time / 60 % 12 || 12}${time / 60 >= 12 ? 'pm' : 'am'}` : String(q * gridMinutes)}
                   </Text>
                 )))}
                 {/* The time now, on the left end of the now line (owner, 2026-11-11). */}
@@ -588,7 +598,7 @@ export default function CalendarScreen() {
                 ) : null}
               </View>
               <View style={[styles.timelineTrack, { backgroundColor: colors.card }]}>
-                {timelineHours.flatMap((time, index) => [0, 1, 2, 3].map((q) => <View key={`${time}-${q}`} style={[styles.timelineLine, q > 0 && styles.timelineQuarterLine, { top: (index * 4 + q) * QUARTER, backgroundColor: colors.border }]} />))}
+                {timelineHours.flatMap((time, index) => steps.map((q) => <View key={`${time}-${q}`} style={[styles.timelineLine, q > 0 && styles.timelineQuarterLine, { top: index * HOUR_HEIGHT + q * stepPx, backgroundColor: colors.border }]} />))}
                 {blocks.map((b) => {
                   // The part of the block on this day, in business minutes.
                   const dayStart = zonedMoment(selectedDate, 0, timeZone).getTime();
@@ -616,7 +626,7 @@ export default function CalendarScreen() {
                       height={height}
                       column={place.column}
                       columns={place.columns}
-                      backgroundColor={BOOKING_COLORS[index % BOOKING_COLORS.length]}
+                      backgroundColor={item.serviceColor ?? BOOKING_COLORS[index % BOOKING_COLORS.length]}
                       dragLabel={isDragged ? formatClock(drag.minutes) : null}
                       onTap={openAppointment}
                       onDragStart={startDrag}

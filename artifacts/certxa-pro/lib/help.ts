@@ -46,6 +46,7 @@ export const HELP: Record<string, HelpPage> = {
         'The envelope opens your Inbox (messages clients send from your website). A number on it shows how many are new.',
       ] },
       { heading: 'Taken today', points: ['What you’ve been paid today, how many visits are paid, and how many appointments are still to go.'] },
+      { heading: 'Weekly goal', points: ['Your weekly revenue goal and how much of it you’ve made this week (Sunday to Saturday). Tap it to set or change the goal and see past weeks. With no goal it says Set a weekly revenue goal.'] },
       { heading: 'Needs your attention', points: [
         'Cancelled by client: bookings a client cancelled (online or by phone with Autumn). Tap one to choose: delete it, mark a no-show without a fee, or mark a no-show and collect your fee.',
         'Booking requests waiting for your answer: tap one to approve it, offer other times or decline it.',
@@ -67,12 +68,14 @@ export const HELP: Record<string, HelpPage> = {
       { heading: 'Moving around', points: [
         'Day, Week and Month switch the view.',
         'The arrows go to the previous or next day, week or month. Today jumps back to today.',
+        'Time grid (Day view, beside the date): a line and a label every 10, 15, 30 or 60 minutes. It’s kept on this phone.',
         'Day: tap a day in the strip at the top to see it. Week: the week’s dates and how many bookings, then each day with its bookings (time, status, client and service); tap a booking to open it, or a day to see it; No bookings when nothing is booked. Month: tap a day to open it.',
         'The refresh button reloads your calendar from Certxa.',
       ] },
       { heading: 'Bookings', points: [
         'Tap a booking to open it: edit it, check out, mark it paid, cancel it or mark a no-show.',
         'A label on a booking shows when it’s PAID, a NO-SHOW or has a DEPOSIT DUE.',
+        'A booking shows in its service’s calendar colour (Services › Calendar colour); one with several services takes the first one’s colour.',
         'To move a booking, press and hold it, then drag it to the new time. You’re shown the new time and choose whether to text the client about it (Notify client), or Cancel to leave it where it was.',
       ] },
       { heading: 'Adding', points: [
@@ -101,6 +104,7 @@ export const HELP: Record<string, HelpPage> = {
       { heading: 'Adding clients', points: [
         'Add a client: their first and last name, and a phone number if you have it. Save client adds them.',
         'Import from your phone’s contacts: choose people from your contacts to add as clients.',
+        'Export client list (under the list): a spreadsheet (CSV) of every client with name, e-mail, phone, birthday and whether they’re banned. Save or share opens it with Share and Save to Files; E-mail it to me sends it to your account’s e-mail.',
       ] },
     ],
   },
@@ -110,6 +114,7 @@ export const HELP: Record<string, HelpPage> = {
     sections: [
       { heading: 'At the top', points: [
         'Their photo and name. The pencil edits their name, phone, e-mail, the name they go by, birthday and allergies; Delete Client removes them and their history for good.',
+        'Merge with another client (in the pencil’s edit page): find duplicate profiles of this client by name, phone or e-mail, then Merge. Their bookings, notes, photos and records move to this client, whose contact details are kept; the duplicates are removed. It can’t be undone, and a duplicate with package visits left or an active membership can’t be merged yet.',
         'Under the name: their status (New, Regular, At risk, Inactive or VIP), a Card on file badge when they have a saved card, and their tags.',
         'Text opens a text to them. Call rings them from your business number when you have Business Phone or Plus, so your own number stays private. Email opens an e-mail.',
         'Book appointment books this client straight away.',
@@ -152,6 +157,7 @@ export const HELP: Record<string, HelpPage> = {
       { heading: 'Before the visit', points: [
         'Edit: change the services, add-ons, date or time.',
         'Text a payment link: the client pays from their phone.',
+        'Resend appointment details: sends the booking confirmation again (with the link to manage the booking), by text and/or e-mail as your Notifications send it.',
         'CANCEL: choose Cancel and text the client, Cancel without a text, or Keep the booking. A late-cancel fee can apply under your cancellation policy.',
         'Delete booking removes it completely, as if it was never booked.',
       ] },
@@ -210,12 +216,14 @@ export const HELP: Record<string, HelpPage> = {
         'The amount due comes from the booking; for a quick sale you key it in.',
         'Discount: 10%, 15%, 20% or 25% off, or a custom amount off. Tax is worked out after the discount, never on the tip.',
         'For a member with a member discount, it is put in as the amount off for you (you can change it).',
+        'Custom charges: Add a custom charge puts a named amount on the visit, like a late fee. It is saved on the booking, so the booking, the bill and reports show it; × takes it off again.',
         'Products: Add a product puts a retail item on the visit (it shows how many you have in stock); − and + change how many. Retail sales tax is added on products. They come out of your stock when the visit is paid, and you get a notification when one is down to its low-stock level.',
         'A deposit the client already paid comes off; sales tax and the platform fee are added if you charge them (Settings › Card reader & Checkout).',
         'The client chooses a tip, or enters their own, or no tip.',
       ] },
       { heading: 'How the client pays', points: [
-        'Choose how the client pays from the list: Tap to Pay on iPhone, Card reader (the Stripe M2; it shows Connected and its battery once it is linked), Card on file, Enter new card, Client credit, Gift card or Cash.',
+        'Choose how the client pays from the list: Tap to Pay on iPhone, Card reader (the Stripe M2; it shows Connected and its battery once it is linked), Card on file, Enter new card, Client credit, Gift card, Cash or Other payment.',
+        'Other payment: a payment made outside Certxa, by Check, Venmo, Zelle, PayPal or Other (type its name). It is recorded on the visit for the amount due; nothing is charged and there is no card fee.',
         'Card on file (with the last 4 digits) shows when the client saved a card. Tap it and confirm to charge the bill to that card; no reader needed.',
         'Enter new card opens a secure Stripe page where you type the client’s card number. When it is accepted you come back here and the payment is finished.',
         'Card needs card payments set up; until then the card choices are switched off, and you take cash or a gift card.',
@@ -542,7 +550,19 @@ export const HELP: Record<string, HelpPage> = {
       'Clients choose how many: for anything priced per item; clients see − 1 + on your website, up to 10.',
       'Add-on groups: give it a group of add-ons, and every add-on in the group is offered with it.',
       'Where you offer it (if you have your own place and do house calls): your place, house calls only, or both.',
+      'Calendar colour: one of 18 colours for this service’s bookings on your calendar (Default leaves the usual colours).',
+      'Share booking link: a link to your website with this service already picked, to send in a text or post anywhere.',
       'Remove service takes it off your menu.',
+    ] }],
+  },
+  revenueGoal: {
+    title: 'Weekly goal',
+    intro: 'A revenue goal for each week, and how you’re doing.',
+    sections: [{ heading: 'How it works', points: [
+      'Set the goal with − and + ($100 at a time) or type the amount, then Save goal. It stays the same every week until you change it. Turn the goal off removes it.',
+      'Weeks run Sunday to Saturday. A week counts paid visits and sales, tips and tax included, and membership payments, less refunds made that week.',
+      'Past weeks shows each earlier week against the goal it had.',
+      'Home shows this week’s progress.',
     ] }],
   },
   catalog: {

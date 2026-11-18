@@ -51,6 +51,8 @@ export type AppointmentRecord = {
   name: string;
   service: string;
   serviceId?: number;
+  /** The service's calendar colour (Services › Calendar colour), if it has one. */
+  serviceColor?: string;
   duration: string;
   price: string;
   amountCents: number;
@@ -135,7 +137,7 @@ type ApiCustomer = {
   visits?: number | null; spentCents?: number | null; lastVisitAt?: string | null; lastService?: string | null; nextAppointmentAt?: string | null;
   allergies?: string | null; isVip?: boolean | null; tags?: string[] | null; avatarUrl?: string | null;
 };
-type ApiService = { id: number; categoryId?: number | null; offeredAt?: string | null; name?: string | null; duration?: number | string | null; price?: number | string | null };
+type ApiService = { id: number; calendarColor?: string | null; categoryId?: number | null; offeredAt?: string | null; name?: string | null; duration?: number | string | null; price?: number | string | null };
 export type ApiAppointment = { clientCancelPending?: boolean | null; feeRetry?: { status: string; owedCents: number; collectedCents: number | null; error: string | null } | null; depositRefundRetry?: string | null; cancelledInPolicy?: boolean | null; depositRefundedCents?: number | null; depositRefundFailed?: boolean | null; cardOnFile?: boolean | null; feePercent?: number | null; feeCents?: number | null; feeChargedCents?: number | null; totalPaid?: number | null; refundedCents?: number | null; calendarHidden?: boolean | null; paymentStatus?: string | null; depositCollected?: number | null; visitAt?: string | null; clientAddress?: HouseCallAddress | null; travelFee?: number | null; appointmentAddons?: { addon?: { id?: number; name?: string | null; price?: number | string | null } | null }[] | null; customLines?: { label?: string; price?: number | string | null }[] | null; id: number; date: string; duration?: number | null; status?: string | null; notes?: string | null; customer?: ApiCustomer | null; service?: ApiService | null };
 
 const BookingContext = createContext<BookingContextValue | null>(null);
@@ -178,7 +180,7 @@ export function mapAppointment(appointment: ApiAppointment, timeZone: string): A
     // A house call's travel fee is part of what the client pays.
     + (Number(appointment.travelFee ?? 0) || 0);
   const minutes = Number(appointment.duration ?? appointment.service?.duration ?? 60) || 60;
-  return { id: String(appointment.id), appointmentId: appointment.id, dateKey: dateKey(businessDay), dateIso: date.toISOString(), startMinutes: zonedMinutes(date, timeZone), time: zonedTimeLabel(date, timeZone), name: nameOf(appointment.customer), service: appointment.service?.name || 'Service', serviceId: appointment.service?.id, duration: `${minutes} min`, price: money(priceValue), amountCents: Math.round(priceValue * 100), status: appointment.status === 'completed' ? (appointment.totalPaid != null ? 'paid' : 'completed') : appointment.status || 'pending', note: appointment.notes ?? undefined, customerId: appointment.customer?.id ?? undefined,
+  return { id: String(appointment.id), appointmentId: appointment.id, dateKey: dateKey(businessDay), dateIso: date.toISOString(), startMinutes: zonedMinutes(date, timeZone), time: zonedTimeLabel(date, timeZone), name: nameOf(appointment.customer), service: appointment.service?.name || 'Service', serviceId: appointment.service?.id, serviceColor: appointment.service?.calendarColor || undefined, duration: `${minutes} min`, price: money(priceValue), amountCents: Math.round(priceValue * 100), status: appointment.status === 'completed' ? (appointment.totalPaid != null ? 'paid' : 'completed') : appointment.status || 'pending', note: appointment.notes ?? undefined, customerId: appointment.customer?.id ?? undefined,
     phone: appointment.customer?.phone ?? undefined, email: appointment.customer?.email ?? undefined,
     avatarUrl: appointment.customer?.avatarUrl ?? null,
     depositDue: appointment.paymentStatus === 'awaiting_payment',

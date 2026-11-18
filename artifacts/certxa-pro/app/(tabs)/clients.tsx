@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Feather } from '@expo/vector-icons';
-import { Image, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,6 +10,8 @@ import { useBookingData } from '@/contexts/BookingContext';
 import { zonedDateLabel } from '@/lib/businessTime';
 import { clientStatusOf, STATUS_LABEL, type ClientStatus } from '@/lib/clientStatus';
 import { HelpTitle } from '@/components/HelpTitle';
+import * as WebBrowser from 'expo-web-browser';
+import { api } from '@/lib/live-api';
 
 import { AppBackground } from '@/components/look/AppBackground';
 import { look, cardShadow } from '@/components/look/tokens';
@@ -36,6 +38,24 @@ export default function ClientsScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const topInset = Platform.OS === 'web' ? 67 : insets.top;
+  // Export the client list as a CSV (owner, 2026-11-18, GlossGenius): name, e-mail, phone, birthday, banned.
+  const [exporting, setExporting] = useState(false);
+  const exportList = () => {
+    const run = async (how: 'share' | 'email') => {
+      setExporting(true);
+      try {
+        if (how === 'share') await WebBrowser.openBrowserAsync((await api.post<{ url: string }>('/api/pro/clients/export/link', {})).url);
+        else { const r = await api.post<{ to: string; count: number }>('/api/pro/clients/export/email', {}); Alert.alert('Client list sent', `${r.count} client${r.count === 1 ? '' : 's'}, sent to ${r.to}.`); }
+      } catch (cause) {
+        Alert.alert('Export failed', cause instanceof Error ? cause.message : 'Try again in a minute.');
+      } finally { setExporting(false); }
+    };
+    Alert.alert('Export client list', 'A spreadsheet (CSV) of every client: name, e-mail, phone, birthday and whether they are banned.', [
+      { text: 'Save or share', onPress: () => void run('share') },
+      { text: 'E-mail it to me', onPress: () => void run('email') },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
 
   const withStatus = useMemo(() => clients.map((client) => ({ client, status: clientStatusOf(client) })), [clients]);
   const matches = (key: Filter, row: (typeof withStatus)[number]) =>
@@ -116,6 +136,7 @@ export default function ClientsScreen() {
           ))}
           {filtered.length === 0 && <View style={[styles.empty, { backgroundColor: colors.card }]}><Feather name="users" size={22} color={colors.mutedForeground} /><Text style={[styles.itemTitle, { color: colors.foreground, marginTop: 10 }]}>No clients found</Text><Text style={[styles.itemSubtitle, { color: colors.mutedForeground }]}>Try another search or filter, or add a new client.</Text></View>}
         </View>
+        {clients.length > 0 ? <TouchableOpacity testID="clients-export" disabled={exporting} onPress={exportList} style={{ alignSelf: 'center', paddingVertical: 14 }}><Text style={[styles.itemSubtitle, { color: colors.primary }]}>{exporting ? 'Exporting…' : 'Export client list'}</Text></TouchableOpacity> : null}
       </ScrollView>
     </KeyboardAvoidingView>
   );

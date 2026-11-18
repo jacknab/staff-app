@@ -198,6 +198,23 @@ export default function ClientProfileScreen() {
     router.back();
   }, 'Could not delete the client.');
 
+  // ── Merge duplicate profiles into this one (owner, 2026-11-18, GlossGenius): this client keeps its details; the chosen
+  // duplicates' bookings, notes and records move here and they're removed. It can't be undone. ──
+  const [mergeSearch, setMergeSearch] = useState('');
+  const [mergeIds, setMergeIds] = useState<number[]>([]);
+  const mergeMatches = mergeSearch.trim().length < 2 ? [] : clients.filter((c) => c.customerId !== clientId && !mergeIds.includes(c.customerId)
+    && [c.name, c.phone, c.email ?? ''].some((v) => v.toLowerCase().replace(/[^a-z0-9@.]/g, '').includes(mergeSearch.toLowerCase().replace(/[^a-z0-9@.]/g, '')))).slice(0, 8);
+  const mergeNames = mergeIds.map((id) => clients.find((c) => c.customerId === id)?.name ?? `Client #${id}`);
+  const mergeClients = () => Alert.alert(`Merge into ${name}?`, `${mergeNames.join(', ')} will be merged into ${name}: their bookings, notes and records move here, and ${name}'s contact details are kept. This can't be undone.`, [
+    { text: 'Cancel', style: 'cancel' },
+    { text: 'Merge', style: 'destructive', onPress: () => void run(async () => {
+      await api.post(`/api/pro/clients/${clientId}/merge`, { loserIds: mergeIds });
+      setMergeIds([]); setMergeSearch(''); setEditing(false);
+      await load();
+      void refreshBookings();
+    }, 'Could not merge the clients.') },
+  ]);
+
   const toggleVip = () => run(async () => {
     await api.patch(`/api/clients/${clientId}`, { clientStatus: client?.clientStatus === 'vip' ? 'active' : 'vip' });
     await load();
@@ -286,6 +303,23 @@ export default function ClientProfileScreen() {
               <TouchableOpacity disabled={saving} onPress={() => { setEditing(false); setError(''); }} style={styles.more}><Text style={[styles.link, { color: colors.mutedForeground }]}>Cancel</Text></TouchableOpacity>
             </View>
             {error ? <Text style={[styles.error, { color: colors.destructive }]}>{error}</Text> : null}
+            <SectionTitle style={styles.section}>Merge with another client</SectionTitle>
+            <View style={[styles.box, card, { padding: 14 }]} testID="client-merge">
+              <Text style={[styles.sub, { color: colors.mutedForeground, textAlign: 'left', marginBottom: 10 }]}>{`Find duplicate profiles of ${name}. Their bookings, notes and records move here, and ${name}'s contact details are kept.`}</Text>
+              <TextInput testID="client-merge-search" value={mergeSearch} onChangeText={setMergeSearch} placeholder="Name, phone or e-mail" placeholderTextColor={colors.mutedForeground} autoCapitalize="none" style={[styles.input, { color: colors.foreground, borderColor: colors.border }]} />
+              {mergeMatches.map((c) => (
+                <TouchableOpacity key={c.customerId} testID={`client-merge-pick-${c.customerId}`} onPress={() => { setMergeIds((ids) => [...ids, c.customerId]); setMergeSearch(''); }} style={styles.more}>
+                  <Text style={[styles.link, { color: colors.foreground }]}>{c.name}{c.phone ? ` · ${c.phone}` : c.email ? ` · ${c.email}` : ''}</Text>
+                </TouchableOpacity>
+              ))}
+              {mergeIds.map((id, i) => (
+                <View key={id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 6 }}>
+                  <Text style={[styles.link, { color: colors.foreground, flex: 1 }]}>{mergeNames[i]}</Text>
+                  <TouchableOpacity testID={`client-merge-remove-${id}`} accessibilityLabel={`Remove ${mergeNames[i]}`} onPress={() => setMergeIds((ids) => ids.filter((x) => x !== id))}><Feather name="x" size={20} color={colors.mutedForeground} /></TouchableOpacity>
+                </View>
+              ))}
+              {mergeIds.length ? <TouchableOpacity testID="client-merge-go" disabled={saving} onPress={mergeClients} style={[styles.button, { backgroundColor: colors.primary }]}><Text style={[styles.buttonText, { color: colors.primaryForeground }]}>{`Merge ${mergeIds.length} into ${name}`}</Text></TouchableOpacity> : null}
+            </View>
             <HoldToDelete testID="client-delete" label="Delete Client" busy={saving} onDone={() => void deleteClient()} />
           </>) : (<>
           {client.avatarUrl

@@ -71,7 +71,10 @@ export default function HomeScreen() {
   const [inboxUnread, setInboxUnread] = useState(0);
   // Bookings clients cancelled, waiting for the owner's choice (GlossGenius style, 2026-11-17; Booking details).
   const [cancels, setCancels] = useState<Ticket[]>([]);
+  // The weekly revenue goal (owner, 2026-11-18, GlossGenius; app/revenue-goal.tsx).
+  const [goal, setGoal] = useState<{ goalCents: number; week: { cents: number } } | null>(null);
   const loadAttention = useCallback(async () => {
+    void api.get<{ goalCents: number; week: { cents: number } }>('/api/pro/revenue-goal').then(setGoal).catch(() => undefined);
     void unreadInboxCount().then(setInboxUnread);
     void api.get<{ cancellations: Ticket[] }>('/api/pro/cancellations').then((r) => setCancels(Array.isArray(r?.cancellations) ? r.cancellations : [])).catch(() => undefined);
     const [reqs, convs] = await Promise.all([
@@ -133,6 +136,15 @@ export default function HomeScreen() {
           {paid.length} paid {paid.length === 1 ? 'visit' : 'visits'} · {left} {left === 1 ? 'appointment' : 'appointments'} still to go
         </Text>
       </View>
+
+      {goal ? (
+        <TouchableOpacity testID="home-goal" onPress={() => router.push('/revenue-goal' as Href)} style={[styles.next, card]}>
+          {goal.goalCents > 0 ? <>
+            <Text style={[styles.goalTitle, { color: colors.foreground }]}>{`Weekly goal · ${money(goal.week.cents)} of ${money(goal.goalCents)}`}</Text>
+            <View style={[styles.goalTrack, { backgroundColor: colors.muted }]}><View style={[styles.goalFill, { backgroundColor: colors.primary, width: `${Math.min(100, Math.round((goal.week.cents / goal.goalCents) * 100))}%` }]} /></View>
+          </> : <Text style={[styles.link, { color: colors.primary }]}>Set a weekly revenue goal</Text>}
+        </TouchableOpacity>
+      ) : null}
 
       {requests.length + unread.length + cancels.length > 0 ? (<>
         <View style={styles.sectionLine}>
@@ -231,6 +243,9 @@ const styles = StyleSheet.create({
   takingsValue: { fontSize: 32, fontFamily: 'Inter_700Bold', marginTop: 4, letterSpacing: -0.5 },
   takingsSub: { fontSize: 15, fontFamily: 'Inter_500Medium', marginTop: 6, opacity: 0.85 },
   next: { borderWidth: 1, borderRadius: 18, padding: 16, marginTop: 14 },
+  goalTitle: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
+  goalTrack: { height: 8, borderRadius: 4, marginTop: 10, overflow: 'hidden' },
+  goalFill: { height: 8, borderRadius: 4 },
   eyebrow: { fontSize: 13, letterSpacing: 1.4, fontFamily: 'Inter_700Bold' },
   nextTime: { fontSize: 23, fontFamily: 'Inter_700Bold', marginTop: 6, marginBottom: 4 },
   sectionLine: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginTop: 26, marginBottom: 10 },
