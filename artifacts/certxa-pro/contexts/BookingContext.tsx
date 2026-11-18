@@ -53,6 +53,9 @@ export type AppointmentRecord = {
   serviceId?: number;
   /** The service's calendar colour (Services › Calendar colour), if it has one. */
   serviceColor?: string;
+  /** Processing time (Services › Processing time): minutes of work before it, and how long it lasts. */
+  processingStart?: number;
+  processing?: number;
   duration: string;
   price: string;
   amountCents: number;
@@ -137,8 +140,8 @@ type ApiCustomer = {
   visits?: number | null; spentCents?: number | null; lastVisitAt?: string | null; lastService?: string | null; nextAppointmentAt?: string | null;
   allergies?: string | null; isVip?: boolean | null; tags?: string[] | null; avatarUrl?: string | null;
 };
-type ApiService = { id: number; calendarColor?: string | null; categoryId?: number | null; offeredAt?: string | null; name?: string | null; duration?: number | string | null; price?: number | string | null };
-export type ApiAppointment = { clientCancelPending?: boolean | null; feeRetry?: { status: string; owedCents: number; collectedCents: number | null; error: string | null } | null; depositRefundRetry?: string | null; cancelledInPolicy?: boolean | null; depositRefundedCents?: number | null; depositRefundFailed?: boolean | null; cardOnFile?: boolean | null; feePercent?: number | null; feeCents?: number | null; feeChargedCents?: number | null; totalPaid?: number | null; refundedCents?: number | null; calendarHidden?: boolean | null; paymentStatus?: string | null; depositCollected?: number | null; visitAt?: string | null; clientAddress?: HouseCallAddress | null; travelFee?: number | null; appointmentAddons?: { addon?: { id?: number; name?: string | null; price?: number | string | null } | null }[] | null; customLines?: { label?: string; price?: number | string | null }[] | null; id: number; date: string; duration?: number | null; status?: string | null; notes?: string | null; customer?: ApiCustomer | null; service?: ApiService | null };
+type ApiService = { id: number; parentServiceId?: number | null; isActive?: boolean | null; calendarColor?: string | null; categoryId?: number | null; offeredAt?: string | null; name?: string | null; duration?: number | string | null; price?: number | string | null };
+export type ApiAppointment = { processingStartMin?: number | null; processingMin?: number | null; clientCancelPending?: boolean | null; feeRetry?: { status: string; owedCents: number; collectedCents: number | null; error: string | null } | null; depositRefundRetry?: string | null; cancelledInPolicy?: boolean | null; depositRefundedCents?: number | null; depositRefundFailed?: boolean | null; cardOnFile?: boolean | null; feePercent?: number | null; feeCents?: number | null; feeChargedCents?: number | null; totalPaid?: number | null; refundedCents?: number | null; calendarHidden?: boolean | null; paymentStatus?: string | null; depositCollected?: number | null; visitAt?: string | null; clientAddress?: HouseCallAddress | null; travelFee?: number | null; appointmentAddons?: { addon?: { id?: number; name?: string | null; price?: number | string | null } | null }[] | null; customLines?: { label?: string; price?: number | string | null }[] | null; id: number; date: string; duration?: number | null; status?: string | null; notes?: string | null; customer?: ApiCustomer | null; service?: ApiService | null };
 
 const BookingContext = createContext<BookingContextValue | null>(null);
 
@@ -180,7 +183,7 @@ export function mapAppointment(appointment: ApiAppointment, timeZone: string): A
     // A house call's travel fee is part of what the client pays.
     + (Number(appointment.travelFee ?? 0) || 0);
   const minutes = Number(appointment.duration ?? appointment.service?.duration ?? 60) || 60;
-  return { id: String(appointment.id), appointmentId: appointment.id, dateKey: dateKey(businessDay), dateIso: date.toISOString(), startMinutes: zonedMinutes(date, timeZone), time: zonedTimeLabel(date, timeZone), name: nameOf(appointment.customer), service: appointment.service?.name || 'Service', serviceId: appointment.service?.id, serviceColor: appointment.service?.calendarColor || undefined, duration: `${minutes} min`, price: money(priceValue), amountCents: Math.round(priceValue * 100), status: appointment.status === 'completed' ? (appointment.totalPaid != null ? 'paid' : 'completed') : appointment.status || 'pending', note: appointment.notes ?? undefined, customerId: appointment.customer?.id ?? undefined,
+  return { id: String(appointment.id), appointmentId: appointment.id, dateKey: dateKey(businessDay), dateIso: date.toISOString(), startMinutes: zonedMinutes(date, timeZone), time: zonedTimeLabel(date, timeZone), name: nameOf(appointment.customer), service: appointment.service?.name || 'Service', serviceId: appointment.service?.id, serviceColor: appointment.service?.calendarColor || undefined, processingStart: appointment.processingStartMin || undefined, processing: appointment.processingMin || undefined, duration: `${minutes} min`, price: money(priceValue), amountCents: Math.round(priceValue * 100), status: appointment.status === 'completed' ? (appointment.totalPaid != null ? 'paid' : 'completed') : appointment.status || 'pending', note: appointment.notes ?? undefined, customerId: appointment.customer?.id ?? undefined,
     phone: appointment.customer?.phone ?? undefined, email: appointment.customer?.email ?? undefined,
     avatarUrl: appointment.customer?.avatarUrl ?? null,
     depositDue: appointment.paymentStatus === 'awaiting_payment',
@@ -248,7 +251,9 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       ]);
       const ownServiceIds = Array.isArray(ownServices?.serviceIds) ? ownServices.serviceIds.map(Number) : [];
       setClients((Array.isArray(customerRows) ? customerRows : []).map(mapCustomer));
-      setServices((Array.isArray(serviceRows) ? serviceRows : []).filter((service) => ownServiceIds.length === 0 || ownServiceIds.includes(Number(service.id))).map(mapService));
+      // A service with options (Services › Options, 2026-11-18) is booked as one of its options, each a service of its own.
+      const withOptions = new Set((Array.isArray(serviceRows) ? serviceRows : []).filter((service) => service.parentServiceId && service.isActive !== false).map((service) => Number(service.parentServiceId)));
+      setServices((Array.isArray(serviceRows) ? serviceRows : []).filter((service) => !withOptions.has(Number(service.id)) && (ownServiceIds.length === 0 || ownServiceIds.includes(Number(service.id)))).map(mapService));
       // Tickets kept off the calendar (POS quick sales, bookings held for a deposit) are not drawn.
       // A booking held for a deposit is hidden from clients but holds the time, so it's on the calendar ("DEPOSIT DUE"):
       // otherwise its slot looks free and moving another booking there is refused (owner, 2026-11-07).

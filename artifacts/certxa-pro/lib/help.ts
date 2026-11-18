@@ -75,6 +75,7 @@ export const HELP: Record<string, HelpPage> = {
       { heading: 'Bookings', points: [
         'Tap a booking to open it: edit it, check out, mark it paid, cancel it or mark a no-show.',
         'A label on a booking shows when it’s PAID, a NO-SHOW or has a DEPOSIT DUE.',
+        'A booking with processing time shows that part lighter, marked Processing; another booking can sit beside it then.',
         'A booking shows in its service’s calendar colour (Services › Calendar colour); one with several services takes the first one’s colour.',
         'To move a booking, press and hold it, then drag it to the new time. You’re shown the new time and choose whether to text the client about it (Notify client), or Cancel to leave it where it was.',
       ] },
@@ -550,6 +551,8 @@ export const HELP: Record<string, HelpPage> = {
       'Clients choose how many: for anything priced per item; clients see − 1 + on your website, up to 10.',
       'Add-on groups: give it a group of add-ons, and every add-on in the group is offered with it.',
       'Where you offer it (if you have your own place and do house calls): your place, house calls only, or both.',
+      'Options: versions of the service with their own minutes and price, like Short, Medium and Long (up to 12). Add an option, give it a name, minutes and price, and Save. On your website the service shows “from” its lowest price and clients choose one; when you book, you pick the option. Each option is booked as “Service · Option” and gets the service’s category, staff, add-on groups and processing time. × removes an option (bookings already made keep it). A service with options shows “N options” in your list.',
+      'Processing time: for a service with time in the middle when the client waits (colour, a mask). Enter the minutes of work first and the minutes of processing; the rest is the finish. During processing you can take another client: online booking, Autumn and your own bookings can use that time. Bookings keep the processing time they were made with.',
       'Calendar colour: one of 18 colours for this service’s bookings on your calendar (Default leaves the usual colours).',
       'Share booking link: a link to your website with this service already picked, to send in a text or post anywhere.',
       'Remove service takes it off your menu.',

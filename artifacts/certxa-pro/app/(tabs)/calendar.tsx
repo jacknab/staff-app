@@ -170,8 +170,15 @@ function DraggableAppointment({
             opacity: isDragging ? 0.95 : 1,
           },
           isDragging && styles.timelineAppointmentDragging,
+          item.processing ? { justifyContent: 'flex-start' } : null,
         ]}
       >
+        {/* Processing time (2026-11-18): the part where the client waits, lighter, so another booking can sit beside it. */}
+        {item.processing && item.processingStart ? (
+          <View pointerEvents="none" style={[styles.processingBand, { top: (item.processingStart / 60) * HOUR_HEIGHT, height: (item.processing / 60) * HOUR_HEIGHT }]}>
+            {(item.processing / 60) * HOUR_HEIGHT >= 22 ? <Text numberOfLines={1} style={styles.processingText}>Processing</Text> : null}
+          </View>
+        ) : null}
         <Text numberOfLines={1} style={styles.timelineClient}>{isDragging ? `${dragLabel} · ${item.name}` : item.name}</Text>
         {/* A short appointment only has room for the name, then the service; the length is shown when all three fit. */}
         {height >= 40 && <Text numberOfLines={1} style={styles.timelineService}>{item.status === 'paid' ? `PAID · ${item.service}` : item.status === 'no_show' ? `NO-SHOW · ${item.service}` : item.depositDue ? `DEPOSIT DUE · ${item.service}` : item.service}</Text>}
@@ -761,6 +768,8 @@ const styles = StyleSheet.create({
   timelineQuarterLine: { left: 12, height: StyleSheet.hairlineWidth },
   timelineAppointment: { position: 'absolute', borderRadius: 8, borderWidth: 2, borderColor: '#FFFFFF', paddingHorizontal: 9, paddingVertical: 3, justifyContent: 'center', overflow: 'hidden' },
   timelineAppointmentDragging: { shadowColor: '#2E1065', shadowOpacity: 0.2, shadowRadius: 10, shadowOffset: { width: 0, height: 6 }, elevation: 6 },
+  processingBand: { position: 'absolute', left: 0, right: 0, backgroundColor: 'rgba(255,255,255,0.6)', justifyContent: 'center', paddingHorizontal: 9 },
+  processingText: { color: '#5A5F7A', fontSize: 12, fontFamily: 'Inter_600SemiBold' },
   timelineClient: { color: '#1E2240', fontSize: 15, lineHeight: 19, fontFamily: 'Inter_700Bold' },
   timelineService: { color: '#1E2240', fontSize: 14, lineHeight: 18, fontFamily: 'Inter_600SemiBold', marginTop: 2 },
   timelineDuration: { color: '#5B5F78', fontSize: 13, lineHeight: 17, fontFamily: 'Inter_500Medium', marginTop: 2 },

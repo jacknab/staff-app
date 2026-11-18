@@ -15,10 +15,12 @@ import { AppBackground } from '@/components/look/AppBackground';
 import { SectionTitle } from '@/components/look/SectionHeader';
 import { look, cardShadow } from '@/components/look/tokens';
 type OfferedAt = 'place' | 'client' | 'any';
-type Service = { id: number; name: string; duration: number; price: number; offeredAt: OfferedAt; categoryId: number | null; allowQuantity: boolean; color: string | null };
+type Service = { id: number; name: string; duration: number; price: number; offeredAt: OfferedAt; categoryId: number | null; allowQuantity: boolean; color: string | null; processingStart: number | null; processing: number | null; parentId: number | null; optionLabel: string | null };
 type Category = { id: number; name: string; sortOrder: number };
 /** The service being added (id 0) or changed, as typed. */
-type Draft = { id: number; name: string; minutes: string; price: string; offeredAt: OfferedAt; categoryId: number | null; allowQuantity: boolean; groupIds: number[]; color: string | null };
+type Draft = { id: number; name: string; minutes: string; price: string; offeredAt: OfferedAt; categoryId: number | null; allowQuantity: boolean; groupIds: number[]; color: string | null; processingOn: boolean; processingStart: string; processing: string; options: OptionDraft[] };
+/** A service option as typed (owner, 2026-11-18, GlossGenius): id 0 = new. */
+type OptionDraft = { id: number; label: string; minutes: string; price: string };
 /** An add-on group (Catalog › Add-on Groups): every add-on in it is offered with the services that have it. */
 type AddonGroup = { id: number; name: string; addonCount: number };
 
@@ -47,7 +49,7 @@ export default function ServicesScreen() {
   const load = useCallback(async () => {
     try {
       const [rows, cats] = await Promise.all([api.get<any[]>('/api/services'), api.get<any[]>('/api/service-categories')]);
-      setServices((Array.isArray(rows) ? rows : []).map((row) => ({ id: Number(row.id), name: String(row.name ?? 'Service'), duration: Number(row.duration) || 0, price: Number(row.price) || 0, allowQuantity: Boolean(row.allowQuantity), offeredAt: row.offeredAt === 'place' || row.offeredAt === 'client' ? row.offeredAt : 'any', categoryId: row.categoryId == null ? null : Number(row.categoryId), color: row.calendarColor ? String(row.calendarColor) : null })));
+      setServices((Array.isArray(rows) ? rows : []).filter((row) => row.isActive !== false).map((row) => ({ id: Number(row.id), name: String(row.name ?? 'Service'), duration: Number(row.duration) || 0, price: Number(row.price) || 0, allowQuantity: Boolean(row.allowQuantity), offeredAt: row.offeredAt === 'place' || row.offeredAt === 'client' ? row.offeredAt : 'any', categoryId: row.categoryId == null ? null : Number(row.categoryId), color: row.calendarColor ? String(row.calendarColor) : null, processingStart: row.processingStartMin ? Number(row.processingStartMin) : null, processing: row.processingMin ? Number(row.processingMin) : null, parentId: row.parentServiceId ? Number(row.parentServiceId) : null, optionLabel: row.optionLabel ? String(row.optionLabel) : null })));
       setCategories((Array.isArray(cats) ? cats : []).map((row) => ({ id: Number(row.id), name: String(row.name ?? ''), sortOrder: Number(row.sortOrder) || 0 })).sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id));
       const list = await api.get<any[]>('/api/addon-groups').catch(() => []);
       setAddonGroups((Array.isArray(list) ? list : []).map((row) => ({ id: Number(row.id), name: String(row.name ?? ''), addonCount: (row.addonIds ?? []).length })));
@@ -76,6 +78,7 @@ export default function ServicesScreen() {
       .catch(() => undefined);
   }, []);
 
+  const optionsOf = (serviceId: number) => services.filter((row) => row.parentId === serviceId);
   const save = async () => {
     if (!draft || saving) return;
     const name = draft.name.trim();
@@ -84,17 +87,23 @@ export default function ServicesScreen() {
     if (!name) return setError('Enter the name of the service.');
     if (!Number.isInteger(minutes) || minutes < 5 || minutes > 720) return setError('Enter how long it takes, in minutes (5 to 720).');
     if (!Number.isFinite(price) || price < 0) return setError('Enter the price, for example 45 or 45.50.');
+    const pStart = Number.parseInt(draft.processingStart, 10), pMin = Number.parseInt(draft.processing, 10);
+    const options = draft.options.map((o) => ({ ...(o.id ? { id: o.id } : {}), label: o.label.trim(), minutes: Number.parseInt(o.minutes, 10), price: Number(o.price) }));
+    if (options.some((o) => !o.label || !(o.minutes >= 5 && o.minutes <= 720) || !Number.isFinite(o.price) || o.price < 0)) return setError('Each option needs a name, its minutes (5 to 720) and a price.');
+    if (draft.processingOn && (!(pStart >= 5) || !(pMin >= 5) || pStart + pMin >= minutes)) return setError('Processing time: enter the minutes of work first and the minutes of processing, leaving time to finish within the service’s minutes.');
     setSaving(true);
     setError('');
     try {
       const category = categories.find((row) => row.id === draft.categoryId);
-      const body = { name, duration: minutes, price: price.toFixed(2), categoryId: category?.id ?? null, category: category?.name ?? 'General', allowQuantity: draft.allowQuantity, calendarColor: draft.color, ...(offersBoth ? { offeredAt: draft.offeredAt } : {}) };
+      const body = { name, duration: minutes, price: price.toFixed(2), categoryId: category?.id ?? null, category: category?.name ?? 'General', allowQuantity: draft.allowQuantity, calendarColor: draft.color, processingStartMin: draft.processingOn ? pStart : null, processingMin: draft.processingOn ? pMin : null, ...(offersBoth ? { offeredAt: draft.offeredAt } : {}) };
       let serviceId = draft.id;
       if (draft.id > 0) await api.patch(`/api/services/${draft.id}`, body);
       else serviceId = Number((await api.post<{ id: number }>('/api/services', body))?.id) || 0;
       if (serviceId > 0 && JSON.stringify(draft.groupIds) !== JSON.stringify(savedGroupIds)) {
         await api.put(`/api/services/${serviceId}/addon-groups`, { groupIds: draft.groupIds });
       }
+      // Options are saved after the service, so each gets its name, groups and staff as they are now.
+      if (serviceId > 0 && (options.length > 0 || optionsOf(serviceId).length > 0)) await api.put(`/api/pro/services/${serviceId}/options`, { options });
       setDraft(null);
       await load();
       // The booking screens read services from the shared list.
@@ -127,7 +136,8 @@ export default function ServicesScreen() {
   const openService = (service: Service) => {
     setError('');
     setSavedGroupIds([]);
-    setDraft({ id: service.id, name: service.name, minutes: String(service.duration), price: service.price.toFixed(2), offeredAt: service.offeredAt, allowQuantity: service.allowQuantity, categoryId: service.categoryId, groupIds: [], color: service.color });
+    setDraft({ id: service.id, name: service.name, minutes: String(service.duration), price: service.price.toFixed(2), offeredAt: service.offeredAt, allowQuantity: service.allowQuantity, categoryId: service.categoryId, groupIds: [], color: service.color, processingOn: !!service.processing, processingStart: service.processingStart ? String(service.processingStart) : '', processing: service.processing ? String(service.processing) : '',
+      options: optionsOf(service.id).map((o) => ({ id: o.id, label: o.optionLabel ?? o.name, minutes: String(o.duration), price: o.price.toFixed(2) })) });
     if (addonGroups.length === 0) return;
     api.get<{ groupIds: number[] }>(`/api/services/${service.id}/addon-groups`)
       .then((r) => {
@@ -139,11 +149,14 @@ export default function ServicesScreen() {
   };
 
   const input = { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground };
+  const setOption = (i: number, change: Partial<OptionDraft>) => draft && setDraft({ ...draft, options: draft.options.map((o, j) => (j === i ? { ...o, ...change } : o)) });
   const editing = draft && draft.id > 0 ? services.find((service) => service.id === draft.id) : undefined;
   // The list under each category (in the Categories order), then the services with none.
+  // Options are listed inside their service, not as services of their own.
+  const listed = services.filter((service) => service.parentId == null);
   const groups = [
-    ...categories.map((category) => ({ id: category.id, name: category.name, services: services.filter((service) => service.categoryId === category.id) })),
-    { id: 0, name: 'Uncategorized', services: services.filter((service) => !categories.some((category) => category.id === service.categoryId)) },
+    ...categories.map((category) => ({ id: category.id, name: category.name, services: listed.filter((service) => service.categoryId === category.id) })),
+    { id: 0, name: 'Uncategorized', services: listed.filter((service) => !categories.some((category) => category.id === service.categoryId)) },
   ].filter((group) => group.services.length > 0);
 
   return (
@@ -154,7 +167,7 @@ export default function ServicesScreen() {
         <TouchableOpacity testID="services-back" accessibilityLabel="Back" onPress={() => (draft ? (setDraft(null), setError('')) : router.back())} style={styles.headerButton}><Feather name="arrow-left" size={21} color={colors.foreground} /></TouchableOpacity>
         <HelpTitle help="services" style={[styles.headerTitle, { color: colors.foreground }]}>{draft ? (draft.id > 0 ? 'Edit service' : 'New service') : 'Services'}</HelpTitle>
         {draft ? <View style={styles.headerButton} /> : (
-          <TouchableOpacity testID="services-add" accessibilityLabel="Add a service" onPress={() => { setError(''); setSavedGroupIds([]); setDraft({ id: 0, name: '', minutes: '', price: '', offeredAt: 'any', categoryId: null, allowQuantity: false, groupIds: [], color: null }); }} style={styles.headerButton}><Feather name="plus" size={22} color={colors.primary} /></TouchableOpacity>
+          <TouchableOpacity testID="services-add" accessibilityLabel="Add a service" onPress={() => { setError(''); setSavedGroupIds([]); setDraft({ id: 0, name: '', minutes: '', price: '', offeredAt: 'any', categoryId: null, allowQuantity: false, groupIds: [], color: null, processingOn: false, processingStart: '', processing: '', options: [] }); }} style={styles.headerButton}><Feather name="plus" size={22} color={colors.primary} /></TouchableOpacity>
         )}
       </View>
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
@@ -172,6 +185,32 @@ export default function ServicesScreen() {
                 <TextInput testID="service-price" keyboardType="decimal-pad" value={draft.price} onChangeText={(price) => setDraft({ ...draft, price: price.replace(/[^\d.]/g, '') })} placeholder="45.00" placeholderTextColor={colors.mutedForeground} style={[styles.input, input]} />
               </View>
             </View>
+            {/* Processing time (owner, 2026-11-18, GlossGenius): work, then time the client waits, then the finish. */}
+            <View style={styles.quantityRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.rowTitle, { color: colors.foreground }]}>Processing time</Text>
+                <Text style={[styles.rowHint, { color: colors.mutedForeground }]}>Time in the middle when the client waits (colour, a mask). You can take another client then.</Text>
+              </View>
+              <Switch testID="service-processing" value={draft.processingOn} onValueChange={(processingOn) => setDraft({ ...draft, processingOn })} trackColor={{ true: colors.primary, false: colors.border }} />
+            </View>
+            {draft.processingOn ? (
+              <>
+                <View style={styles.pair}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.label, { color: colors.foreground }]}>Work first (min)</Text>
+                    <TextInput testID="service-processing-start" keyboardType="number-pad" value={draft.processingStart} onChangeText={(v) => setDraft({ ...draft, processingStart: v.replace(/\D/g, '') })} placeholder="30" placeholderTextColor={colors.mutedForeground} style={[styles.input, input]} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.label, { color: colors.foreground }]}>Processing (min)</Text>
+                    <TextInput testID="service-processing-min" keyboardType="number-pad" value={draft.processing} onChangeText={(v) => setDraft({ ...draft, processing: v.replace(/\D/g, '') })} placeholder="45" placeholderTextColor={colors.mutedForeground} style={[styles.input, input]} />
+                  </View>
+                </View>
+                {(() => {
+                  const left = (Number.parseInt(draft.minutes, 10) || 0) - (Number.parseInt(draft.processingStart, 10) || 0) - (Number.parseInt(draft.processing, 10) || 0);
+                  return <Text style={[styles.rowHint, { color: left > 0 ? colors.mutedForeground : colors.destructive }]}>{left > 0 ? `Then ${left} min to finish.` : 'Leave time to finish: work first and processing must be less than the service’s minutes.'}</Text>;
+                })()}
+              </>
+            ) : null}
             {categories.length > 0 ? (
               <>
                 <Text style={[styles.label, { color: colors.foreground }]}>Category</Text>
@@ -219,6 +258,26 @@ export default function ServicesScreen() {
                 ) : null}
               </>
             ) : null}
+            {/* Options (owner, 2026-11-18, GlossGenius): versions of this service with their own time and price. */}
+            <Text style={[styles.label, { color: colors.foreground }]}>Options</Text>
+            <Text style={[styles.rowHint, { color: colors.mutedForeground, marginTop: -4, marginBottom: 8 }]}>Versions of this service with their own time and price, like Short, Medium, Long. Clients choose one.</Text>
+            {draft.options.map((o, i) => (
+              <View key={`${o.id}-${i}`} testID={`service-option-${i}`} style={[styles.row, styles.groupRow, { backgroundColor: colors.card, borderColor: colors.border, flexDirection: 'column', alignItems: 'stretch' }]}>
+                <View style={styles.pair}>
+                  <TextInput testID={`service-option-label-${i}`} value={o.label} onChangeText={(label) => setOption(i, { label: label.slice(0, 40) })} placeholder="Name, e.g. Long" placeholderTextColor={colors.mutedForeground} style={[styles.input, input, { flex: 1 }]} />
+                  <TouchableOpacity testID={`service-option-remove-${i}`} accessibilityLabel={`Remove ${o.label || 'option'}`} onPress={() => setDraft({ ...draft, options: draft.options.filter((_, j) => j !== i) })} style={styles.headerButton}><Feather name="x" size={20} color={colors.mutedForeground} /></TouchableOpacity>
+                </View>
+                <View style={[styles.pair, { marginTop: 8 }]}>
+                  <TextInput testID={`service-option-minutes-${i}`} keyboardType="number-pad" value={o.minutes} onChangeText={(minutes) => setOption(i, { minutes: minutes.replace(/\D/g, '') })} placeholder="Minutes" placeholderTextColor={colors.mutedForeground} style={[styles.input, input, { flex: 1 }]} />
+                  <TextInput testID={`service-option-price-${i}`} keyboardType="decimal-pad" value={o.price} onChangeText={(price) => setOption(i, { price: price.replace(/[^\d.]/g, '') })} placeholder="Price ($)" placeholderTextColor={colors.mutedForeground} style={[styles.input, input, { flex: 1 }]} />
+                </View>
+              </View>
+            ))}
+            {draft.options.length < 12 ? (
+              <TouchableOpacity testID="service-option-add" onPress={() => setDraft({ ...draft, options: [...draft.options, { id: 0, label: '', minutes: draft.minutes, price: '' }] })} style={{ alignSelf: 'flex-start', paddingVertical: 6 }}>
+                <Text style={[styles.rowTitle, { color: colors.primary }]}>Add an option</Text>
+              </TouchableOpacity>
+            ) : null}
             {offersBoth ? (
               <>
                 <Text style={[styles.label, { color: colors.foreground }]}>Where you offer it</Text>
@@ -256,9 +315,9 @@ export default function ServicesScreen() {
                 <TouchableOpacity key={service.id} testID={`service-${service.id}`} onPress={() => openService(service)} style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}>
                   <View style={{ flex: 1 }}>
                     <Text numberOfLines={1} style={[styles.rowTitle, { color: colors.foreground }]}>{service.name}</Text>
-                    <Text style={[styles.rowHint, { color: colors.mutedForeground }]}>{minutesLabel(service.duration)}{offersBoth && service.offeredAt === 'place' ? ` · ${ownPlace} only` : offersBoth && service.offeredAt === 'client' ? ' · House calls only' : ''}</Text>
+                    <Text style={[styles.rowHint, { color: colors.mutedForeground }]}>{optionsOf(service.id).length ? `${optionsOf(service.id).length} options` : minutesLabel(service.duration)}{service.processing ? ` · ${service.processing} min processing` : ''}{offersBoth && service.offeredAt === 'place' ? ` · ${ownPlace} only` : offersBoth && service.offeredAt === 'client' ? ' · House calls only' : ''}</Text>
                   </View>
-                  <Text style={[styles.rowTitle, { color: colors.foreground }]}>{`$${service.price.toFixed(2)}`}</Text>
+                  <Text style={[styles.rowTitle, { color: colors.foreground }]}>{optionsOf(service.id).length ? `from $${Math.min(...optionsOf(service.id).map((o) => o.price)).toFixed(2)}` : `$${service.price.toFixed(2)}`}</Text>
                   <Feather name="chevron-right" size={20} color={colors.mutedForeground} />
                 </TouchableOpacity>
               ))}
