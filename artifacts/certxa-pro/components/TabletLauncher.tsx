@@ -1,7 +1,8 @@
 /**
  * Tablets (owner, 2026-11-19): no bottom tab bar. A round button at the bottom left opens a floating panel down the left
  * side, like Android's app sidebar: two columns of app-style icons (each its own colour, white symbol, name under it) for
- * every part of the app; the app stays in view behind it. Phones keep the tab bar. Shown on the five main screens; pages
+ * every part of the app; the app stays in view behind it. The panel widens to as many columns as it takes to show every
+ * icon at once, without scrolling (owner, 2026-11-19). Phones keep the tab bar. Shown on the five main screens; pages
  * opened from them have their Back button.
  */
 import { useState, type ComponentProps } from 'react';
@@ -18,6 +19,11 @@ export function useIsTablet() {
   const { width, height } = useWindowDimensions();
   return Math.min(width, height) >= 600;
 }
+
+/** One icon's cell, and the height of a row and of a group's title, for working out how many columns fit. */
+const CELL_WIDTH = 114;
+const ROW_HEIGHT = 124;
+const GROUP_TITLE_HEIGHT = 30;
 
 type Icon = ComponentProps<typeof Feather>['name'];
 type App = { key: string; label: string; icon: Icon; to: Href | (() => void) };
@@ -38,6 +44,7 @@ export function TabletLauncher() {
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const paymentsReady = usePaymentsReady();
+  const { width, height } = useWindowDimensions();
 
   const groups: { title: string; apps: App[] }[] = [
     { title: 'Your day', apps: [
@@ -76,6 +83,15 @@ export function TabletLauncher() {
     ] },
   ];
 
+  const panelTop = (Platform.OS === 'web' ? 24 : insets.top) + 16;
+  const panelBottom = Math.max(insets.bottom, 12) + 92;
+  // The fewest columns that fit every group's rows in the panel's height, no wider than the screen.
+  const fitHeight = height - panelTop - panelBottom - 30;
+  const maxColumns = Math.max(2, Math.floor((width - 60) / CELL_WIDTH));
+  let columns = 2;
+  while (columns < maxColumns
+    && groups.reduce((sum, g) => sum + GROUP_TITLE_HEIGHT + Math.ceil(g.apps.length / columns) * ROW_HEIGHT, 0) > fitHeight) columns += 1;
+
   const go = (app: App) => {
     setOpen(false);
     if (typeof app.to === 'function') app.to(); else router.navigate(app.to);
@@ -94,7 +110,7 @@ export function TabletLauncher() {
       <Modal visible={open} animationType="fade" transparent onRequestClose={() => setOpen(false)} supportedOrientations={['portrait', 'landscape']}>
         <TouchableOpacity activeOpacity={1} onPress={() => setOpen(false)} style={styles.backdrop} accessibilityLabel="Close">
           <TouchableOpacity activeOpacity={1} onPress={() => undefined} testID="tablet-launcher-overlay"
-            style={[styles.panel, { top: (Platform.OS === 'web' ? 24 : insets.top) + 16, bottom: Math.max(insets.bottom, 12) + 92 }]}>
+            style={[styles.panel, { top: panelTop, maxHeight: height - panelTop - panelBottom, width: columns * CELL_WIDTH + 24 }]}>
             <ScrollView contentContainerStyle={styles.panelBody} showsVerticalScrollIndicator={false}>
               {groups.map((g) => (
                 <View key={g.title} style={styles.group}>
@@ -105,7 +121,7 @@ export function TabletLauncher() {
                       return (
                         <TouchableOpacity key={app.key} testID={`tablet-app-${app.key}`} accessibilityLabel={app.label} onPress={() => go(app)} activeOpacity={0.75} style={styles.app}>
                           <LinearGradient colors={TINT[app.key] ?? ['#A78BFA', '#7C3AED']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.icon, here && styles.iconHere]}>
-                            <Feather name={app.icon} size={32} color="#FFFFFF" />
+                            <Feather name={app.icon} size={29} color="#FFFFFF" />
                           </LinearGradient>
                           <Text style={styles.label} numberOfLines={2}>{app.label}</Text>
                         </TouchableOpacity>
@@ -128,15 +144,15 @@ const styles = StyleSheet.create({
   dockButton: { width: 62, height: 62, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   backdrop: { flex: 1, backgroundColor: 'rgba(17, 12, 34, 0.12)' },
   // The floating panel down the left, like Android's app sidebar.
-  panel: { position: 'absolute', left: 18, width: 268, borderRadius: 30, backgroundColor: 'rgba(246, 245, 250, 0.98)',
+  panel: { position: 'absolute', left: 18, borderRadius: 30, backgroundColor: 'rgba(246, 245, 250, 0.98)',
     shadowColor: '#1C1650', shadowOpacity: 0.22, shadowRadius: 24, shadowOffset: { width: 0, height: 10 }, elevation: 14, overflow: 'hidden' },
   panelBody: { paddingHorizontal: 12, paddingTop: 10, paddingBottom: 18 },
   group: { marginTop: 10 },
-  groupTitle: { fontSize: 13, letterSpacing: 1.2, fontFamily: 'Inter_700Bold', color: '#6B6687', marginLeft: 10, marginBottom: 2 },
+  groupTitle: { height: GROUP_TITLE_HEIGHT - 10, fontSize: 13, letterSpacing: 1.2, fontFamily: 'Inter_700Bold', color: '#6B6687', marginLeft: 10 },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
-  app: { width: '50%', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 4 },
-  icon: { width: 72, height: 72, borderRadius: 18, alignItems: 'center', justifyContent: 'center',
+  app: { width: CELL_WIDTH, height: ROW_HEIGHT, alignItems: 'center', paddingTop: 8, paddingHorizontal: 4 },
+  icon: { width: 64, height: 64, borderRadius: 16, alignItems: 'center', justifyContent: 'center',
     shadowColor: '#1C1650', shadowOpacity: 0.18, shadowRadius: 6, shadowOffset: { width: 0, height: 3 }, elevation: 4 },
   iconHere: { borderWidth: 3, borderColor: '#FFFFFF' },
-  label: { marginTop: 8, fontSize: 15, lineHeight: 19, fontFamily: 'Inter_600SemiBold', color: '#1F1B33', textAlign: 'center' },
+  label: { marginTop: 7, fontSize: 15, lineHeight: 19, fontFamily: 'Inter_600SemiBold', color: '#1F1B33', textAlign: 'center' },
 });
