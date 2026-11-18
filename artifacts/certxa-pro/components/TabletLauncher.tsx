@@ -1,7 +1,7 @@
 /**
  * Tablets (owner, 2026-11-19): no bottom tab bar. A round button at the bottom left opens a floating panel down the left
  * side, like Android's app sidebar: two columns of app-style icons (each its own colour, white symbol, name under it) for
- * every part of the app; the app stays in view behind it. The panel widens to as many columns as it takes to show every
+ * the main parts of the app (owner's list, 2026-11-19; the rest are in More); the app stays in view behind it. The panel widens to as many columns as it takes to show every
  * icon at once, without scrolling (owner, 2026-11-19). Phones keep the tab bar. Shown on the five main screens; pages
  * opened from them have their Back button.
  */
@@ -52,31 +52,19 @@ export function TabletLauncher() {
       { key: 'calendar', label: 'Calendar', icon: 'calendar', to: '/calendar' as Href },
       { key: 'clients', label: 'Clients', icon: 'users', to: '/clients' as Href },
       { key: 'pos', label: 'POS', icon: 'credit-card', to: (paymentsReady === false ? '/payments-pos' : '/pos') as Href },
-      { key: 'book', label: 'New booking', icon: 'plus-circle', to: '/booking' as Href },
       { key: 'past', label: 'Past 30 days', icon: 'clock', to: '/past-bookings' as Href },
     ] },
     { title: 'Business', apps: [
       { key: 'money', label: 'Money', icon: 'dollar-sign', to: '/money' as Href },
-      { key: 'invoices', label: 'Invoices', icon: 'file', to: '/invoices' as Href },
-      { key: 'phone', label: 'Business Phone', icon: 'phone', to: '/phone' as Href },
-      { key: 'messages', label: 'Messages', icon: 'message-circle', to: '/messages' as Href },
-      { key: 'expenses', label: 'Expenses', icon: 'file-minus', to: '/expenses' as Href },
-      { key: 'memberships', label: 'Memberships', icon: 'award', to: '/memberships' as Href },
-      { key: 'forms', label: 'Forms & Waivers', icon: 'file-text', to: '/forms' as Href },
       { key: 'catalog', label: 'Services', icon: 'scissors', to: '/catalog' as Href },
+      { key: 'forms', label: 'Forms & Waivers', icon: 'file-text', to: '/forms' as Href },
     ] },
     { title: 'Client Growth', apps: [
-      { key: 'waitlist', label: 'Waitlist', icon: 'list', to: '/waitlist' as Href },
       { key: 'campaigns', label: 'Campaigns', icon: 'send', to: '/campaigns' as Href },
-      { key: 'promo', label: 'Promo Codes', icon: 'tag', to: '/promo-codes' as Href },
-      { key: 'referrals', label: 'Referrals', icon: 'user-plus', to: '/referrals' as Href },
       { key: 'reviews', label: 'Reviews', icon: 'star', to: '/reviews' as Href },
-      { key: 'portfolio', label: 'Portfolio', icon: 'image', to: '/portfolio' as Href },
     ] },
     { title: 'Account', apps: [
       { key: 'ai', label: 'Business AI', icon: 'message-square', to: '/ai' as Href },
-      { key: 'sell', label: 'Gift Cards', icon: 'gift', to: '/sell' as Href },
-      { key: 'credits', label: 'Text Credits', icon: 'battery-charging', to: '/credits' as Href },
       { key: 'settings', label: 'Settings', icon: 'settings', to: '/settings' as Href },
       { key: 'more', label: 'More', icon: 'grid', to: '/more' as Href },
       { key: 'help', label: 'Help Center', icon: 'help-circle', to: () => void WebBrowser.openBrowserAsync('https://certxa.com/pro-help') },
