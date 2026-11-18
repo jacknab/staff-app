@@ -160,7 +160,7 @@ export const HELP: Record<string, HelpPage> = {
         'Forms: the forms and waivers this visit needs — filled in (View), sent and waiting, or not sent. Send e-mails the link (or texts it when there’s no e-mail); Fill in here opens the form on your phone for the client. Send another form sends any of your other forms.',
       ] },
       { heading: 'Before the visit', points: [
-        'The ⋮ button at the top right holds every action: Edit appointment, Mark as completed, No-show (no fee), No-show (collect fee), Resend appointment details, Cancel appointment and Delete appointment. One that doesn’t apply right now is grey, with why under it.',
+        'The ⋮ button at the top right holds every action: Edit appointment, Mark as completed, No-show (no fee), No-show (collect fee), Resend appointment details, Cancel appointment and Delete appointment. One that doesn’t apply right now is grey, with why under it. On a cancelled booking, No-show (no fee), No-show (collect fee) and Delete appointment can be chosen at any time.',
         'Edit appointment: change the services, add-ons, date or time.',
         'Text a payment link: the client pays from their phone.',
         'Resend appointment details: sends the booking confirmation again (with the link to manage the booking), by text and/or e-mail as your Notifications send it.',

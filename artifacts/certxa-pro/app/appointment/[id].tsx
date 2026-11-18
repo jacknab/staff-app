@@ -479,12 +479,13 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
   const [cancelDecided, setCancelDecided] = useState(false);
   const [flagged, setFlagged] = useState(params.clientCancelPending === '1');
   const clientCancelPending = status === 'cancelled' && flagged && !cancelDecided && !isPreview;
-  const decideCancellation = async (decision: 'charge' | 'no_charge') => {
+  const decideCancellation = async (decision: 'charge' | 'no_charge' | 'no_show' | 'no_show_fee') => {
     setSaving(true); setError('');
     try {
       const r = await api.post<{ feeError?: string | null; feeChargedCents?: number | null }>(`/api/pro/appointments/${appointmentId}/cancellation`, { decision });
       setCancelDecided(true);
       if (decision === 'no_charge') setWaivedHere(true);
+      if (decision === 'no_show' || decision === 'no_show_fee') setStatus('no_show');
       await refresh();
       if (r?.feeChargedCents != null) setFeeCharged(Number(r.feeChargedCents));
       if (r?.feeError) Alert.alert('Fee not charged yet', String(r.feeError));
@@ -596,17 +597,21 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
   const noShowFee = (charge: boolean) => Alert.alert(charge ? `Charge the ${feeMoney} no-show fee?` : 'Mark as no-show?',
     charge ? `${clientName} is marked a no-show and ${feeMoney} is charged to their card on file.` : `${clientName} is marked a no-show. No fee is charged.`, [
       { text: 'Not now', style: 'cancel' },
-      { text: charge ? `Charge ${feeMoney}` : 'Mark as no-show', style: 'destructive', onPress: () => void close('no-show', { chargeFee: charge }) },
+      { text: charge ? `Charge ${feeMoney}` : 'Mark as no-show', style: 'destructive',
+        // A cancelled booking becomes a no-show through its cancellation (the menu matches the buttons on the page).
+        onPress: () => void (status === 'cancelled' ? decideCancellation(charge ? 'no_show_fee' : 'no_show') : close('no-show', { chargeFee: charge })) },
     ]);
+  // A cancelled booking can be marked a no-show at any time; an open one once its time is over.
+  const canNoShow = (isOpenBooking && visitOver) || status === 'cancelled';
   const menuItems: { key: string; label: string; why?: string; on: boolean; run: () => void }[] = [
     { key: 'edit', label: 'Edit appointment', on: canEdit && !isPreview, why: 'Only an upcoming booking can be edited', run: openEdit },
     { key: 'complete', label: prepaid ? 'Mark as done' : 'Mark as completed', on: isOpenBooking, why: 'This booking is already closed', run: () => void markCompleted() },
-    { key: 'no-show', label: 'No-show (no fee)', on: isOpenBooking && visitOver, why: isOpenBooking ? 'After the appointment’s time is over' : 'This booking is already closed', run: () => noShowFee(false) },
-    ...(noShowFeeSetUp ? [{ key: 'no-show-fee', label: `No-show (collect fee · ${feeMoney})`, on: isOpenBooking && visitOver && params.cardOnFile === '1' && !isPreview,
+    { key: 'no-show', label: 'No-show (no fee)', on: canNoShow && !isPreview, why: isOpenBooking ? 'After the appointment’s time is over' : 'This booking is already closed', run: () => noShowFee(false) },
+    ...(noShowFeeSetUp ? [{ key: 'no-show-fee', label: `No-show (collect fee · ${feeMoney})`, on: canNoShow && params.cardOnFile === '1' && !isPreview,
       why: params.cardOnFile !== '1' ? 'No card on file' : isOpenBooking ? 'After the appointment’s time is over' : 'This booking is already closed', run: () => noShowFee(true) }] : []),
     { key: 'resend', label: 'Resend appointment details', on: !isPreview && canEdit && !visitOver, why: 'Only for an upcoming booking', run: () => void resendDetails() },
     { key: 'cancel', label: 'Cancel appointment', on: isOpenBooking && status !== 'started', why: 'This booking can’t be cancelled now', run: cancelBooking },
-    { key: 'delete', label: 'Delete appointment', on: closed && !clientCancelPending, why: 'Cancel it or mark a no-show first; it then stays on the client’s record until you delete it', run: deleteAppointment },
+    { key: 'delete', label: 'Delete appointment', on: closed, why: 'Cancel it or mark a no-show first; it then stays on the client’s record until you delete it', run: deleteAppointment },
   ];
 
   return (
