@@ -5,10 +5,12 @@
  *
  * Needs your attention (owner, 2026-11-04): booking requests waiting for an answer, and conversations with texts not
  * read yet. Opening a conversation reads it (GET /api/sms-inbox/messages marks it read), so it leaves the list.
+ *
+ * Tablets (owner, 2026-11-19): one screen with Home on the left and the full Calendar on the right.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Feather } from '@expo/vector-icons';
-import { ActivityIndicator, Animated, Modal, Platform, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Animated, Modal, Platform, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
@@ -24,6 +26,8 @@ import { HelpTitle } from '@/components/HelpTitle';
 import { AppBackground } from '@/components/look/AppBackground';
 import { SectionTitle } from '@/components/look/SectionHeader';
 import { APP_MAX_WIDTH } from '@/components/TabletFrame';
+import { useIsTablet } from '@/components/TabletLauncher';
+import CalendarScreen from './calendar';
 import { look, cardShadow } from '@/components/look/tokens';
 type Ticket = ApiAppointment & { calendarHidden?: boolean | null };
 type Conversation = { clientPhone: string; clientName: string | null; lastMessage: string; lastMessageAt: string; unreadCount: number };
@@ -36,6 +40,21 @@ const isPaid = (t: Ticket) => t.status === 'paid' || (t.status === 'completed' &
 const STATUS_TEXT: Record<string, string> = { completed: 'Completed', paid: 'Paid', started: 'In progress', pending: 'Booked', confirmed: 'Booked', cancelled: 'Cancelled', no_show: 'No-show' };
 
 export default function HomeScreen() {
+  const isTablet = useIsTablet();
+  const { width } = useWindowDimensions();
+  if (!isTablet) return <HomeContent />;
+  // Home about 40% of the screen, kept readable in portrait and not too wide in landscape.
+  const homeWidth = Math.round(Math.min(460, Math.max(360, width * 0.4)));
+  return (
+    <View style={styles.split}>
+      <View style={[styles.splitPane, { width: homeWidth }]}><HomeContent paneWidth={homeWidth} /></View>
+      <View style={styles.splitLine} />
+      <View style={[styles.splitPane, { flex: 1 }]}><CalendarScreen /></View>
+    </View>
+  );
+}
+
+function HomeContent({ paneWidth }: { paneWidth?: number }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -128,7 +147,7 @@ export default function HomeScreen() {
       <AppBackground />
       <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
         <TouchableOpacity activeOpacity={1} onPress={() => setMenuOpen(false)} style={styles.menuBackdrop} accessibilityLabel="Close menu">
-          <View pointerEvents="box-none" style={styles.menuColumn}>
+          <View pointerEvents="box-none" style={[styles.menuColumn, paneWidth ? { maxWidth: paneWidth, alignSelf: 'flex-start' } : null]}>
             <View testID="home-menu-list" style={[styles.menu, { top: topInset + 50, backgroundColor: colors.card, borderColor: colors.border }]}>
             {quickLinks.map((link) => (
               <TouchableOpacity key={link.key} testID={`home-menu-${link.key}`} onPress={() => { setMenuOpen(false); router.push(link.href); }} style={styles.menuItem}>
@@ -277,6 +296,9 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  split: { flex: 1, flexDirection: 'row', backgroundColor: look.pageTop },
+  splitPane: { height: '100%', overflow: 'hidden' },
+  splitLine: { width: StyleSheet.hairlineWidth, backgroundColor: 'rgba(28, 22, 80, 0.14)' },
   content: { paddingHorizontal: 20, paddingBottom: 120 },
   dayLabel: { fontSize: 15, fontFamily: 'Inter_600SemiBold', marginTop: 14, marginBottom: 8 },
   date: { fontSize: 14, letterSpacing: 1.2, fontFamily: 'Inter_700Bold' },
