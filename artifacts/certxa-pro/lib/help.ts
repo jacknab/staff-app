@@ -122,10 +122,10 @@ export const HELP: Record<string, HelpPage> = {
     intro: 'Everything about one client.',
     sections: [
       { heading: 'At the top', points: [
-        'Their photo and name. The pencil edits their name, phone, e-mail, the name they go by, birthday and allergies; Delete Client removes them and their history for good.',
+        'Their photo and name. The ⋮ button at the top right opens Edit profile (name, phone, e-mail, the name they go by, birthday and allergies; Delete Client removes them and their history for good), Notes, Photos (goes to their before and after photos) and History (goes to their visits).',
         'Heard about you: how they found you, from your website’s question or what you added on a booking.',
-        'Merge with another client (in the pencil’s edit page): find duplicate profiles of this client by name, phone or e-mail, then Merge. Their bookings, notes, photos and records move to this client, whose contact details are kept; the duplicates are removed. It can’t be undone, and a duplicate with package visits left or an active membership can’t be merged yet.',
-        'Under the name: their status (New, Regular, At risk, Inactive or VIP), a Card on file badge when they have a saved card, and their tags.',
+        'Merge with another client (in ⋮ › Edit profile): find duplicate profiles of this client by name, phone or e-mail, then Merge. Their bookings, notes, photos and records move to this client, whose contact details are kept; the duplicates are removed. It can’t be undone, and a duplicate with package visits left or an active membership can’t be merged yet.',
+        'Under the name: a Card on file badge when they have a saved card. Their tags are in the Tags section further down.',
         'Text opens a text to them. Call rings them from your business number when you have Business Phone or Plus, so your own number stays private. Email opens an e-mail.',
         'Book appointment books this client straight away.',
         'Send booking link texts them a link to your website with their name, phone and e-mail already filled in (1 text credit).',

@@ -7,9 +7,9 @@
  *   POST/DELETE /api/clients/:id/tags · PATCH /api/clients/:id/notes/:noteId · PUT /api/clients/:id/marketing-preferences
  *   DELETE /api/pro/clients/:id (for good, from the bottom of Edit)
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Feather } from '@expo/vector-icons';
-import { ActivityIndicator, Alert, Image, Linking, ScrollView, StatusBar, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Linking, Modal, ScrollView, StatusBar, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { callClient } from '@/lib/voice';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -28,6 +28,7 @@ import { HoldToDelete } from '@/components/HoldToDelete';
 
 import { AppBackground } from '@/components/look/AppBackground';
 import { SectionTitle } from '@/components/look/SectionHeader';
+import { MenuCard } from '@/components/look/MenuCard';
 import { look, cardShadow } from '@/components/look/tokens';
 type Note = { id: number; noteContent: string; createdAt: string; pinned?: boolean | null };
 type Tag = { id: number; tagName: string; tagColor?: string | null };
@@ -84,6 +85,14 @@ export default function ClientProfileScreen() {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
+  // The ⋮ menu (owner, 2026-11-18): Photos and History scroll this page to them.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
+  const sectionY = useRef<{ photos?: number; history?: number }>({});
+  const jumpTo = (key: 'photos' | 'history') => {
+    setMenuOpen(false);
+    setTimeout(() => scrollRef.current?.scrollTo({ y: Math.max(0, (sectionY.current[key] ?? 0) - 10), animated: true }), 250);
+  };
   const [draft, setDraft] = useState({ name: '', phone: '', email: '', preferredName: '', birthday: '', allergies: '' });
   const [tagText, setTagText] = useState('');
   const [addingTag, setAddingTag] = useState(false);
@@ -277,17 +286,34 @@ export default function ClientProfileScreen() {
     <View style={[styles.root, { backgroundColor: look.pageTop, paddingTop: insets.top }]}>
       <AppBackground />
       <StatusBar barStyle="dark-content" />
+      <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
+        <TouchableOpacity activeOpacity={1} onPress={() => setMenuOpen(false)} style={styles.overlayBackdrop} accessibilityLabel="Close">
+          <TouchableOpacity activeOpacity={1} onPress={() => undefined} testID="client-menu-overlay" style={[styles.overlayPanel, { backgroundColor: look.pageTop, paddingBottom: Math.max(insets.bottom, 18) }]}>
+            <View style={styles.overlayHead}>
+              <Text style={[styles.overlayTitle, { color: look.heading }]} numberOfLines={1}>{name}</Text>
+              <TouchableOpacity testID="client-menu-close" accessibilityLabel="Close" onPress={() => setMenuOpen(false)} style={styles.headerButton}><Feather name="x" size={24} color={look.heading} /></TouchableOpacity>
+            </View>
+            <View style={styles.overlayGroup}>
+              <MenuCard testID="client-menu-edit" icon={{ feather: 'edit-2' }} title="Edit profile" subtitle="Name, phone, e-mail, birthday" onPress={() => { setMenuOpen(false); startEdit(); }} />
+              <MenuCard testID="client-menu-notes" icon={{ feather: 'file-text' }} title="Notes" subtitle="Notes about this client" onPress={() => { setMenuOpen(false); router.push({ pathname: '/notes', params: { customerId: String(clientId), clientName: name } }); }} />
+              <MenuCard testID="client-menu-photos" icon={{ feather: 'image' }} title="Photos" subtitle="Before and after photos" onPress={() => jumpTo('photos')} />
+              <MenuCard testID="client-menu-history" icon={{ feather: 'clock' }} title="History" subtitle="Upcoming, past and cancelled visits" onPress={() => jumpTo('history')} />
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
       <View style={styles.header}>
         <TouchableOpacity testID="client-profile-back" accessibilityLabel="Back" onPress={() => router.back()} style={styles.headerButton}><Feather name="arrow-left" size={21} color={colors.foreground} /></TouchableOpacity>
         <HelpTitle help="client" style={[styles.headerTitle, { color: colors.foreground }]}>Client</HelpTitle>
+        {/* ⋮ like the calendar's + (owner, 2026-11-18): Edit profile, Notes, Photos, History. */}
         {client && !editing ? (
-          <TouchableOpacity testID="client-edit" accessibilityLabel="Edit client" onPress={startEdit} style={styles.headerButton}><Feather name="edit-2" size={19} color={colors.foreground} /></TouchableOpacity>
+          <TouchableOpacity testID="client-menu" accessibilityLabel="More for this client" onPress={() => setMenuOpen(true)} style={[styles.menuButton, { backgroundColor: colors.primary }]}><Feather name="more-vertical" size={22} color={colors.primaryForeground} /></TouchableOpacity>
         ) : <View style={styles.headerButton} />}
       </View>
       {loading ? <ActivityIndicator style={{ marginTop: 40 }} color={colors.primary} /> : !client ? (
         <Text style={[styles.error, { color: colors.destructive, textAlign: 'center', marginTop: 40 }]}>{error || 'This client could not be found.'}</Text>
       ) : (
-        <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <ScrollView ref={scrollRef} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           {editing ? (<>
             <SectionTitle style={[styles.section, { marginTop: 6 }]}>{`Edit ${name}`}</SectionTitle>
             <View style={[styles.box, card, { padding: 14 }]}>
@@ -328,12 +354,8 @@ export default function ClientProfileScreen() {
           <Text style={[styles.name, { color: colors.foreground }]}>{name}</Text>
           {client.preferredName ? <Text style={[styles.sub, { color: colors.mutedForeground }]}>Goes by {client.preferredName}</Text> : null}
           <View style={styles.badges}>
-            <View style={[styles.badge, { backgroundColor: status === 'at_risk' ? colors.accent : colors.secondary }]}><Text style={[styles.badgeText, { color: status === 'at_risk' ? colors.accentForeground : colors.secondaryForeground }]}>{STATUS_LABEL[status]}</Text></View>
             {/* The client has a saved card (owner, 2026-11-17); the brand and last 4 are in the details below. */}
             {client.cardLast4 ? <View testID="client-card-badge" style={[styles.badge, { backgroundColor: colors.secondary }]}><Text style={[styles.badgeText, { color: colors.secondaryForeground }]}>Card on file</Text></View> : null}
-            {client.tags.map((t) => (
-              <View key={t.tagId} style={[styles.badge, { backgroundColor: colors.muted }]}><Text style={[styles.badgeText, { color: colors.foreground }]}>{t.tag.tagName}</Text></View>
-            ))}
           </View>
 
           {/* The same Text / Call / Email icons as a booking (owner, 2026-11-03); grey when it can't be used. */}
@@ -344,7 +366,7 @@ export default function ClientProfileScreen() {
               { key: 'email', icon: 'mail' as const, label: 'Email', on: () => Linking.openURL(`mailto:${email}`), ok: !!email },
             ].map((a) => (
               <TouchableOpacity key={a.key} testID={`client-action-${a.key}`} accessibilityLabel={a.label} accessibilityState={{ disabled: !a.ok }} disabled={!a.ok} onPress={() => void a.on()} style={styles.quickAction}>
-                <View style={[styles.quickIcon, { backgroundColor: a.ok ? `${colors.primary}18` : colors.muted }]}><Feather name={a.icon} size={19} color={a.ok ? colors.primary : colors.mutedForeground} /></View>
+                <View style={[styles.quickIcon, { backgroundColor: a.ok ? `${colors.primary}18` : colors.muted }]}><Feather name={a.icon} size={26} color={a.ok ? colors.primary : colors.mutedForeground} /></View>
                 <Text style={[styles.quickLabel, { color: a.ok ? colors.primary : colors.mutedForeground }]}>{a.label}</Text>
               </TouchableOpacity>
             ))}
@@ -402,6 +424,7 @@ export default function ClientProfileScreen() {
 
           {error ? <Text style={[styles.error, { color: colors.destructive }]}>{error}</Text> : null}
 
+          <View onLayout={(e) => { sectionY.current.history = e.nativeEvent.layout.y; }} />
           <SectionTitle style={[styles.section]}>Upcoming</SectionTitle>
           <View style={[styles.box, card]}>
             {upcoming.length ? upcoming.map(visitRow) : <Text style={[styles.empty, { color: colors.mutedForeground }]}>Nothing booked.</Text>}
@@ -435,7 +458,7 @@ export default function ClientProfileScreen() {
           <FormsPanel customerId={clientId} />
 
           {/* Before/after photos, private to the business (owner, 2026-11-03). */}
-          <View style={{ marginTop: 22 }}><ClientPhotos clientId={clientId} avatarUrl={client.avatarUrl} onProfilePhoto={(url) => void setProfilePhoto(url)} onRemoved={() => { void load(); void refreshBookings(); }} /></View>
+          <View style={{ marginTop: 22 }} onLayout={(e) => { sectionY.current.photos = e.nativeEvent.layout.y; }}><ClientPhotos clientId={clientId} avatarUrl={client.avatarUrl} onProfilePhoto={(url) => void setProfilePhoto(url)} onRemoved={() => { void load(); void refreshBookings(); }} /></View>
 
           <View style={styles.sectionLine}>
             <SectionTitle style={[styles.section]}>Notes</SectionTitle>
@@ -532,6 +555,12 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   header: { height: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12 },
   headerButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  menuButton: { width: 42, height: 42, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  overlayBackdrop: { flex: 1, backgroundColor: 'rgba(17, 12, 34, 0.45)', justifyContent: 'flex-end' },
+  overlayPanel: { borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingHorizontal: 18, paddingTop: 14 },
+  overlayHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 10 },
+  overlayTitle: { flex: 1, fontSize: 24, fontFamily: 'Inter_700Bold' },
+  overlayGroup: { gap: 12 },
   headerTitle: { fontSize: 18, fontFamily: 'Inter_600SemiBold' },
   content: { paddingHorizontal: 20, paddingTop: 6 },
   avatar: { width: 78, height: 78, borderRadius: 39, alignItems: 'center', justifyContent: 'center', alignSelf: 'center' },
@@ -542,10 +571,10 @@ const styles = StyleSheet.create({
   badge: { borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4 },
   badgeText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderRadius: 14, paddingHorizontal: 10, minHeight: 30 },
-  quickActions: { flexDirection: 'row', justifyContent: 'center', gap: 19, marginTop: 18 },
-  quickAction: { width: 52, alignItems: 'center', gap: 6 },
-  quickIcon: { width: 37, height: 37, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
-  quickLabel: { fontSize: 13, fontFamily: 'Inter_500Medium' },
+  quickActions: { flexDirection: 'row', justifyContent: 'center', gap: 28, marginTop: 20 },
+  quickAction: { width: 70, alignItems: 'center', gap: 8 },
+  quickIcon: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
+  quickLabel: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
   bookButton: { height: 48, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 18 },
   alert: { flexDirection: 'row', alignItems: 'flex-start', gap: 9, borderRadius: 14, padding: 13, marginTop: 14 },
   alertText: { flex: 1, fontSize: 16, lineHeight: 22, fontFamily: 'Inter_600SemiBold' },
