@@ -13,7 +13,6 @@ import { zonedDay, zonedMoment, zonedTimeLabel } from '@/lib/businessTime';
 import { api, ApiError } from '@/lib/live-api';
 import { FormsPanel } from '@/components/FormsPanel';
 import { HelpTitle } from '@/components/HelpTitle';
-import { ClientAvatar } from '@/components/ClientAvatar';
 import { ChoiceSlider, type SliderSide } from '@/components/ChoiceSlider';
 import { SelectField } from '@/components/SelectField';
 
@@ -51,10 +50,6 @@ function hoursAndMinutes(text: string) {
   const match = text.match(/^(\d+) min$/);
   const total = match ? Number(match[1]) : 0;
   return total >= 60 ? `${Math.floor(total / 60)} hr${total % 60 ? ` ${total % 60} min` : ''}` : text;
-}
-
-function initialsFor(name: string) {
-  return name.split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase() ?? '').join('') || 'CP';
 }
 
 function statusLabel(status: string) {
@@ -507,6 +502,17 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
     if (clientCancelPending && !asked.current) { asked.current = true; askLateCancelFee(); }
   }, [clientCancelPending]);
 
+  // The card on file, shown when its icon is tapped (brand and last 4 digits).
+  const showCardOnFile = () => {
+    api.get<{ card: { brand: string | null; last4: string | null } | null }>(`/api/payments/terminal/card-on-file?appointmentId=${appointmentId}`)
+      .then((r) => {
+        const c = r?.card;
+        const brand = c?.brand ? `${c.brand[0].toUpperCase()}${c.brand.slice(1)}` : 'Card';
+        Alert.alert('Card on file', c?.last4 ? `${brand} ending ${c.last4}` : `${clientName} has a card on file.`);
+      })
+      .catch(() => Alert.alert('Card on file', `${clientName} has a card on file.`));
+  };
+
   // ── History (owner, 2026-11-17): every change to this booking, who made it, and the old and new values ──
   // "How did you hear about us?" (owner, 2026-11-18, GlossGenius): when the business asks it and this client hasn't answered.
   const [howHeard, setHowHeard] = useState<{ ask: boolean; answer: string | null } | null>(null);
@@ -671,8 +677,6 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
       ) : (
         <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]} showsVerticalScrollIndicator={false}>
           <View style={styles.profile}>
-            <ClientAvatar testID="appointment-client-avatar" clientId={isPreview ? 0 : Number(params.customerId)} avatarUrl={params.avatarUrl} initials={initialsFor(clientName)}
-              style={[styles.avatar, { backgroundColor: colors.muted }]} textStyle={[styles.avatarText, { color: colors.mutedForeground }]} />
             <Text style={[styles.clientName, { color: colors.foreground }]}>{clientName}</Text>
             <Text style={[styles.clientSubtitle, { color: colors.mutedForeground }]}>{isPreview ? 'Preview client' : 'Client appointment'}</Text>
             {/* The client (or this booking) has a saved card (owner, 2026-11-17). */}
@@ -681,7 +685,9 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
                 options={['Social media', 'Web search', 'A friend', 'Other'].map((v) => ({ value: v, label: v }))} onChange={saveHowHeard} />
             </View> : null}
             {params.clientConfirmed === '1' && !isPreview ? <View testID="appointment-confirmed-badge" style={[styles.cardBadge, { backgroundColor: colors.secondary }]}><Text style={[styles.cardBadgeText, { color: colors.secondaryForeground }]}>Confirmed by client</Text></View> : null}
-            {params.cardOnFile === '1' && !isPreview ? <View testID="appointment-card-badge" style={[styles.cardBadge, { backgroundColor: colors.secondary }]}><Text style={[styles.cardBadgeText, { color: colors.secondaryForeground }]}>Card on file</Text></View> : null}
+            {/* Card on file as an icon (owner, 2026-11-18): tap it to see which card. */}
+            {params.cardOnFile === '1' && !isPreview ? <TouchableOpacity testID="appointment-card-badge" onPress={showCardOnFile} accessibilityRole="button" accessibilityLabel="Card on file"
+              style={[styles.cardBadge, styles.cardIconBadge, { backgroundColor: colors.secondary }]}><Feather name="credit-card" size={20} color={colors.secondaryForeground} /></TouchableOpacity> : null}
           </View>
 
           {/* A finished visit is a record: reach the client from their profile. */}
@@ -800,9 +806,13 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
                 {`This booking was cancelled inside your cancellation policy. Mark it as a no-show, with or without the ${feeAsk} fee.`}
               </Text>
               <View style={styles.choiceBlock}>
-                <ChoiceSlider testID="no-show-fee-slider" choice={noShowChoice} onChoice={setNoShowChoice} leftLabel="COLLECT FEE" rightLabel="NO FEE"
+                <View style={styles.choiceLabels}>
+                  <Text style={[styles.choiceCaption, { color: noShowChoice === 'left' ? colors.primary : colors.mutedForeground }]}>{`COLLECT FEE · ${feeAsk}`}</Text>
+                  <Text style={[styles.choiceCaption, { color: noShowChoice === 'right' ? colors.accentForeground : colors.mutedForeground }]}>NO FEE</Text>
+                </View>
+                <ChoiceSlider testID="no-show-fee-slider" choice={noShowChoice} onChoice={setNoShowChoice} leftLabel="YES" rightLabel="NO"
                   accessibilityLabel="No-show fee choice" accessibilityHint={`Slide left to collect the ${feeAsk} fee. Slide right for no fee.`} />
-                <Text style={[styles.choiceInstruction, { color: colors.mutedForeground }]}>Slide the handle left to collect the fee or right for no fee. You can also tap either side.</Text>
+                <Text style={[styles.choiceInstruction, { color: colors.mutedForeground }]}>Slide the handle left for yes or right for no. You can also tap either side.</Text>
               </View>
               <View style={[styles.choiceOutcome, { backgroundColor: noShowChoice === 'left' ? colors.secondary : colors.accent }]}>
                 <Feather name={noShowChoice === 'left' ? 'credit-card' : 'check-circle'} size={19} color={noShowChoice === 'left' ? colors.primary : colors.accentForeground} />
@@ -1087,6 +1097,8 @@ const styles = StyleSheet.create({
   textActionText: { fontSize: 17, fontFamily: 'Inter_500Medium' },
   refundedNote: { fontSize: 15, fontFamily: 'Inter_500Medium', textAlign: 'center', marginTop: 14 },
   choiceBlock: { marginTop: 20 },
+  choiceLabels: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 4, marginBottom: 9 },
+  choiceCaption: { fontSize: 13, letterSpacing: 0.75, fontFamily: 'Inter_700Bold' },
   choiceInstruction: { textAlign: 'center', fontSize: 13, lineHeight: 20, fontFamily: 'Inter_400Regular', marginTop: 9 },
   choiceOutcome: { minHeight: 58, borderRadius: 14, paddingHorizontal: 13, paddingVertical: 11, flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 16 },
   choiceOutcomeText: { flex: 1, fontSize: 15, lineHeight: 20, fontFamily: 'Inter_500Medium' },
@@ -1111,10 +1123,9 @@ const styles = StyleSheet.create({
   editText: { fontSize: 17, fontFamily: 'Inter_500Medium', marginLeft: 'auto' },
   content: { paddingHorizontal: 18, paddingTop: 10, paddingBottom: 55 },
   profile: { alignItems: 'center', paddingTop: 14 },
-  avatar: { width: 77, height: 77, borderRadius: 39, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: 23, fontFamily: 'Inter_400Regular', letterSpacing: 1 },
   clientName: { fontSize: 25, fontFamily: 'Inter_500Medium', letterSpacing: 0.2, marginTop: 11 },
   clientSubtitle: { fontSize: 14, fontFamily: 'Inter_400Regular', marginTop: 4 },
+  cardIconBadge: { paddingHorizontal: 14, paddingVertical: 6 },
   quickActions: { flexDirection: 'row', justifyContent: 'center', gap: 19, marginTop: 21, marginBottom: 20 },
   quickAction: { width: 66, alignItems: 'center', gap: 6 },
   quickIcon: { width: 37, height: 37, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },

@@ -173,7 +173,7 @@ export const HELP: Record<string, HelpPage> = {
         'USE A PACKAGE VISIT pays with one visit from a package the client bought (it shows how many are left).',
         'USE A MEMBERSHIP VISIT pays with a visit included in the client’s membership this period (it shows how many are left).',
         'History, at the bottom: every change to the booking, newest first: who booked it, moves (old and new time), service, length, price or add-on changes, payments, deposits, fees, refunds and cancellations, and who made each change (you, the client or Autumn).',
-        'Late cancellation: cancelled inside your cancellation policy, by the client or by you, with a card on file. Nothing is charged by itself: opening the booking asks you, and on the page you slide the handle to COLLECT FEE (charged to their card on file) or NO FEE, then tap MARK AS NO-SHOW. A cancel within the policy, with no card, or with a paid deposit kept as the penalty, isn’t asked.',
+        'Late cancellation: cancelled inside your cancellation policy, by the client or by you, with a card on file. Nothing is charged by itself: opening the booking asks you, and on the page you slide the handle left for YES (collect the fee from their card on file) or right for NO (no fee), then tap MARK AS NO-SHOW. A cancel within the policy, with no card, or with a paid deposit kept as the penalty, isn’t asked.',
         'No-show (no fee) and No-show (collect fee) work once the booking’s time is over. Collect fee shows when your policy has a no-show fee, and charges it to the client’s card on file (grey with “No card on file” when they have none). With no fee you can still charge it later with CHARGE NO-SHOW FEE.',
       ] },
       { heading: 'After', points: [

@@ -49,13 +49,13 @@ export function ChoiceSlider({ choice, onChoice, leftLabel, rightLabel, accessib
 
   return (
     <View testID={testID} style={[styles.choiceSlider, { backgroundColor: colors.muted, borderColor: colors.border }]} onLayout={(event) => { maxTravel.current = Math.max(0, event.nativeEvent.layout.width / 2 - 31); }}>
-      <TouchableOpacity testID={testID ? `${testID}-left` : undefined} accessibilityRole="button" accessibilityState={{ selected: choice === 'left' }} onPress={() => { onChoice('left'); animateTo('left'); }} style={[styles.sliderSide, styles.leftSide]}>
+      <TouchableOpacity testID={testID ? `${testID}-left` : undefined} accessibilityRole="button" accessibilityState={{ selected: choice === 'left' }} onPress={() => { onChoice('left'); animateTo('left'); }} style={styles.sliderSide}>
         <Text style={[styles.sliderLabel, { color: choice === 'left' ? colors.primary : colors.mutedForeground }]}>{leftLabel}</Text>
       </TouchableOpacity>
       <View style={styles.sliderCenter} pointerEvents="none">
         <View style={[styles.sliderRail, { backgroundColor: choice === 'left' ? colors.primary : choice === 'right' ? colors.accentForeground : colors.border }]} />
       </View>
-      <TouchableOpacity testID={testID ? `${testID}-right` : undefined} accessibilityRole="button" accessibilityState={{ selected: choice === 'right' }} onPress={() => { onChoice('right'); animateTo('right'); }} style={[styles.sliderSide, styles.rightSide]}>
+      <TouchableOpacity testID={testID ? `${testID}-right` : undefined} accessibilityRole="button" accessibilityState={{ selected: choice === 'right' }} onPress={() => { onChoice('right'); animateTo('right'); }} style={styles.sliderSide}>
         <Text style={[styles.sliderLabel, { color: choice === 'right' ? colors.accentForeground : colors.mutedForeground }]}>{rightLabel}</Text>
       </TouchableOpacity>
       <Animated.View
@@ -75,9 +75,6 @@ export function ChoiceSlider({ choice, onChoice, leftLabel, rightLabel, accessib
 const styles = StyleSheet.create({
   choiceSlider: { height: 62, borderWidth: 1, borderRadius: 31, flexDirection: 'row', alignItems: 'center', position: 'relative', overflow: 'hidden' },
   sliderSide: { flex: 1, height: '100%', alignItems: 'center', justifyContent: 'center' },
-  // Each label sits clear of where the handle rests on its side, so a longer label stays readable.
-  leftSide: { paddingLeft: 56 },
-  rightSide: { paddingRight: 56 },
   sliderLabel: { fontSize: 14, letterSpacing: 1.2, fontFamily: 'Inter_700Bold' },
   sliderCenter: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
   sliderRail: { width: 2, height: 22, borderRadius: 1 },
