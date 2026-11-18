@@ -198,7 +198,7 @@ export default function HomeScreen() {
           ].map((item, index) => (
             <TouchableOpacity key={item.key} testID={item.testID} onPress={item.open}
               style={[styles.row, index > 0 ? { borderTopColor: colors.border, borderTopWidth: StyleSheet.hairlineWidth } : null]}>
-              <BreathingDot />
+              <BlinkingDot />
               <View style={{ flex: 1 }}>
                 <Text style={[styles.rowTitle, { color: colors.foreground }]} numberOfLines={1}>{item.title}</Text>
                 <Text style={[styles.rowSub, { color: colors.mutedForeground }]} numberOfLines={1}>{item.sub}</Text>
@@ -286,7 +286,7 @@ const styles = StyleSheet.create({
   nextTime: { fontSize: 23, fontFamily: 'Inter_700Bold', marginTop: 6, marginBottom: 4 },
   sectionLine: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginTop: 26, marginBottom: 10 },
   section: {},
-  dot: { width: 8, height: 8, borderRadius: 4 },
+  dot: { width: 11, height: 11, borderRadius: 6 },
   moreLinks: { flexDirection: 'row', justifyContent: 'flex-end', gap: 18, marginTop: 8 },
   link: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
   list: { borderWidth: 1, borderRadius: 16, overflow: 'hidden', ...cardShadow },
@@ -299,20 +299,18 @@ const styles = StyleSheet.create({
   empty: { borderWidth: 1, borderRadius: 16, minHeight: 110, alignItems: 'center', justifyContent: 'center', gap: 8 },
 });
 
-/** The attention dot: pink, breathing (owner, 2026-11-18). */
-function BreathingDot() {
-  const pulse = useRef(new Animated.Value(0)).current;
+/** The attention dot: pink, blinking on and off so it catches the eye (owner, 2026-11-18). */
+function BlinkingDot() {
+  const on = useRef(new Animated.Value(1)).current;
   useEffect(() => {
     const loop = Animated.loop(Animated.sequence([
-      Animated.timing(pulse, { toValue: 1, duration: 1100, useNativeDriver: true }),
-      Animated.timing(pulse, { toValue: 0, duration: 1100, useNativeDriver: true }),
+      Animated.timing(on, { toValue: 0, duration: 80, useNativeDriver: true }),
+      Animated.delay(420),
+      Animated.timing(on, { toValue: 1, duration: 80, useNativeDriver: true }),
+      Animated.delay(520),
     ]));
     loop.start();
     return () => loop.stop();
-  }, [pulse]);
-  return (
-    <Animated.View style={[styles.dot, { backgroundColor: '#EC4899',
-      opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 0.4] }),
-      transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.5] }) }] }]} />
-  );
+  }, [on]);
+  return <Animated.View style={[styles.dot, { backgroundColor: '#EC4899', opacity: on }]} />;
 }

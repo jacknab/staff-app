@@ -48,7 +48,7 @@ export const HELP: Record<string, HelpPage> = {
       { heading: 'Taken today', points: ['What you’ve been paid today, how many visits are paid, and how many appointments are still to go.'] },
       { heading: 'Weekly goal', points: ['Your weekly revenue goal and how much of it you’ve made this week (Sunday to Saturday). Tap it to set or change the goal and see past weeks. With no goal it says Set a weekly revenue goal.'] },
       { heading: 'Needs your attention', points: [
-        'A pink, breathing dot marks each item. Late cancellation: a booking cancelled inside your cancellation policy (by the client online, by phone with Autumn, or by you) when the client has a card on file. It stays here until you open it and mark it as a no-show, collecting the fee from their card or not.',
+        'A blinking pink dot marks each item. Late cancellation: a booking cancelled inside your cancellation policy (by the client online, by phone with Autumn, or by you) when the client has a card on file. It stays here until you open it and mark it as a no-show, collecting the fee from their card or not.',
         'Booking requests waiting for your answer: tap one to approve it, offer other times or decline it.',
         'Texts from clients you haven’t read: tap one to open the conversation. All messages opens every conversation.',
         'Each item leaves the list once you’ve answered or read it.',
