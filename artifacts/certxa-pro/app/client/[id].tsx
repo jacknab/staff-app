@@ -296,6 +296,7 @@ export default function ClientProfileScreen() {
             <View style={styles.overlayGroup}>
               <MenuCard testID="client-menu-edit" icon={{ feather: 'edit-2' }} title="Edit profile" subtitle="Name, phone, e-mail, birthday" onPress={() => { setMenuOpen(false); startEdit(); }} />
               <MenuCard testID="client-menu-notes" icon={{ feather: 'file-text' }} title="Notes" subtitle="Notes about this client" onPress={() => { setMenuOpen(false); router.push({ pathname: '/notes', params: { customerId: String(clientId), clientName: name } }); }} />
+              <MenuCard testID="client-menu-card" icon={{ feather: 'credit-card' }} title="Card on file" subtitle="Their saved card and every payment" onPress={() => { setMenuOpen(false); router.push({ pathname: '/client-payments' as any, params: { customerId: String(clientId), clientName: name } }); }} />
               <MenuCard testID="client-menu-photos" icon={{ feather: 'image' }} title="Photos" subtitle="Before and after photos" onPress={() => jumpTo('photos')} />
               <MenuCard testID="client-menu-history" icon={{ feather: 'clock' }} title="History" subtitle="Upcoming, past and cancelled visits" onPress={() => jumpTo('history')} />
             </View>

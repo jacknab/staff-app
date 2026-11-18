@@ -61,6 +61,21 @@ export const HELP: Record<string, HelpPage> = {
       { heading: 'Tip', points: ['Pull down to refresh.'] },
     ],
   },
+  clientPayments: {
+    title: 'Card on file',
+    intro: 'A client’s saved card and every payment they’ve made. Open it from the client’s ⋮ menu.',
+    sections: [
+      { heading: 'At the top', points: ['Their saved card (brand, last 4 digits and when it expires), or No card on file. A card is saved when they pay by card at checkout or save one when booking online.', 'Search finds a payment by what it was for, how it was paid, the amount or the date. The card and search stay put; the payments scroll.'] },
+      { heading: 'Payments', points: ['Every paid visit and invoice, and any no-show or late-cancel fee charged, newest first, with how it was paid. Refunded shows when money went back. Tap one to see its receipt.'] },
+    ],
+  },
+  clientReceipt: {
+    title: 'Receipt',
+    intro: 'Everything a receipt has: your business, the date, who did it, each service, add-on and extra, discount, tax, tip, total, how it was paid and any refund.',
+    sections: [
+      { heading: 'Send it', points: ['Text receipt texts the client a link to this receipt. Email receipt e-mails it to them. Each asks first, and is grey when the client has no phone number or e-mail.'] },
+    ],
+  },
   pastBookings: {
     title: 'Past 30 days',
     intro: 'Every booking from the last 30 days, newest first, by day. Open it from Home › ⋮.',
@@ -122,7 +137,7 @@ export const HELP: Record<string, HelpPage> = {
     intro: 'Everything about one client.',
     sections: [
       { heading: 'At the top', points: [
-        'Their photo and name. The ⋮ button at the top right opens Edit profile (name, phone, e-mail, the name they go by, birthday and allergies; Delete Client removes them and their history for good), Notes, Photos (goes to their before and after photos) and History (goes to their visits).',
+        'Their photo and name. The ⋮ button at the top right opens Card on file (their saved card and every payment, with receipts), Edit profile (name, phone, e-mail, the name they go by, birthday and allergies; Delete Client removes them and their history for good), Notes, Photos (goes to their before and after photos) and History (goes to their visits).',
         'Heard about you: how they found you, from your website’s question or what you added on a booking.',
         'Merge with another client (in ⋮ › Edit profile): find duplicate profiles of this client by name, phone or e-mail, then Merge. Their bookings, notes, photos and records move to this client, whose contact details are kept; the duplicates are removed. It can’t be undone, and a duplicate with package visits left or an active membership can’t be merged yet.',
         'Under the name: a Card on file badge when they have a saved card. Their tags are in the Tags section further down.',
