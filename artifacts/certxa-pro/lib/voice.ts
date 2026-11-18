@@ -1,12 +1,14 @@
 /**
- * Business Phone calls (owner, 2026-11-04): the Twilio Voice SDK, iPhone only for now. Certxa gives this phone a
+ * Business Phone calls (owner, 2026-11-04): the Twilio Voice SDK. iPhone, and Android once the build has the Certxa Firebase
+ * file (app.config.js extra.androidCalling, 2026-11-19). Certxa gives this phone a
  * one-hour voice token (POST /api/pro/phone/token); no Twilio key ever lives in the app. Incoming calls arrive as
  * VoIP pushes and ring through CallKit like any phone call; calls out always show the business number (the server
  * sets it). Plus pros without a Business Phone number call their clients (from their profile only) and take their
  * clients' calls on Certxa's shared Plus number (GET /api/pro/phone/calling). The call in progress is kept here so the in-call screen can show it (useActiveCall).
  */
 import { useSyncExternalStore } from 'react';
-import { Linking, Platform } from 'react-native';
+import { Linking, PermissionsAndroid, Platform } from 'react-native';
+import Constants from 'expo-constants';
 import type { Call, CallInvite, Voice } from '@twilio/voice-react-native-sdk';
 import { api } from '@/lib/live-api';
 import { certxaRequest } from '@/lib/certxa-api';
@@ -19,8 +21,9 @@ export type ActiveCall = { call: Call | null; number: string; incoming: boolean;
   /** The call screen is set aside (e.g. to look at the client's profile); a bar at the top brings it back. */
   minimized: boolean };
 
-export const voiceSupported = Platform.OS === 'ios';
-// Loaded only on iPhone: the native module isn't in the web preview.
+// Android rings through Firebase: only a build made with the Certxa Firebase file can take calls (app.config.js).
+export const voiceSupported = Platform.OS === 'ios' || (Platform.OS === 'android' && Constants.expoConfig?.extra?.androidCalling === true);
+// Loaded only on the phones above: the native module isn't in the web preview.
 const twilioSdk = () => require('@twilio/voice-react-native-sdk') as typeof import('@twilio/voice-react-native-sdk');
 let voice: Voice | null = null;
 let active: ActiveCall | null = null;
@@ -66,10 +69,21 @@ function track(call: Call, number: string, incoming: boolean) {
 const APNS = process.env.EXPO_PUBLIC_APNS_ENV === 'production' ? 'production' : 'development';
 
 async function voiceToken(authToken?: string): Promise<string> {
+  // The platform too: Android's calls ring through the Android push credential (routes/businessPhone.ts).
+  const body = { apns: APNS, platform: Platform.OS };
   const r = authToken
-    ? await certxaRequest<{ token: string }>('/api/pro/phone/token', { method: 'POST', body: JSON.stringify({ apns: APNS }) }, authToken)
-    : await api.post<{ token: string }>('/api/pro/phone/token', { apns: APNS });
+    ? await certxaRequest<{ token: string }>('/api/pro/phone/token', { method: 'POST', body: JSON.stringify(body) }, authToken)
+    : await api.post<{ token: string }>('/api/pro/phone/token', body);
   return r.token;
+}
+
+/** Android asks for the microphone, and (Android 13+) to show the incoming-call screen as a notification. */
+async function androidCallPermissions(): Promise<boolean> {
+  if (Platform.OS !== 'android') return true;
+  const wanted = [PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+    ...(Number(Platform.Version) >= 33 ? [PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS] : [])];
+  const got = await PermissionsAndroid.requestMultiple(wanted);
+  return got[PermissionsAndroid.PERMISSIONS.RECORD_AUDIO] === PermissionsAndroid.RESULTS.GRANTED;
 }
 
 /**
@@ -79,10 +93,12 @@ async function voiceToken(authToken?: string): Promise<string> {
 export async function prepareVoice(): Promise<void> {
   if (!voiceSupported) return;
   try {
-    await sdk().initializePushRegistry();
-    // The incoming-call screen (Apple's own, CallKit) shows the caller line Certxa sends with the call, e.g.
-    // "Client: Jane Smith · Regular" (routes/businessPhone.ts callerLine), instead of the bare number.
-    await sdk().setIncomingCallContactHandleTemplate('${DisplayName}');
+    if (Platform.OS === 'ios') {
+      await sdk().initializePushRegistry();
+      // The incoming-call screen (Apple's own, CallKit) shows the caller line Certxa sends with the call, e.g.
+      // "Client: Jane Smith · Regular" (routes/businessPhone.ts callerLine), instead of the bare number.
+      await sdk().setIncomingCallContactHandleTemplate('${DisplayName}');
+    }
     for (const call of (await sdk().getCalls()).values()) if (!active) track(call, call.getFrom() ?? '', true);
   } catch { /* calls still work once registered */ }
 }
@@ -93,6 +109,7 @@ export async function registerBusinessPhone(): Promise<boolean> {
   try {
     canCall = !!(await callingMode());
     if (!canCall) return false;
+    await androidCallPermissions();
     await sdk().register(await voiceToken());
     return true;
   } catch {
@@ -109,7 +126,8 @@ export async function unregisterBusinessPhone(authToken: string | null): Promise
 
 /** Call a number from the business number. */
 export async function placeCall(number: string): Promise<void> {
-  if (!voiceSupported) throw new Error('Calls from your business number work on iPhone.');
+  if (!voiceSupported) throw new Error('Calls from your business number aren’t available on this phone yet.');
+  if (!(await androidCallPermissions())) throw new Error('Allow the microphone for Certxa Pro to make calls.');
   const digits = number.replace(/\D/g, '');
   const call = await sdk().connect(await voiceToken(), { params: { To: digits }, contactHandle: number, notificationDisplayName: number });
   track(call, number, false);
