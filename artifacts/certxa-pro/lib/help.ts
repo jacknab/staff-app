@@ -241,7 +241,7 @@ export const HELP: Record<string, HelpPage> = {
         'Split payment: take part of the bill in cash (type the amount), or use a gift card or credit, then choose how to pay the rest. Each part paid shows above the list (Credit used, Gift card paid, Cash taken), and the amount due is what is left.',
         'When it’s done, send a receipt by text or e-mail, after any payment; once it’s sent you’re back on Home. Book next appointment: choose how many weeks out, then See my calendar (opens that day), Instant book (the same weekday, time and services, booked at once, even if the time is taken, so check your calendar) or Choose another time (the booking form on that day). New sale starts the next one.',
       ] },
-      { heading: 'Card reader', points: ['New Stripe M2 setup (one time): enter the code shown on the reader and tap Register. After that, checkout finds it on its own.'] },
+      { heading: 'Card reader', points: ['A new Stripe M2 is registered once in Settings › Payments (Register a new Stripe M2). After that, checkout finds it on its own.'] },
       { heading: 'If something goes wrong', points: ['If a card payment is approved but not finished, tap Retry capture before leaving, so the payment is completed.', 'Recent payments lists the last payments taken here.'] },
     ],
   },
