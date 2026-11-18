@@ -45,7 +45,7 @@ import { look, cardShadow } from '@/components/look/tokens';
 // Stripe M2 does not require that Apple entitlement.
 const TAP_TO_PAY_ENABLED = true;
 // Shown on the payment screen so a tester can tell which build is installed.
-const BUILD_LABEL = 'Build Nov 18 · I';
+const BUILD_LABEL = 'Build Nov 18 · J';
 const EXPO_GO_PREVIEW = process.env.EXPO_PUBLIC_EXPO_GO_PREVIEW === '1';
 
 type PaymentStep = 'idle' | 'tap_intro' | 'initializing' | 'discovering' | 'connecting' | 'ready' | 'processing' | 'capture_pending' | 'success' | 'error';
@@ -1075,55 +1075,6 @@ export default function CheckoutScreen() {
       setStep('tap_intro');
     }}
   />;
-
-  return (
-    <View style={[styles.root, { backgroundColor: colors.background, paddingTop: topInset }]}>
-      <StatusBar barStyle="dark-content" />
-      <ScrollView contentContainerStyle={styles.pageContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        <View style={styles.topLine}><View><Text style={[styles.eyebrow, { color: colors.primary }]}>CERTXA PRO</Text><HelpTitle help="checkout" style={[styles.title, { color: colors.foreground }]}>Checkout</HelpTitle></View><View style={[styles.secureBadge, { backgroundColor: colors.secondary }]}><Feather name="lock" size={15} color={colors.primary} /><Text style={[styles.secureText, { color: colors.primary }]}>Certxa secure</Text></View></View>
-        <View style={{ marginBottom: 14 }}><PaymentsSetupBanner message="Set up card payments to take this payment with Tap to Pay or the M2 reader." /></View>
-        <View style={[styles.amountPanel, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.amountCaption, { color: colors.mutedForeground }]}>PAYMENT AMOUNT</Text>
-          <Text testID="checkout-amount" style={[styles.amount, { color: colors.foreground }]}>{dollars(digits)}</Text>
-          <Text style={[styles.liveAmountNote, { color: colors.mutedForeground }]}>{params.appointmentId ? `Loaded from Certxa appointment #${params.appointmentId}` : 'Select Check Out from the live calendar to load an appointment.'}</Text>
-        </View>
-        <View style={styles.form}>
-          <View style={styles.formField}><Text style={[styles.fieldLabel, { color: colors.foreground }]}>Certxa appointment ID</Text><TextInput keyboardType="number-pad" onChangeText={setAppointmentId} placeholder="Required for live payment" placeholderTextColor={colors.mutedForeground} style={[styles.fieldInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} testID="appointment-id" value={appointmentId} /></View>
-          <View style={styles.formField}><Text style={[styles.fieldLabel, { color: colors.foreground }]}>Client name <Text style={{ color: colors.mutedForeground }}>(optional)</Text></Text><TextInput autoCapitalize="words" onChangeText={setClientName} placeholder="Shown on the receipt" placeholderTextColor={colors.mutedForeground} style={[styles.fieldInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} testID="client-name" value={clientName} /></View>
-           {paymentMethod === 'card' ? <View style={styles.formField}>
-            <Text style={[styles.fieldLabel, { color: colors.foreground }]}>New Stripe M2 setup <Text style={{ color: colors.mutedForeground }}>(one time)</Text></Text>
-            <View style={styles.registrationRow}>
-              <TextInput autoCapitalize="none" autoCorrect={false} onChangeText={setRegistrationCode} placeholder="Reader registration code" placeholderTextColor={colors.mutedForeground} style={[styles.fieldInput, styles.registrationInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} testID="m2-registration-code" value={registrationCode} />
-              <TouchableOpacity disabled={isRegisteringReader || !registrationCode.trim()} onPress={registerM2Reader} style={[styles.registerButton, { backgroundColor: registrationCode.trim() ? colors.secondary : colors.muted }]} testID="register-m2"><Text style={[styles.registerButtonText, { color: registrationCode.trim() ? colors.primary : colors.mutedForeground }]}>{isRegisteringReader ? 'Registering…' : 'Register'}</Text></TouchableOpacity>
-            </View>
-            {readerSetupText ? <Text style={[styles.setupText, { color: colors.primary }]}>{readerSetupText}</Text> : null}
-           </View> : null}
-        </View>
-        {error ? <View style={[styles.errorNotice, { backgroundColor: colors.accent }]}><Feather name="alert-circle" size={17} color={colors.accentForeground} /><Text style={[styles.previewText, { color: colors.accentForeground }]}>{error}</Text></View> : null}
-        <Text style={[styles.methodHeading, { color: colors.foreground }]}>Payment method</Text>
-        <View style={styles.methodList}>
-          {paymentMethods.map((method) => {
-            const selected = paymentMethod === method.key;
-            return (
-              <TouchableOpacity key={method.key} testID={`payment-method-${method.key}`} onPress={() => setPaymentMethod(method.key)} accessibilityRole="button" accessibilityState={{ selected }} style={[styles.methodCard, { backgroundColor: selected ? colors.secondary : colors.card, borderColor: selected ? colors.primary : colors.border }]}>
-                <View style={[styles.methodIcon, { backgroundColor: selected ? colors.primary : colors.muted }]}><Feather name={method.icon} size={18} color={selected ? colors.primaryForeground : colors.foreground} /></View>
-                <View style={{ flex: 1 }}><Text style={[styles.methodLabel, { color: colors.foreground }]}>{method.label}</Text><Text style={[styles.methodDescription, { color: colors.mutedForeground }]}>{method.description}</Text></View>
-                <Feather name={selected ? 'check-circle' : 'circle'} size={20} color={selected ? colors.primary : colors.border} />
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-        {paymentMethod === 'gift_card' ? <View style={styles.giftCardField}><Text style={[styles.fieldLabel, { color: colors.foreground }]}>Gift card number <Text style={{ color: colors.mutedForeground }}>(optional)</Text></Text><TextInput autoCapitalize="characters" onChangeText={setGiftCardCode} placeholder="Add a reference to the receipt" placeholderTextColor={colors.mutedForeground} style={[styles.fieldInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} testID="gift-card-code" value={giftCardCode} /></View> : null}
-        {paymentMethod === 'card' ? <View style={styles.readerButtons}>
-          <TouchableOpacity testID="stripe-m2" onPress={() => startReader('m2')} disabled={Number(digits) < 50} style={[styles.tapButton, styles.readerButton, { backgroundColor: Number(digits) < 50 ? colors.muted : colors.primary }]}><Feather name="credit-card" size={20} color={Number(digits) < 50 ? colors.mutedForeground : colors.primaryForeground} /><Text style={[styles.tapButtonText, { color: Number(digits) < 50 ? colors.mutedForeground : colors.primaryForeground }]}>Stripe M2</Text></TouchableOpacity>
-          <TouchableOpacity testID="tap-to-pay" onPress={() => startReader('tap_to_pay')} disabled={!TAP_TO_PAY_ENABLED || Number(digits) < 50} style={[styles.tapButton, styles.readerButton, { backgroundColor: colors.muted }]}><Feather name="radio" size={20} color={colors.mutedForeground} /><Text style={[styles.tapButtonText, { color: colors.mutedForeground }]}>Tap to Pay pending Apple</Text></TouchableOpacity>
-        </View> : <TouchableOpacity testID={`record-${paymentMethod}`} onPress={processManualPayment} disabled={Number(digits) < 50} style={[styles.tapButton, { backgroundColor: Number(digits) < 50 ? colors.muted : colors.primary }]}><Feather name={selectedMethod.icon} size={20} color={Number(digits) < 50 ? colors.mutedForeground : colors.primaryForeground} /><Text style={[styles.tapButtonText, { color: Number(digits) < 50 ? colors.mutedForeground : colors.primaryForeground }]}>Record {selectedMethod.label} payment</Text></TouchableOpacity>}
-        <View style={styles.recentHeader}><Text style={[styles.sectionTitle, { color: colors.foreground }]}>Recent payments</Text></View>
-        <View style={styles.saleList}>{sales.slice(0, 3).map((sale, index) => <View key={`${sale.time}-${index}`} style={[styles.saleRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={[styles.saleIcon, { backgroundColor: colors.secondary }]}><Feather name="check" size={17} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={[styles.quickTitle, { color: colors.foreground }]}>{sale.label}</Text><Text style={[styles.saleTime, { color: colors.mutedForeground }]}>{sale.time}</Text></View><Text style={[styles.saleAmount, { color: colors.foreground }]}>{sale.amount}</Text></View>)}</View>
-        <Text style={[styles.disclaimer, { color: colors.mutedForeground }]}>Payments are processed by Certxa Connect in a custom native build.</Text>
-      </ScrollView>
-    </View>
-  );
 }
 
 /** One way to pay in the checkout list: icon, name, a short line under it, and an arrow. */

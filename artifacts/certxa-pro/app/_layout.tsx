@@ -9,6 +9,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { installWebAlert } from '@/lib/webAlert';
 import {
   Inter_400Regular,
   Inter_500Medium,
@@ -27,6 +28,9 @@ import { HelpHost } from '@/components/HelpTitle';
 import { PaymentsAttentionFrame } from '@/components/PaymentsAttentionBanner';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { CertxaTerminalProvider } from '@/components/CertxaTerminalProvider';
+
+// Confirmations work in the browser build too (lib/webAlert.ts).
+installWebAlert();
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
