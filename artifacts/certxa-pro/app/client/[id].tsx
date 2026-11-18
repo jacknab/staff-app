@@ -34,7 +34,7 @@ type Tag = { id: number; tagName: string; tagColor?: string | null };
 type Prefs = { smsMarketingOptIn?: boolean | null; emailMarketingOptIn?: boolean | null; promotionalNotifications?: boolean | null; appointmentReminders?: boolean | null; reviewRequests?: boolean | null };
 type Client = {
   id: number; avatarUrl?: string | null; cardBrand?: string | null; cardLast4?: string | null; firstName?: string | null; lastName?: string | null; fullName?: string | null; preferredName?: string | null;
-  dateOfBirth?: string | null; allergies?: string | null; clientStatus?: string | null; loyaltyPoints?: number | null;
+  dateOfBirth?: string | null; allergies?: string | null; clientStatus?: string | null; loyaltyPoints?: number | null; referralSource?: string | null;
   totalVisits: number; totalSpentCents: number; spent12mCents: number; lastVisitAt?: string | null;
   primaryPhone?: string | null; primaryEmail?: string | null; notes: Note[]; tags: { tagId: number; tag: Tag }[];
   /** phoneType comes from Twilio's line-type lookup when the number is added or changed (storage.ts). */
@@ -372,6 +372,7 @@ export default function ClientProfileScreen() {
             </View>
           ) : null}
 
+          {client.referralSource ? <Text testID="client-how-heard" style={[styles.sub, { color: colors.mutedForeground }]}>{`Heard about you: ${client.referralSource}`}</Text> : null}
           {packages.map((p) => (
             <Text key={p.id} testID={`client-package-${p.id}`} style={[styles.sub, { color: colors.foreground }]}>{p.name}: {p.visitsLeft} of {p.visitsTotal} visits left</Text>
           ))}

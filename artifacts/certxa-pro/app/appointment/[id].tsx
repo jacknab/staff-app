@@ -14,6 +14,7 @@ import { api, ApiError } from '@/lib/live-api';
 import { FormsPanel } from '@/components/FormsPanel';
 import { HelpTitle } from '@/components/HelpTitle';
 import { ClientAvatar } from '@/components/ClientAvatar';
+import { SelectField } from '@/components/SelectField';
 
 import { AppBackground } from '@/components/look/AppBackground';
 import { look, cardShadow } from '@/components/look/tokens';
@@ -499,6 +500,17 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
   };
 
   // ── History (owner, 2026-11-17): every change to this booking, who made it, and the old and new values ──
+  // "How did you hear about us?" (owner, 2026-11-18, GlossGenius): when the business asks it and this client hasn't answered.
+  const [howHeard, setHowHeard] = useState<{ ask: boolean; answer: string | null } | null>(null);
+  useEffect(() => {
+    const cid = Number(params.customerId);
+    if (isPreview || !cid) return;
+    api.get<{ ask: boolean; answer: string | null }>(`/api/pro/clients/${cid}/how-heard`).then(setHowHeard).catch(() => undefined);
+  }, [params.customerId, isPreview]);
+  const saveHowHeard = (answer: string) => {
+    setHowHeard((h) => (h ? { ...h, answer } : h));
+    api.put(`/api/pro/clients/${params.customerId}/how-heard`, { answer }).catch(() => setHowHeard((h) => (h ? { ...h, answer: null } : h)));
+  };
   const [history, setHistory] = useState<{ at: string; text: string }[] | null>(null);
   const [historyTick, setHistoryTick] = useState(0);
   // ── Resend appointment details (owner, 2026-11-18, GlossGenius): the booking confirmation again, text and/or e-mail ──
@@ -618,6 +630,10 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
             <Text style={[styles.clientName, { color: colors.foreground }]}>{clientName}</Text>
             <Text style={[styles.clientSubtitle, { color: colors.mutedForeground }]}>{isPreview ? 'Preview client' : 'Client appointment'}</Text>
             {/* The client (or this booking) has a saved card (owner, 2026-11-17). */}
+            {howHeard?.ask && !howHeard.answer ? <View style={{ marginTop: 10, alignSelf: 'stretch', paddingHorizontal: 20 }}>
+              <SelectField compact testID="appointment-how-heard" title="How they heard about you" placeholder="Add how they heard about you" value={null as string | null}
+                options={['Social media', 'Web search', 'A friend', 'Other'].map((v) => ({ value: v, label: v }))} onChange={saveHowHeard} />
+            </View> : null}
             {params.cardOnFile === '1' && !isPreview ? <View testID="appointment-card-badge" style={[styles.cardBadge, { backgroundColor: colors.secondary }]}><Text style={[styles.cardBadgeText, { color: colors.secondaryForeground }]}>Card on file</Text></View> : null}
           </View>
 

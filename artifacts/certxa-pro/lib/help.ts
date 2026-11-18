@@ -115,6 +115,7 @@ export const HELP: Record<string, HelpPage> = {
     sections: [
       { heading: 'At the top', points: [
         'Their photo and name. The pencil edits their name, phone, e-mail, the name they go by, birthday and allergies; Delete Client removes them and their history for good.',
+        'Heard about you: how they found you, from your website’s question or what you added on a booking.',
         'Merge with another client (in the pencil’s edit page): find duplicate profiles of this client by name, phone or e-mail, then Merge. Their bookings, notes, photos and records move to this client, whose contact details are kept; the duplicates are removed. It can’t be undone, and a duplicate with package visits left or an active membership can’t be merged yet.',
         'Under the name: their status (New, Regular, At risk, Inactive or VIP), a Card on file badge when they have a saved card, and their tags.',
         'Text opens a text to them. Call rings them from your business number when you have Business Phone or Plus, so your own number stays private. Email opens an e-mail.',
@@ -150,6 +151,7 @@ export const HELP: Record<string, HelpPage> = {
     intro: 'One booking and everything you can do with it.',
     sections: [
       { heading: 'What you see', points: [
+        'Add how they heard about you (when you ask it in Booking rules and the client hasn’t answered): choose Social media, Web search, A friend or Other.',
         'The client, with Text, Call and Email buttons. A Card on file badge under the name means the client (or this booking) has a saved card, so a no-show or late-cancel fee can be charged.',
         'The services, add-ons, date, time and total, and any deposit: paid, due (a link was texted), kept or refunded.',
         'For a house call: the client’s address (Open in Maps), when to leave, the drive, setup and pack-up time, and the travel fee.',
@@ -217,6 +219,7 @@ export const HELP: Record<string, HelpPage> = {
         'The amount due comes from the booking; for a quick sale you key it in.',
         'Discount: 10%, 15%, 20% or 25% off, or a custom amount off. Tax is worked out after the discount, never on the tip.',
         'For a member with a member discount, it is put in as the amount off for you (you can change it).',
+        'Promo code: type one of your codes and tap Apply; it becomes the discount (one per visit). A code the client typed when booking online is already on. × takes it off. If a code can’t be used, the message says why (not started, expired, first visit only, used up).',
         'Custom charges: Add a custom charge puts a named amount on the visit, like a late fee. It is saved on the booking, so the booking, the bill and reports show it; × takes it off again.',
         'Products: Add a product puts a retail item on the visit (it shows how many you have in stock); − and + change how many. Retail sales tax is added on products. They come out of your stock when the visit is paid, and you get a notification when one is down to its low-stock level.',
         'A deposit the client already paid comes off; sales tax and the platform fee are added if you charge them (Settings › Card reader & Checkout).',
@@ -260,8 +263,8 @@ export const HELP: Record<string, HelpPage> = {
         'The cards share one spot and change every 15 seconds; swipe to see the next one. A card disappears once you have that plan, and comes back if it ends.',
       ] },
       { heading: 'Menu', points: [
-        'Business: Money (sales, payouts and payments) and Business Phone.',
-        'Client Growth: Waitlist, Campaigns, Reviews and Portfolio.',
+        'Business: Money (sales, payouts and payments), Business Phone, Expenses, Memberships and Forms & Waivers.',
+        'Client Growth: Waitlist, Campaigns, Promo Codes, Referrals, Reviews and Portfolio.',
         'Account: Business AI, Gift Cards & Packages, Credit balance and Settings.',
         'The person button at the top opens About you.',
       ] },
@@ -558,6 +561,17 @@ export const HELP: Record<string, HelpPage> = {
       'Remove service takes it off your menu.',
     ] }],
   },
+  promoCodes: {
+    title: 'Promo codes',
+    intro: 'Discount codes like SUMMER25, for checkout and your website.',
+    sections: [{ heading: 'How it works', points: [
+      'Tap + for a new code: its name (3 to 32 letters, numbers, - or _), percent off or an amount off, what a percent applies to (the whole visit, services or products), New clients only, limits on total uses and uses per client, and start and end dates (YYYY-MM-DD, or empty to keep it on).',
+      'A new code is a Draft: it doesn’t work yet, and you can Edit or Delete it. Publish makes it work and fixes it; it can’t be changed after that. End code stops it.',
+      'Each code shows Draft, Scheduled (starts later), Active, Expired or Ended, and how many times it’s been used. A use is a booking with the code that wasn’t cancelled.',
+      'Clients type a code when they book on your website (the field shows only while you have an active code). You apply codes at checkout.',
+      'Codes aren’t shown on your website: share them in a campaign, on social media or in a text.',
+    ] }],
+  },
   revenueGoal: {
     title: 'Weekly goal',
     intro: 'A revenue goal for each week, and how you’re doing.',
@@ -785,6 +799,8 @@ export const HELP: Record<string, HelpPage> = {
       'Minimum notice: how far ahead clients must book (1 to 24 hours). You can still book any time yourself.',
       'Booking increments: which start times clients can pick (every 15 minutes offers 9:00, 9:15, 9:30…).',
       'Padded time: extra minutes kept free at the end of every booking. The times clients see include it.',
+      'Minimize scheduling gaps: on a day that already has bookings or blocked time, clients online see only times next to them (back to back, or with a gap up to the time you choose). A day with nothing booked shows every time. Keep to my booking increments: off offers the exact time a booking ends; on, the next increment. Autumn offers the same times. You can still book any time yourself.',
+      'Ask how clients heard about you: after a client books online for the first time, your website asks Social media, Web search, A friend or Other. The answers so far show under the switch; you can add a client’s answer on their booking.',
       'Advance booking: limit how many months ahead clients can book.',
       'Allow online cancellation: clients can cancel online up to your cancellation notice (Cancellation policy).',
     ] }],

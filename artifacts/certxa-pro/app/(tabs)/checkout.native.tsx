@@ -45,7 +45,7 @@ import { look, cardShadow } from '@/components/look/tokens';
 // Stripe M2 does not require that Apple entitlement.
 const TAP_TO_PAY_ENABLED = true;
 // Shown on the payment screen so a tester can tell which build is installed.
-const BUILD_LABEL = 'Build Nov 18 · C';
+const BUILD_LABEL = 'Build Nov 18 · D';
 const EXPO_GO_PREVIEW = process.env.EXPO_PUBLIC_EXPO_GO_PREVIEW === '1';
 
 type PaymentStep = 'idle' | 'tap_intro' | 'initializing' | 'discovering' | 'connecting' | 'ready' | 'processing' | 'capture_pending' | 'success' | 'error';
@@ -297,6 +297,31 @@ export default function CheckoutScreen() {
       setCustomDiscount((Math.round(baseCentsParam * r.discount.percent / 100) / 100).toFixed(2));
     }).catch(() => undefined);
   }, [params.appointmentId, baseCentsParam]);
+  // Promo codes (owner, 2026-11-18, GlossGenius; app/promo-codes.tsx): one code per visit. It becomes the visit's
+  // discount (the % and custom amount go away while it's on). A code the client typed when booking online is already on.
+  const [promo, setPromo] = useState<{ code: string; cents: number } | null>(null);
+  const [promoInput, setPromoInput] = useState('');
+  const [promoBusy, setPromoBusy] = useState(false);
+  const applyPromo = async (code: string, productsCents: number) => {
+    setPromoBusy(true); setError('');
+    try {
+      const r = await api.post<{ code: string; discountCents: number }>(`/api/pro/appointments/${params.appointmentId}/promo`, { code, servicesCents: baseCentsParam, productsCents });
+      setPromo({ code: r.code, cents: r.discountCents }); setPromoInput('');
+      setDiscountPercent(0); setCustomDiscount((r.discountCents / 100).toFixed(2));
+    } catch (cause) { setError(errorMessage(cause)); } finally { setPromoBusy(false); }
+  };
+  const removePromo = async () => {
+    setPromoBusy(true);
+    try { await api.del(`/api/pro/appointments/${params.appointmentId}/promo`); setPromo(null); setCustomDiscount(''); }
+    catch (cause) { setError(errorMessage(cause)); } finally { setPromoBusy(false); }
+  };
+  useEffect(() => {
+    const id = Number(params.appointmentId);
+    setPromo(null);
+    if (EXPO_GO_PREVIEW || !id || isQuickSale) return;
+    api.get<{ code: string | null }>(`/api/pro/appointments/${id}/promo`).then((r) => { if (r?.code) void applyPromo(r.code, 0); }).catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.appointmentId]);
   // The business's sales tax (Settings → Sales tax; off unless they turn on tax on services) and tip presets.
   const [tax, setTax] = useState<{ rate: number; services: boolean; retail: number }>({ rate: 0, services: false, retail: 0 });
   const [tipPresets, setTipPresets] = useState<number[] | undefined>(undefined);
@@ -825,6 +850,7 @@ export default function CheckoutScreen() {
     setNextWeeks(null); setRebookNote('');
     setOtherOpen(false); setOtherKind(null); setOtherLabel('');
     setCharges([]); setChargeOpen(false); setChargeLabel(''); setChargePrice('');
+    setPromo(null); setPromoInput('');
     setProducts([]); setGiftPaidCents(0); setCashPartCents(0); setCreditPaidCents(0); setCreditBalanceCents(0);
     void clearPendingTerminalCapture();
   };
@@ -908,6 +934,12 @@ export default function CheckoutScreen() {
             {error ? <View style={[styles.errorNotice, { backgroundColor: colors.accent }]}><Feather name="alert-circle" size={17} color={colors.accentForeground} /><Text style={[styles.previewText, { color: colors.accentForeground }]}>{error}</Text></View> : null}
              {isTapIntro && baseCentsParam > 0 ? <View testID="discount-block" style={[styles.formField, { width: '100%', marginTop: 16 }]}>
                <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Discount{discountCents > 0 ? <Text style={{ color: colors.primary }}>{` · −${dollars(String(discountCents))}`}</Text> : null}</Text>
+               {promo ? (
+                 <View testID="promo-line" style={styles.registrationRow}>
+                   <Text style={[styles.fieldLabel, { flex: 1, color: colors.foreground }]}>{`Promo ${promo.code} · −${dollars(String(promo.cents))}`}</Text>
+                   <TouchableOpacity testID="promo-remove" disabled={promoBusy} accessibilityLabel={`Remove promo ${promo.code}`} onPress={() => void removePromo()} style={[styles.registerButton, { backgroundColor: colors.secondary, minWidth: 44 }]}><Feather name="x" size={18} color={colors.primary} /></TouchableOpacity>
+                 </View>
+               ) : <>
                <View style={{ flexDirection: 'row', gap: 6 }}>
                  {[0, 10, 15, 20, 25].map((pct) => {
                    const selected = customDiscountCents <= 0 && discountPercent === pct;
@@ -916,6 +948,11 @@ export default function CheckoutScreen() {
                </View>
                {memberDiscount ? <Text testID="member-discount-line" style={[styles.serviceLabel, { color: colors.mutedForeground, marginBottom: 6 }]}>{`Member discount: ${memberDiscount.name}, ${memberDiscount.percent}% off`}</Text> : null}
                <TextInput keyboardType="numbers-and-punctuation" returnKeyType="done" onChangeText={setCustomDiscount} placeholder="Or a custom amount off, e.g. 39.00" placeholderTextColor={colors.mutedForeground} style={[styles.fieldInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} testID="discount-custom" value={customDiscount} />
+               {!isQuickSale && Number(appointmentId) > 0 ? <View style={styles.registrationRow}>
+                 <TextInput testID="promo-input" autoCapitalize="characters" autoCorrect={false} value={promoInput} onChangeText={(v) => setPromoInput(v.replace(/\s/g, '').toUpperCase().slice(0, 32))} placeholder="Or a promo code" placeholderTextColor={colors.mutedForeground} style={[styles.fieldInput, styles.registrationInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
+                 <TouchableOpacity testID="promo-apply" disabled={promoBusy || promoInput.length < 3} onPress={() => void applyPromo(promoInput, productCents)} style={[styles.registerButton, { backgroundColor: promoInput.length >= 3 ? colors.secondary : colors.muted }]}><Text style={[styles.registerButtonText, { color: promoInput.length >= 3 ? colors.primary : colors.mutedForeground }]}>{promoBusy ? 'Checking…' : 'Apply'}</Text></TouchableOpacity>
+               </View> : null}
+               </>}
              </View> : null}
              {isTapIntro && !isQuickSale && Number(appointmentId) > 0 && (catalog.length > 0 || products.length > 0) ? <View testID="products-block" style={[styles.formField, { width: '100%', marginTop: 16 }]}>
                <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Products{productCents > 0 ? <Text style={{ color: colors.primary }}>{` · ${dollars(String(productCents))}`}</Text> : null}</Text>

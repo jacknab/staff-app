@@ -270,6 +270,7 @@ export default function MoreScreen() {
           <View style={styles.menuList}>
             <MenuCard testID="menu-waitlist" icon={{ mci: 'calendar-clock-outline' }} title="Waitlist" subtitle="Clients waiting for a time" onPress={() => router.push('/waitlist')} />
             <MenuCard testID="menu-campaigns" icon={{ mci: 'bullhorn-outline' }} title="Campaigns" subtitle="Text a special to clients" onPress={() => router.push('/campaigns')} />
+            <MenuCard testID="menu-promo-codes" icon={{ feather: 'tag' }} title="Promo Codes" subtitle="Discount codes for checkout and online booking" onPress={() => router.push('/promo-codes' as any)} />
             <MenuCard testID="menu-referrals" icon={{ feather: 'users' }} title="Referrals" subtitle="Reward clients who send a friend" onPress={() => router.push('/referrals' as any)} />
             <MenuCard testID="menu-reviews" icon={{ feather: 'star' }} title="Reviews" subtitle="See what clients said and reply" onPress={() => router.push('/reviews')} />
             <MenuCard testID="menu-portfolio" icon={{ feather: 'image' }} title="Portfolio" subtitle="Photos of your work on your website" onPress={() => router.push('/portfolio')} />

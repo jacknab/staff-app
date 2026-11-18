@@ -139,6 +139,8 @@ export default function SettingsScreen() {
           cancellationPolicyText: policies.cancellationPolicyText ?? '', cancellationPolicyRequired: !!policies.cancellationPolicyRequired,
           feePercent: policies.cancellationFeeValue != null ? String(Number(policies.cancellationFeeValue)) : '',
           bookingWindowHours: Math.max(1, Number(calendar?.bookingWindowHours ?? 1) || 1), timeSlotInterval: Number(calendar?.timeSlotInterval ?? 15), bufferMinutes: Number(calendar?.bufferMinutes ?? 0), paddedMinutes: Number(calendar?.paddedMinutes ?? 0),
+          gapRuleMinutes: calendar?.gapRuleMinutes == null ? -1 : Number(calendar.gapRuleMinutes), gapRuleIncrements: !!calendar?.gapRuleIncrements,
+          askHowHeard: !!calendar?.askHowHeard, heardSummary: await api.get<{ answers: { source: string; count: number }[] }>('/api/pro/how-heard-summary').then((r) => r.answers).catch(() => []),
         });
       } else if (next === 'blocked') setDraft({ list: await api.get<any[]>('/api/booking-ban-list'), phone: '', reason: '' });
       else if (next === 'phone') {
@@ -240,7 +242,8 @@ export default function SettingsScreen() {
         onlineBookingMode: draft.onlineBookingMode, advanceBookingEnabled: draft.advanceBookingEnabled, advanceBookingMonths: draft.advanceBookingMonths,
         allowOnlineCancellation: draft.allowOnlineCancellation,
       });
-      await api.put('/api/calendar-settings', { bookingWindowHours: draft.bookingWindowHours, timeSlotInterval: draft.timeSlotInterval, paddedMinutes: draft.paddedMinutes });
+      await api.put('/api/calendar-settings', { bookingWindowHours: draft.bookingWindowHours, timeSlotInterval: draft.timeSlotInterval, paddedMinutes: draft.paddedMinutes,
+        gapRuleMinutes: draft.gapRuleMinutes < 0 ? null : draft.gapRuleMinutes, gapRuleIncrements: draft.gapRuleIncrements, askHowHeard: draft.askHowHeard });
     });
     if (screen === 'policy') return run(async () => {
       if (draft.cancellationPolicyRequired && !String(draft.cancellationPolicyText).trim()) throw new Error('Write the policy before requiring clients to accept it.');
@@ -579,6 +582,13 @@ export default function SettingsScreen() {
       {/* Padded time (owner, 2026-11-09): extra time saved on the end of every booking, online and in the app. */}
       <Label>Padded time</Label>{withCurrent('paddedMinutes', [0, 15, 30, 45, 60], (value) => (value === 0 ? 'Off' : `${value} min`))}
       <Help>Extra time added to the end of every booking, so you can offer extras. The times clients see include it.</Help>
+      {/* Minimize scheduling gaps (owner, 2026-11-18, GlossGenius). */}
+      <Label>Minimize scheduling gaps</Label>{choices('gapRuleMinutes', [{ value: -1, label: 'Off' }, { value: 0, label: 'Back to back' }, ...([[30, '30 min'], [60, '1 hr'], [90, '1 hr 30 min'], [120, '2 hrs'], [150, '2 hrs 30 min'], [180, '3 hrs']] as const).map(([m, l]) => ({ value: m, label: `Gaps up to ${l}` }))])}
+      <Help>On a day that already has bookings, clients online only see times next to them, so you aren’t left with gaps nobody can book. A day with nothing booked shows every time. Best once your calendar fills; you can still book any time yourself.</Help>
+      {Number(draft.gapRuleMinutes) >= 0 ? toggle('gapRuleIncrements', 'Keep to my booking increments', 'Off: clients can book right when a booking ends (2:15). On: the next increment (2:30), which can leave a small gap.') : null}
+      {/* "How did you hear about us?" (owner, 2026-11-18, GlossGenius client origin survey). */}
+      {toggle('askHowHeard', 'Ask how clients heard about you', 'After a client books online for the first time, your website asks: social media, web search, a friend or other. You can also add it on a booking.')}
+      {draft.askHowHeard && draft.heardSummary?.length ? <Help>{`So far: ${draft.heardSummary.map((a: any) => `${a.source} ${a.count}`).join(' · ')}`}</Help> : null}
 
       <SectionTitle style={styles.section}>Advance booking</SectionTitle>
       {toggle('advanceBookingEnabled', 'Limit how far ahead clients can book', 'Clients can only book online up to the time you choose, counted from today.')}
