@@ -828,16 +828,18 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
             </>
           ) : clientCancelPending ? (
             <>
-              {/* A late cancel: slide to collect the fee or not, then MARK AS NO-SHOW (the deposit request's slider). */}
-              <Text testID="client-cancel-note" style={[styles.refundedNote, { color: colors.foreground }]}>
+              {/* A late cancel: slide to collect the fee or not, then MARK AS NO-SHOW (the deposit request's slider). Its own
+                  bordered card, so it's the first thing the pro sees on the page (owner, 2026-11-18). */}
+              <View testID="late-cancel-card" style={[styles.decisionCard, { backgroundColor: colors.card, borderColor: colors.primary }]}>
+              <Text testID="client-cancel-note" style={[styles.decisionTitle, { color: colors.foreground }]}>
                 {`This booking was cancelled inside your cancellation policy. Mark it as a no-show, with or without the ${feeAsk} fee.`}
               </Text>
               <View style={styles.choiceBlock}>
                 <View style={styles.choiceLabels}>
-                  <Text style={[styles.choiceCaption, { color: noShowChoice === 'left' ? colors.primary : colors.mutedForeground }]}>{`COLLECT FEE · ${feeAsk}`}</Text>
-                  <Text style={[styles.choiceCaption, { color: noShowChoice === 'right' ? colors.accentForeground : colors.mutedForeground }]}>NO FEE</Text>
+                  <Text style={[styles.choiceCaption, styles.strongCaption, { color: noShowChoice === 'left' ? colors.primary : colors.foreground }]}>{`COLLECT FEE · ${feeAsk}`}</Text>
+                  <Text style={[styles.choiceCaption, styles.strongCaption, { color: noShowChoice === 'right' ? colors.accentForeground : colors.foreground }]}>NO FEE</Text>
                 </View>
-                <ChoiceSlider testID="no-show-fee-slider" choice={noShowChoice} onChoice={setNoShowChoice} leftLabel="YES" rightLabel="NO"
+                <ChoiceSlider strong testID="no-show-fee-slider" choice={noShowChoice} onChoice={setNoShowChoice} leftLabel="YES" rightLabel="NO"
                   accessibilityLabel="No-show fee choice" accessibilityHint={`Slide left to collect the ${feeAsk} fee. Slide right for no fee.`} />
                 <Text style={[styles.choiceInstruction, { color: colors.mutedForeground }]}>Slide the handle left for yes or right for no. You can also tap either side.</Text>
               </View>
@@ -855,6 +857,7 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
                   <Text style={[styles.actionText, { color: noShowChoice ? colors.primaryForeground : colors.mutedForeground }]}>{saving ? 'SAVING…' : 'MARK AS NO-SHOW'}</Text>
                 </TouchableOpacity>
               </LinearGradient>
+              </View>
             </>
           ) : closed ? (
             <>
@@ -1124,6 +1127,9 @@ const styles = StyleSheet.create({
   textActionText: { fontSize: 17, fontFamily: 'Inter_500Medium' },
   refundedNote: { fontSize: 15, fontFamily: 'Inter_500Medium', textAlign: 'center', marginTop: 14 },
   choiceBlock: { marginTop: 20 },
+  decisionCard: { borderWidth: 2, borderRadius: 22, padding: 18, marginTop: 18, ...cardShadow, shadowOpacity: 0.16, shadowRadius: 18, elevation: 6 },
+  decisionTitle: { fontSize: 18, lineHeight: 25, fontFamily: 'Inter_700Bold', textAlign: 'center' },
+  strongCaption: { fontSize: 15, letterSpacing: 0.9 },
   noticeBackdrop: { flex: 1, backgroundColor: 'rgba(17, 12, 34, 0.45)', alignItems: 'center', justifyContent: 'center', padding: 18 },
   noticeCard: { width: '100%', maxWidth: 460, borderRadius: 22, padding: 24 },
   noticeTitle: { fontSize: 25, fontFamily: 'Inter_700Bold', marginBottom: 12 },

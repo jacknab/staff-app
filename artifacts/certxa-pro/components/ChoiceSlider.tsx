@@ -10,7 +10,7 @@ export type SliderSide = 'left' | 'right';
  * The two-way slider (first used for the deposit request when booking): slide the handle left or right, or tap a
  * side, to choose; the button below it then acts on the choice. Shared so every yes/no choice in the app looks the same.
  */
-export function ChoiceSlider({ choice, onChoice, leftLabel, rightLabel, accessibilityLabel, accessibilityHint, testID }: {
+export function ChoiceSlider({ choice, onChoice, leftLabel, rightLabel, accessibilityLabel, accessibilityHint, testID, strong }: {
   choice: SliderSide | null;
   onChoice: (choice: SliderSide) => void;
   leftLabel: string;
@@ -18,6 +18,8 @@ export function ChoiceSlider({ choice, onChoice, leftLabel, rightLabel, accessib
   accessibilityLabel: string;
   accessibilityHint: string;
   testID?: string;
+  /** Larger, dark labels, for a choice the page is built around (the late-cancel fee). */
+  strong?: boolean;
 }) {
   const colors = useColors();
   const offset = useRef(new Animated.Value(0)).current;
@@ -50,13 +52,13 @@ export function ChoiceSlider({ choice, onChoice, leftLabel, rightLabel, accessib
   return (
     <View testID={testID} style={[styles.choiceSlider, { backgroundColor: colors.muted, borderColor: colors.border }]} onLayout={(event) => { maxTravel.current = Math.max(0, event.nativeEvent.layout.width / 2 - 31); }}>
       <TouchableOpacity testID={testID ? `${testID}-left` : undefined} accessibilityRole="button" accessibilityState={{ selected: choice === 'left' }} onPress={() => { onChoice('left'); animateTo('left'); }} style={styles.sliderSide}>
-        <Text style={[styles.sliderLabel, { color: choice === 'left' ? colors.primary : colors.mutedForeground }]}>{leftLabel}</Text>
+        <Text style={[styles.sliderLabel, strong && styles.strongLabel, { color: choice === 'left' ? colors.primary : strong ? colors.foreground : colors.mutedForeground }]}>{leftLabel}</Text>
       </TouchableOpacity>
       <View style={styles.sliderCenter} pointerEvents="none">
         <View style={[styles.sliderRail, { backgroundColor: choice === 'left' ? colors.primary : choice === 'right' ? colors.accentForeground : colors.border }]} />
       </View>
       <TouchableOpacity testID={testID ? `${testID}-right` : undefined} accessibilityRole="button" accessibilityState={{ selected: choice === 'right' }} onPress={() => { onChoice('right'); animateTo('right'); }} style={styles.sliderSide}>
-        <Text style={[styles.sliderLabel, { color: choice === 'right' ? colors.accentForeground : colors.mutedForeground }]}>{rightLabel}</Text>
+        <Text style={[styles.sliderLabel, strong && styles.strongLabel, { color: choice === 'right' ? colors.accentForeground : strong ? colors.foreground : colors.mutedForeground }]}>{rightLabel}</Text>
       </TouchableOpacity>
       <Animated.View
         {...responder.panHandlers}
@@ -76,6 +78,7 @@ const styles = StyleSheet.create({
   choiceSlider: { height: 62, borderWidth: 1, borderRadius: 31, flexDirection: 'row', alignItems: 'center', position: 'relative', overflow: 'hidden' },
   sliderSide: { flex: 1, height: '100%', alignItems: 'center', justifyContent: 'center' },
   sliderLabel: { fontSize: 14, letterSpacing: 1.2, fontFamily: 'Inter_700Bold' },
+  strongLabel: { fontSize: 18, letterSpacing: 1.4 },
   sliderCenter: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
   sliderRail: { width: 2, height: 22, borderRadius: 1 },
   sliderThumb: { position: 'absolute', left: '50%', marginLeft: -28, top: 2, width: 54, height: 56, borderRadius: 28, borderWidth: 1, alignItems: 'center', justifyContent: 'center', elevation: 2 },
