@@ -8,7 +8,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Feather } from '@expo/vector-icons';
-import { ActivityIndicator, Animated, Platform, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Animated, Modal, Platform, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
@@ -52,23 +52,11 @@ export default function HomeScreen() {
     return () => clearInterval(timer);
   }, []);
 
-  const [tab, setTab] = useState<'upcoming' | 'past'>('upcoming');
-  // The last 30 days, newest first (Past 30 days tab): paid, cancelled, no-shows and the rest.
-  const [past, setPast] = useState<Ticket[]>([]);
-  const [pastLoading, setPastLoading] = useState(false);
-  const [pastError, setPastError] = useState('');
-  const loadPast = useCallback(async () => {
-    setPastLoading(true); setPastError('');
-    try {
-      const to = new Date();
-      const from = new Date(to.getTime() - 30 * 86_400_000);
-      const rows = await api.get<Ticket[]>(`/api/appointments?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}${ownStaffId ? `&staffId=${ownStaffId}` : ''}`);
-      setPast((Array.isArray(rows) ? rows : []).filter((t) => !t.calendarHidden || t.status === 'cancelled').sort((a, b) => +new Date(b.date) - +new Date(a.date)));
-    } catch (cause) {
-      setPastError(cause instanceof Error ? cause.message : 'Could not load the last 30 days.');
-    } finally { setPastLoading(false); }
-  }, [ownStaffId]);
-  useEffect(() => { if (tab === 'past') void loadPast(); }, [tab, loadPast]);
+  // The ⋮ menu at the top right (owner, 2026-11-18): quick links, starting with Past 30 days.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const quickLinks: { key: string; label: string; href: Href }[] = [
+    { key: 'past', label: 'Past 30 days', href: '/past-bookings' as Href },
+  ];
 
   const load = useCallback(async () => {
     setError('');
@@ -137,20 +125,22 @@ export default function HomeScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: look.pageTop }}>
       <AppBackground />
-    <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.content, { paddingTop: topInset + 12 }]}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load(); void loadAttention(); if (tab === 'past') void loadPast(); }} tintColor={colors.primary} />}>
-      <View style={styles.headRow}>
-        <View style={{ flex: 1 }}>
-          <HelpTitle help="home" style={[styles.date, { color: colors.primary }]}>{zonedDateLabel(now, timeZone).toUpperCase()}</HelpTitle>
-          {/* Two tabs instead of the greeting (owner, 2026-11-18): what's coming up, and the last 30 days. */}
-          <View style={[styles.segmentedControl, { borderColor: colors.border, backgroundColor: colors.card }]}>
-            {([['upcoming', 'Upcoming'], ['past', 'Past 30 days']] as const).map(([key, label]) => (
-              <TouchableOpacity key={key} testID={`home-tab-${key}`} accessibilityRole="button" accessibilityState={{ selected: tab === key }}
-                onPress={() => setTab(key)} style={[styles.segment, tab === key && { backgroundColor: colors.primary }]}>
-                <Text style={[styles.segmentText, { color: tab === key ? colors.primaryForeground : colors.mutedForeground }]}>{label}</Text>
+      <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
+        <TouchableOpacity activeOpacity={1} onPress={() => setMenuOpen(false)} style={styles.menuBackdrop} accessibilityLabel="Close menu">
+          <View testID="home-menu-list" style={[styles.menu, { top: topInset + 50, backgroundColor: colors.card, borderColor: colors.border }]}>
+            {quickLinks.map((link) => (
+              <TouchableOpacity key={link.key} testID={`home-menu-${link.key}`} onPress={() => { setMenuOpen(false); router.push(link.href); }} style={styles.menuItem}>
+                <Text style={[styles.menuText, { color: colors.foreground }]}>{link.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
+        </TouchableOpacity>
+      </Modal>
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.content, { paddingTop: topInset + 12 }]}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load(); void loadAttention(); }} tintColor={colors.primary} />}>
+      <View style={styles.headRow}>
+        <View style={{ flex: 1 }}>
+          <HelpTitle help="home" style={[styles.date, { color: colors.primary }]}>{zonedDateLabel(now, timeZone).toUpperCase()}</HelpTitle>
         </View>
         {/* Inbox: messages clients send from the website, with the count not read yet (app/inbox). */}
         <TouchableOpacity onPress={() => router.push('/inbox' as Href)} style={styles.inboxButton} testID="home-inbox"
@@ -162,9 +152,11 @@ export default function HomeScreen() {
             </View>
           ) : null}
         </TouchableOpacity>
+        <TouchableOpacity onPress={() => setMenuOpen(true)} style={styles.inboxButton} testID="home-menu" accessibilityLabel="More">
+          <Feather name="more-vertical" size={24} color={colors.foreground} />
+        </TouchableOpacity>
       </View>
 
-      {tab === 'past' ? <PastBookings tickets={past} loading={pastLoading} error={pastError} timeZone={timeZone} onOpen={(id) => router.push(`/appointment/${id}`)} /> : <>
       <View style={[styles.takings, { backgroundColor: colors.primary }]} testID="home-takings">
         <Text style={[styles.takingsLabel, { color: colors.primaryForeground }]}>Taken today</Text>
         <Text style={[styles.takingsValue, { color: colors.primaryForeground }]}>{loading ? '—' : money(takenCents)}</Text>
@@ -264,7 +256,6 @@ export default function HomeScreen() {
           </View>
         </View>
       ))}
-      </>}
     </ScrollView>
     </View>
   );
@@ -274,10 +265,11 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: 20, paddingBottom: 120 },
   dayLabel: { fontSize: 15, fontFamily: 'Inter_600SemiBold', marginTop: 14, marginBottom: 8 },
   date: { fontSize: 14, letterSpacing: 1.2, fontFamily: 'Inter_700Bold' },
-  headRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  segmentedControl: { flexDirection: 'row', alignSelf: 'flex-start', borderWidth: 1, borderRadius: 9, padding: 2, marginTop: 10 },
-  segment: { paddingVertical: 9, paddingHorizontal: 16, borderRadius: 7, alignItems: 'center' },
-  segmentText: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
+  headRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 4 },
+  menuBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.08)' },
+  menu: { position: 'absolute', right: 14, minWidth: 240, maxWidth: 320, borderWidth: 1, borderRadius: 14, paddingVertical: 6, ...cardShadow },
+  menuItem: { paddingHorizontal: 16, paddingVertical: 13 },
+  menuText: { fontSize: 17, fontFamily: 'Inter_500Medium' },
   inboxButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
   inboxBadge: { position: 'absolute', top: 2, right: 0, minWidth: 20, height: 20, borderRadius: 10, borderWidth: 2, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center' },
   inboxBadgeText: { color: '#FFFFFF', fontSize: 13, fontFamily: 'Inter_700Bold' },
@@ -322,51 +314,5 @@ function BreathingDot() {
     <Animated.View style={[styles.dot, { backgroundColor: '#EC4899',
       opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 0.4] }),
       transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.5] }) }] }]} />
-  );
-}
-
-/** Past 30 days: every booking, newest first, by day, with how it ended. */
-function PastBookings({ tickets, loading, error, timeZone, onOpen }: { tickets: Ticket[]; loading: boolean; error: string; timeZone: string; onOpen: (id: number) => void }) {
-  const colors = useColors();
-  const card = { backgroundColor: colors.card, borderColor: colors.border };
-  const days = useMemo(() => {
-    const groups: { label: string; items: Ticket[] }[] = [];
-    for (const t of tickets) {
-      const label = zonedDateLabel(t.date, timeZone);
-      const last = groups[groups.length - 1];
-      if (last && last.label === label) last.items.push(t); else groups.push({ label, items: [t] });
-    }
-    return groups;
-  }, [tickets, timeZone]);
-  if (loading && tickets.length === 0) return <ActivityIndicator style={{ marginTop: 24 }} color={colors.primary} />;
-  if (error) return <Text style={[styles.rowSub, { color: colors.destructive, marginTop: 16 }]}>{error}</Text>;
-  if (days.length === 0) return <View style={[styles.empty, card, { marginTop: 16 }]}><Feather name="clock" size={20} color={colors.mutedForeground} /><Text style={[styles.rowSub, { color: colors.mutedForeground }]}>No bookings in the last 30 days.</Text></View>;
-  return (
-    <View testID="home-past">
-      {days.map((group) => (
-        <View key={group.label}>
-          <Text style={[styles.dayLabel, { color: colors.mutedForeground }]}>{group.label}</Text>
-          <View style={[styles.list, card]}>
-            {group.items.map((t, index) => {
-              const done = isPaid(t);
-              const text = done ? 'Paid' : t.status === 'completed' ? 'Completed' : STATUS_TEXT[String(t.status)] ?? 'Booked';
-              return (
-                <TouchableOpacity key={t.id} testID={`home-past-${t.id}`} onPress={() => onOpen(t.id)}
-                  style={[styles.row, index > 0 ? { borderTopColor: colors.border, borderTopWidth: StyleSheet.hairlineWidth } : null]}>
-                  <Text style={[styles.rowTime, { color: colors.foreground }]}>{zonedTimeLabel(t.date, timeZone)}</Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.rowTitle, { color: colors.foreground }]} numberOfLines={1}>{clientName(t)}</Text>
-                    <Text style={[styles.rowSub, { color: colors.mutedForeground }]} numberOfLines={1}>{t.service?.name || 'Appointment'}</Text>
-                  </View>
-                  <View style={[styles.pill, { backgroundColor: done ? colors.secondary : t.status === 'no_show' || t.status === 'cancelled' ? colors.accent : colors.muted }]}>
-                    <Text style={[styles.pillText, { color: done ? colors.secondaryForeground : t.status === 'no_show' || t.status === 'cancelled' ? colors.accentForeground : colors.mutedForeground }]}>{text}</Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-      ))}
-    </View>
   );
 }

@@ -42,7 +42,7 @@ export const HELP: Record<string, HelpPage> = {
     intro: 'Your day at a glance, in your business’s time zone.',
     sections: [
       { heading: 'At the top', points: [
-        'Today’s date, then two tabs: Upcoming (this page) and Past 30 days (every booking from the last 30 days, newest first, with how it ended: Paid, Completed, Cancelled or No-show; tap one to open it).',
+        'Today’s date. The ⋮ button at the top right opens quick links: Past 30 days (every booking from the last 30 days, newest first).',
         'The envelope opens your Inbox (messages clients send from your website). A number on it shows how many are new.',
       ] },
       { heading: 'Taken today', points: ['What you’ve been paid today, how many visits are paid, and how many appointments are still to go.'] },
@@ -59,6 +59,13 @@ export const HELP: Record<string, HelpPage> = {
         'Calendar opens the calendar to see other days.',
       ] },
       { heading: 'Tip', points: ['Pull down to refresh.'] },
+    ],
+  },
+  pastBookings: {
+    title: 'Past 30 days',
+    intro: 'Every booking from the last 30 days, newest first, by day. Open it from Home › ⋮.',
+    sections: [
+      { heading: 'Each booking', points: ['Its time, the client and the service, and how it ended: Paid, Completed (done, not paid), Cancelled or No-show. Booked means it was never checked out or closed. Tap one to open it.'] },
     ],
   },
   calendar: {
@@ -130,7 +137,7 @@ export const HELP: Record<string, HelpPage> = {
         'Memberships: what’s left this period, when it renews or ends, Cancel membership, and Add membership (charge the card on file or send a link to join).',
       ] },
       { heading: 'Visits', points: ['Upcoming, Past visits and Cancelled, each with its status. Tap one to open it. Show all lists every one.'] },
-      { heading: 'Credit & referrals', points: ['The credit they can use at checkout, who referred them and who they referred. Referred by (once, while Referrals is on) saves who sent them and gives them their credit.'] },
+      { heading: 'Credit & referrals', points: ['The credit they can use at checkout, who referred them and who they referred. Referred by (once, while Referrals is on) saves who sent them and gives them their credit. Share referral link sends them their own link to give friends.'] },
       { heading: 'Forms', points: ['The forms and waivers they filled in (tap View to read their answers and signature), and links sent but not filled in yet (Send again, or Fill in here to open it on your phone). Send a form sends one of your forms.'] },
       { heading: 'Notes and photos', points: [
         'Notes: the newest notes, pinned ones first. Add or see all opens every note; Pin note keeps one at the top.',
@@ -678,7 +685,7 @@ export const HELP: Record<string, HelpPage> = {
     title: 'Referrals',
     intro: 'Reward clients who send you a friend.',
     sections: [
-      { heading: 'Your reward', points: ['Reward referrals turns it on. Set the credit for the client who referred and for the new client, then tap Save.', 'On a new client’s profile, choose Referred by. The new client gets their credit at once; the client who referred them gets theirs after the new client’s first paid visit (you get a notification).', 'Credit is used at checkout with Use credit.'] },
+      { heading: 'Your reward', points: ['Reward referrals turns it on. Set the credit for the client who referred and for the new client, then tap Save.', 'Every client has a personal referral link: Share referral link on their profile, and Refer a friend under My bookings on your website. A new client who books through it is saved as referred by them by itself. Referred by on a new client’s profile is for a friend who calls or walks in. The new client gets their credit at once; the client who referred them gets theirs after the new client’s first paid visit (you get a notification).', 'Credit is used at checkout with Use credit.'] },
       { heading: 'Referrals', points: ['Every referral, and whether both have been rewarded. Tap one to open the new client.'] },
     ],
   },
