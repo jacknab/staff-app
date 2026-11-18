@@ -116,7 +116,6 @@ export default function ClientsScreen() {
             <TouchableOpacity disabled={saving} testID="save-client" onPress={saveClient} style={[styles.saveButton, { backgroundColor: colors.primary }]}><Text style={[styles.saveText, { color: colors.primaryForeground }]}>{saving ? 'Saving…' : 'Save client'}</Text></TouchableOpacity>
           </View>
         )}
-        <View style={styles.countLine}><Text style={[styles.sectionTitle, { color: colors.foreground }]}>{FILTERS.find((f) => f.key === filter)?.key === 'all' ? 'All clients' : FILTERS.find((f) => f.key === filter)?.label}</Text><Text style={[styles.count, { color: colors.mutedForeground }]}>{filtered.length}</Text></View>
       </View>
       <ScrollView contentContainerStyle={styles.listContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={styles.clientList}>
@@ -147,7 +146,7 @@ export default function ClientsScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  fixedHeader: { paddingHorizontal: 20, paddingTop: 16 },
+  fixedHeader: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12 },
   listContent: { paddingHorizontal: 20, paddingTop: 2, paddingBottom: 120 },
   detailContent: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 100 },
   topLine: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
@@ -157,9 +156,6 @@ const styles = StyleSheet.create({
   addButton: { width: 42, height: 42, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   searchBox: { height: 48, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 10 },
   searchInput: { flex: 1, fontSize: 16, fontFamily: 'Inter_400Regular', paddingVertical: 0 },
-  countLine: { flexDirection: 'row', alignItems: 'center', gap: 9, marginTop: 22, marginBottom: 10 },
-  sectionTitle: { fontSize: 18, fontFamily: 'Inter_600SemiBold' },
-  count: { fontSize: 14, fontFamily: 'Inter_500Medium' },
   clientList: { gap: 9 },
   clientRow: { minHeight: 70, borderWidth: 1, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 11, flexDirection: 'row', alignItems: 'center', gap: 11, ...cardShadow },
   avatar: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },

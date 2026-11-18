@@ -157,20 +157,25 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
-      <View style={[styles.takings, { backgroundColor: colors.primary }]} testID="home-takings">
-        <Text style={[styles.takingsLabel, { color: colors.primaryForeground }]}>Taken today</Text>
-        <Text style={[styles.takingsValue, { color: colors.primaryForeground }]}>{loading ? '—' : money(takenCents)}</Text>
-        <Text style={[styles.takingsSub, { color: colors.primaryForeground }]}>
+      {/* Taken today on a light purple card (owner, 2026-11-18), with Set a goal in its corner. */}
+      <View style={[styles.takings, { backgroundColor: look.tile, borderColor: look.cardBorder }]} testID="home-takings">
+        <View style={styles.takingsTop}>
+          <Text style={[styles.takingsLabel, { color: colors.primary }]}>Taken today</Text>
+          <TouchableOpacity testID="home-set-goal" onPress={() => router.push('/revenue-goal' as Href)} style={[styles.goalButton, { backgroundColor: colors.card, borderColor: look.cardBorder }]}>
+            <Text style={[styles.goalButtonText, { color: colors.primary }]}>Set a goal</Text>
+          </TouchableOpacity>
+        </View>
+        <Text style={[styles.takingsValue, { color: look.heading }]}>{loading ? '—' : money(takenCents)}</Text>
+        <Text style={[styles.takingsSub, { color: colors.mutedForeground }]}>
           {paid.length} paid {paid.length === 1 ? 'visit' : 'visits'} · {left} {left === 1 ? 'appointment' : 'appointments'} still to go
         </Text>
       </View>
 
-      {goal ? (
+      {/* The weekly goal's progress, once one is set (set or change it with Set a goal). */}
+      {goal && goal.goalCents > 0 ? (
         <TouchableOpacity testID="home-goal" onPress={() => router.push('/revenue-goal' as Href)} style={[styles.next, card]}>
-          {goal.goalCents > 0 ? <>
-            <Text style={[styles.goalTitle, { color: colors.foreground }]}>{`Weekly goal · ${money(goal.week.cents)} of ${money(goal.goalCents)}`}</Text>
-            <View style={[styles.goalTrack, { backgroundColor: colors.muted }]}><View style={[styles.goalFill, { backgroundColor: colors.primary, width: `${Math.min(100, Math.round((goal.week.cents / goal.goalCents) * 100))}%` }]} /></View>
-          </> : <Text style={[styles.link, { color: colors.primary }]}>Set a weekly revenue goal</Text>}
+          <Text style={[styles.goalTitle, { color: colors.foreground }]}>{`Weekly goal · ${money(goal.week.cents)} of ${money(goal.goalCents)}`}</Text>
+          <View style={[styles.goalTrack, { backgroundColor: colors.muted }]}><View style={[styles.goalFill, { backgroundColor: colors.primary, width: `${Math.min(100, Math.round((goal.week.cents / goal.goalCents) * 100))}%` }]} /></View>
         </TouchableOpacity>
       ) : null}
 
@@ -217,10 +222,17 @@ export default function HomeScreen() {
 
       {nextUp ? (
         <TouchableOpacity testID="home-next-up" onPress={() => router.push(`/appointment/${nextUp.id}`)} style={[styles.next, card]}>
-          <Text style={[styles.eyebrow, { color: colors.primary }]}>NEXT UP</Text>
-          <Text style={[styles.nextTime, { color: colors.foreground }]}>{zonedTimeLabel(nextUp.date, timeZone)}</Text>
-          <Text style={[styles.rowTitle, { color: colors.foreground }]}>{clientName(nextUp)}</Text>
-          <Text style={[styles.rowSub, { color: colors.mutedForeground }]}>{nextUp.service?.name || 'Appointment'} · {Number(nextUp.duration ?? 60)} min</Text>
+          {/* NEXT UP and the time on the left, the client and service on the right (owner, 2026-11-18). */}
+          <View style={styles.nextRow}>
+            <View>
+              <Text style={[styles.nextLabel, { color: colors.primary }]}>NEXT UP</Text>
+              <Text style={[styles.nextTime, { color: colors.foreground }]}>{zonedTimeLabel(nextUp.date, timeZone)}</Text>
+            </View>
+            <View style={styles.nextWho}>
+              <Text style={[styles.rowTitle, { color: colors.foreground, textAlign: 'right' }]} numberOfLines={1}>{clientName(nextUp)}</Text>
+              <Text style={[styles.rowSub, { color: colors.mutedForeground, textAlign: 'right' }]} numberOfLines={2}>{nextUp.service?.name || 'Appointment'} · {Number(nextUp.duration ?? 60)} min</Text>
+            </View>
+          </View>
         </TouchableOpacity>
       ) : null}
 
@@ -274,10 +286,16 @@ const styles = StyleSheet.create({
   inboxBadge: { position: 'absolute', top: 2, right: 0, minWidth: 20, height: 20, borderRadius: 10, borderWidth: 2, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center' },
   inboxBadgeText: { color: '#FFFFFF', fontSize: 13, fontFamily: 'Inter_700Bold' },
   title: { fontSize: 34, fontFamily: 'Inter_700Bold', letterSpacing: -0.7, marginTop: 4 },
-  takings: { borderRadius: 20, padding: 18, marginTop: 20 },
-  takingsLabel: { fontSize: 15, fontFamily: 'Inter_600SemiBold', opacity: 0.85 },
+  takings: { borderRadius: 20, borderWidth: 1, padding: 18, marginTop: 20 },
+  takingsTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  goalButton: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
+  goalButtonText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  nextRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 14 },
+  nextWho: { flex: 1, alignItems: 'flex-end' },
+  nextLabel: { fontSize: 15, letterSpacing: 1.2, fontFamily: 'Inter_700Bold' },
+  takingsLabel: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
   takingsValue: { fontSize: 32, fontFamily: 'Inter_700Bold', marginTop: 4, letterSpacing: -0.5 },
-  takingsSub: { fontSize: 15, fontFamily: 'Inter_500Medium', marginTop: 6, opacity: 0.85 },
+  takingsSub: { fontSize: 15, fontFamily: 'Inter_500Medium', marginTop: 6 },
   next: { borderWidth: 1, borderRadius: 18, padding: 16, marginTop: 14 },
   goalTitle: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
   goalTrack: { height: 8, borderRadius: 4, marginTop: 10, overflow: 'hidden' },
