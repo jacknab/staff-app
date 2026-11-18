@@ -45,7 +45,7 @@ import { look, cardShadow } from '@/components/look/tokens';
 // Stripe M2 does not require that Apple entitlement.
 const TAP_TO_PAY_ENABLED = true;
 // Shown on the payment screen so a tester can tell which build is installed.
-const BUILD_LABEL = 'Build Nov 18 · G';
+const BUILD_LABEL = 'Build Nov 18 · H';
 const EXPO_GO_PREVIEW = process.env.EXPO_PUBLIC_EXPO_GO_PREVIEW === '1';
 
 type PaymentStep = 'idle' | 'tap_intro' | 'initializing' | 'discovering' | 'connecting' | 'ready' | 'processing' | 'capture_pending' | 'success' | 'error';
@@ -929,9 +929,12 @@ export default function CheckoutScreen() {
           <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.tapContent, { flexGrow: 1, paddingBottom: insets.bottom + 84 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
              {isTapIntro ? null : <View style={[styles.nfcCircle, { backgroundColor: isReady || isCapturePending ? colors.secondary : colors.muted }]}><Feather name={isCapturePending ? 'alert-circle' : isReady ? 'radio' : 'loader'} size={32} color={isReady || isCapturePending ? colors.primary : colors.mutedForeground} /></View>}
              <Text style={[styles.tapTitle, { color: colors.foreground }]}>{isCapturePending ? 'Payment needs finalizing' : isTapIntro ? 'Take payment' : isReady ? 'Ready for payment' : `Connecting ${readerMode === 'm2' ? 'Stripe M2' : 'Tap to Pay'}`}</Text>
-             <Text style={[styles.tapSub, { color: colors.mutedForeground }]}>{error || (isTapIntro ? 'Card, cash or gift card.' : statusText)}</Text>
+             {/* Hidden on checkout (owner, 2026-11-18): the line under "Take payment" (error or "Card, cash or gift card."). Remove this comment to bring it back.
+             <Text style={[styles.tapSub, { color: colors.mutedForeground }]}>{error || (isTapIntro ? 'Card, cash or gift card.' : statusText)}</Text> */}
             <View style={[styles.amountCard, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.eyebrow, { color: colors.mutedForeground }]}>AMOUNT DUE</Text><Text style={[styles.tapAmount, { color: colors.foreground }]}>{dollars(digits)}</Text><Text style={[styles.serviceLabel, { color: colors.mutedForeground }]}>{clientName.trim() || 'Certxa appointment'} · {isQuickSale ? String(params.serviceName || 'Quick sale') : `Appointment #${appointmentId || '—'}`}</Text></View>
-            {error ? <View style={[styles.errorNotice, { backgroundColor: colors.accent }]}><Feather name="alert-circle" size={17} color={colors.accentForeground} /><Text style={[styles.previewText, { color: colors.accentForeground }]}>{error}</Text></View> : null}
+            {/* Hidden on checkout (owner, 2026-11-18): the error box. Remove this comment to bring it back.
+            {error ? <View style={[styles.errorNotice, { backgroundColor: colors.accent }]}><Feather name="alert-circle" size={17} color={colors.accentForeground} /><Text style={[styles.previewText, { color: colors.accentForeground }]}>{error}</Text></View> : null} */}
+             {/* Hidden on checkout (owner, 2026-11-18): Discount (with promo code). Remove this comment to bring it back.
              {isTapIntro && baseCentsParam > 0 ? <View testID="discount-block" style={[styles.formField, { width: '100%', marginTop: 16 }]}>
                <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Discount{discountCents > 0 ? <Text style={{ color: colors.primary }}>{` · −${dollars(String(discountCents))}`}</Text> : null}</Text>
                {promo ? (
@@ -953,7 +956,7 @@ export default function CheckoutScreen() {
                  <TouchableOpacity testID="promo-apply" disabled={promoBusy || promoInput.length < 3} onPress={() => void applyPromo(promoInput, productCents)} style={[styles.registerButton, { backgroundColor: promoInput.length >= 3 ? colors.secondary : colors.muted }]}><Text style={[styles.registerButtonText, { color: promoInput.length >= 3 ? colors.primary : colors.mutedForeground }]}>{promoBusy ? 'Checking…' : 'Apply'}</Text></TouchableOpacity>
                </View> : null}
                </>}
-             </View> : null}
+             </View> : null} */}
              {isTapIntro && !isQuickSale && Number(appointmentId) > 0 && (catalog.length > 0 || products.length > 0) ? <View testID="products-block" style={[styles.formField, { width: '100%', marginTop: 16 }]}>
                <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Products{productCents > 0 ? <Text style={{ color: colors.primary }}>{` · ${dollars(String(productCents))}`}</Text> : null}</Text>
                {products.map((l, i) => (
@@ -968,6 +971,7 @@ export default function CheckoutScreen() {
                  options={catalog.filter((p) => !products.some((l) => l.productId === p.id)).map((p) => ({ value: p.id, label: `${p.name} · ${dollars(String(p.priceCents))}${p.stock != null ? ` · ${p.stock} in stock` : ''}` }))}
                  onChange={(productId) => { const p = catalog.find((x) => x.id === productId); if (p) void saveProducts([...products, { productId: p.id, name: p.name, priceCents: p.priceCents, quantity: 1 }]); }} /> : null}
              </View> : null}
+             {/* Hidden on checkout (owner, 2026-11-18): Custom charges. Remove this comment to bring it back.
              {isTapIntro && !isQuickSale && Number(appointmentId) > 0 && creditPaidCents === 0 && giftPaidCents === 0 && cashPartCents === 0 ? <View testID="charges-block" style={[styles.formField, { width: '100%', marginTop: 16 }]}>
                <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Custom charges{chargesCents > 0 ? <Text style={{ color: colors.primary }}>{` · ${dollars(String(chargesCents))}`}</Text> : null}</Text>
                {charges.map((c) => (
@@ -983,13 +987,14 @@ export default function CheckoutScreen() {
                    <TouchableOpacity testID="charge-save" disabled={chargeBusy} onPress={() => void addCharge()} style={[styles.registerButton, { backgroundColor: colors.secondary }]}><Text style={[styles.registerButtonText, { color: colors.primary }]}>{chargeBusy ? 'Adding…' : 'Add'}</Text></TouchableOpacity>
                  </View>
                </> : <TouchableOpacity testID="charge-open" onPress={() => { setError(''); setChargeOpen(true); }} style={{ alignSelf: 'flex-start', paddingVertical: 6 }}><Text style={[styles.registerButtonText, { color: colors.primary }]}>Add a custom charge</Text></TouchableOpacity>}
-             </View> : null}
+             </View> : null} */}
              {isTapIntro && creditPaidCents > 0 ? <Text testID="credit-paid-line" style={[styles.fieldLabel, { width: '100%', marginTop: 12, color: colors.foreground }]}>{`Credit used · −${dollars(String(creditPaidCents))}`}</Text> : null}
              {isTapIntro && giftPaidCents > 0 ? <Text testID="gift-paid-line" style={[styles.fieldLabel, { width: '100%', marginTop: 12, color: colors.foreground }]}>{`Gift card paid · −${dollars(String(giftPaidCents))}`}</Text> : null}
              {isTapIntro && cashPartCents > 0 ? <Text testID="cash-part-line" style={[styles.fieldLabel, { width: '100%', marginTop: 12, color: colors.foreground }]}>{`Cash taken · −${dollars(String(cashPartCents))}`}</Text> : null}
              {isTapIntro && depositCents > 0 ? <Text testID="deposit-line" style={[styles.fieldLabel, { width: '100%', marginTop: 12, color: colors.foreground }]}>{`Deposit already paid · −${dollars(String(depositCents))}`}</Text> : null}
              {isTapIntro && taxCents > 0 ? <Text testID="sales-tax-line" style={[styles.fieldLabel, { width: '100%', marginTop: 12, color: colors.foreground }]}>{`Sales tax (${(tax.rate * 100).toFixed(2).replace(/\.?0+$/, '')}%) · ${dollars(String(taxCents))}`}</Text> : null}
              {isTapIntro && feeCents > 0 ? <Text testID="platform-fee-line" style={[styles.fieldLabel, { width: '100%', marginTop: 12, color: colors.foreground }]}>{`Platform fee (${(feeRate * 100).toFixed(2).replace(/\.?0+$/, '')}%) · ${dollars(String(feeCents))}`}</Text> : null}
+             {/* Hidden on checkout (owner, 2026-11-18): New Stripe M2 setup. Remove this comment to bring it back.
              {isTapIntro && !cardsOff ? <View testID="m2-registration-intro" style={[styles.formField, { width: '100%', marginTop: 18 }]}>
                <Text style={[styles.fieldLabel, { color: colors.foreground }]}>New Stripe M2 setup <Text style={{ color: colors.mutedForeground }}>(one time)</Text></Text>
                <View style={styles.registrationRow}>
@@ -997,7 +1002,7 @@ export default function CheckoutScreen() {
                <TouchableOpacity disabled={isRegisteringReader || !registrationCode.trim()} onPress={registerM2Reader} style={[styles.registerButton, { backgroundColor: registrationCode.trim() ? colors.secondary : colors.muted }]} testID="register-m2"><Text style={[styles.registerButtonText, { color: registrationCode.trim() ? colors.primary : colors.mutedForeground }]}>{isRegisteringReader ? 'Registering…' : 'Register'}</Text></TouchableOpacity>
                </View>
                {readerSetupText ? <Text style={[styles.setupText, { color: colors.primary }]}>{readerSetupText}</Text> : null}
-             </View> : null}
+             </View> : null} */}
              {!isTapIntro ? <TouchableOpacity disabled={(!isReady && !isCapturePending && !isTapIntro) || isBusy || (isTapIntro && cardsOff)} testID={isTapIntro ? 'start-tap-to-pay' : isCapturePending ? 'retry-capture' : 'accept-payment'} onPress={isTapIntro ? () => startCard('tap_to_pay') : isCapturePending ? retryCapture : processPayment} style={[styles.primaryButton, { backgroundColor: (isReady || isCapturePending || (isTapIntro && !cardsOff)) && !isBusy ? colors.primary : colors.muted }]}><Feather name={isTapIntro ? 'radio' : isCapturePending ? 'refresh-cw' : 'radio'} size={19} color={(isReady || isCapturePending || (isTapIntro && !cardsOff)) && !isBusy ? colors.primaryForeground : colors.mutedForeground} /><Text style={[styles.primaryButtonText, { color: (isReady || isCapturePending || (isTapIntro && !cardsOff)) && !isBusy ? colors.primaryForeground : colors.mutedForeground }]}>{isBusy ? (step === 'processing' ? 'Payment in progress…' : 'Preparing…') : isTapIntro ? 'Start Tap to Pay' : isCapturePending ? 'Retry capture' : 'Accept payment'}</Text></TouchableOpacity> : null}
              {/* How the client pays (owner, 2026-11-17): one list of the ways to pay, then Split payment. */}
              {isTapIntro ? <View testID="payment-methods" style={[styles.payList, { backgroundColor: colors.card, borderColor: colors.border }]}>
