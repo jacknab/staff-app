@@ -3,7 +3,7 @@
     "name": "Certxa Pro",
     "slug": "certxa-pro",
     "version": "1.0.9",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "certxa-pro",
     "userInterfaceStyle": "light",

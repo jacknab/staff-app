@@ -21,6 +21,7 @@ import { Redirect, Stack, usePathname, useRouter, type Href } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen';
 import { BookingProvider, useBookingData } from '@/contexts/BookingContext';
 import { TabletFrame } from '@/components/TabletFrame';
+import { setScreenTurning } from '@/lib/orientation';
 import { onBookingPush, registerForBookingPushes } from '@/lib/push';
 import { setInboxLive } from '@/lib/inboxLive';
 import { prepareVoice, registerBusinessPhone } from '@/lib/voice';
@@ -184,6 +185,9 @@ function RootLayoutNav() {
     </PaymentsAttentionFrame>
   );
 }
+
+// Tablets turn with the device; phones stay upright (lib/orientation.ts).
+setScreenTurning();
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
