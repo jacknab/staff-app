@@ -160,11 +160,12 @@ export const HELP: Record<string, HelpPage> = {
         'Forms: the forms and waivers this visit needs — filled in (View), sent and waiting, or not sent. Send e-mails the link (or texts it when there’s no e-mail); Fill in here opens the form on your phone for the client. Send another form sends any of your other forms.',
       ] },
       { heading: 'Before the visit', points: [
-        'Edit: change the services, add-ons, date or time.',
+        'The ⋮ button at the top right holds every action: Edit appointment, Mark as completed, No-show (no fee), No-show (collect fee), Resend appointment details, Cancel appointment and Delete appointment. One that doesn’t apply right now is grey, with why under it.',
+        'Edit appointment: change the services, add-ons, date or time.',
         'Text a payment link: the client pays from their phone.',
         'Resend appointment details: sends the booking confirmation again (with the link to manage the booking), by text and/or e-mail as your Notifications send it.',
-        'CANCEL: choose Cancel and text the client, Cancel without a text, or Keep the booking. A late-cancel fee can apply under your cancellation policy.',
-        'Delete booking removes it completely, as if it was never booked.',
+        'Cancel appointment: choose Cancel and text the client, Cancel without a text, or Keep the booking. A late-cancel fee can apply under your cancellation policy.',
+        'Delete appointment (once it’s cancelled or a no-show) removes it completely, as if it was never booked.',
       ] },
       { heading: 'Getting paid', points: [
         'CHECKOUT opens checkout for this visit, with tip and discount.',
@@ -173,7 +174,7 @@ export const HELP: Record<string, HelpPage> = {
         'USE A MEMBERSHIP VISIT pays with a visit included in the client’s membership this period (it shows how many are left).',
         'History, at the bottom: every change to the booking, newest first: who booked it, moves (old and new time), service, length, price or add-on changes, payments, deposits, fees, refunds and cancellations, and who made each change (you, the client or Autumn).',
         'Cancelled by the client: nothing is charged by itself. Choose DELETE APPOINTMENT (no fee), MARK AS NO-SHOW (NO FEE) or MARK AS NO-SHOW (COLLECT FEE), which charges your fee to their card on file. When their deposit was kept, it is the penalty, so there is no delete and no extra fee.',
-        'NO-SHOW appears once the booking’s time is over, and marks a missed visit. If your policy has a no-show fee and the client saved a card, you choose: Mark no-show and charge the fee, or Mark no-show only (you can still charge it later with CHARGE NO-SHOW FEE).',
+        'No-show (no fee) and No-show (collect fee) work once the booking’s time is over. Collect fee shows when your policy has a no-show fee, and charges it to the client’s card on file (grey with “No card on file” when they have none). With no fee you can still charge it later with CHARGE NO-SHOW FEE.',
       ] },
       { heading: 'After', points: [
         'REBOOK books their next visit with the same services.',

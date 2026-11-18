@@ -412,22 +412,6 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
     { text: 'Cancel without a text', onPress: () => void close('cancel', { notifyClient: false }) },
     { text: 'Keep the booking', style: 'cancel' },
   ]);
-  // With a no-show fee set up, the pro chooses whether to charge it (owner, 2026-11-17).
-  const markNoShow = () => {
-    const fee = `$${(feeCents / 100).toFixed(2)}`;
-    const feeSetUp = feePercent > 0 && feeCents >= 50 && depositPaidCents <= 0 && feeCharged == null && !feeRetry;
-    const canCharge = feeSetUp && params.cardOnFile === '1';
-    const why = `${clientName} didn't come to their ${serviceName.toLowerCase()}.`;
-    if (canCharge) return Alert.alert('Mark as no-show?', `${why} You can charge the ${fee} no-show fee to their card on file.`, [
-      { text: `Mark no-show and charge ${fee}`, style: 'destructive', onPress: () => void close('no-show', { chargeFee: true }) },
-      { text: 'Mark no-show only', onPress: () => void close('no-show', { chargeFee: false }) },
-      { text: 'Not now', style: 'cancel' },
-    ]);
-    return Alert.alert('Mark as no-show?', feeSetUp ? `${why} No card on file, so the ${fee} no-show fee can't be charged.` : why, [
-      { text: 'Not now', style: 'cancel' },
-      { text: 'Mark as no-show', style: 'destructive', onPress: () => void close('no-show', { chargeFee: false }) },
-    ]);
-  };
   // The fee (decided 10-22): only when the pro taps it, to the client's card on file. The amount is the one agreed
   // when the client booked (saved with the booking, 11-07); older bookings: the fee % of the booking.
   const [feeCharged, setFeeCharged] = useState<number | null>(params.feeChargedCents ? Number(params.feeChargedCents) : null);
@@ -597,10 +581,44 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
     }
   };
 
+  // ── The ⋮ menu (owner, 2026-11-18, GlossGenius): every action on the booking in one place, the ones that don't apply
+  // now greyed with why. No-show with or without the fee are their own items, for a client with a card on file. ──
+  const [menuOpen, setMenuOpen] = useState(false);
+  const isOpenBooking = status !== 'paid' && status !== 'completed' && !closed;
+  const noShowFeeSetUp = feePercent > 0 && feeCents >= 50 && depositPaidCents <= 0 && feeCharged == null && !feeRetry;
+  const feeMoney = `$${(feeCents / 100).toFixed(2)}`;
+  const noShowFee = (charge: boolean) => Alert.alert(charge ? `Charge the ${feeMoney} no-show fee?` : 'Mark as no-show?',
+    charge ? `${clientName} is marked a no-show and ${feeMoney} is charged to their card on file.` : `${clientName} is marked a no-show. No fee is charged.`, [
+      { text: 'Not now', style: 'cancel' },
+      { text: charge ? `Charge ${feeMoney}` : 'Mark as no-show', style: 'destructive', onPress: () => void close('no-show', { chargeFee: charge }) },
+    ]);
+  const menuItems: { key: string; label: string; why?: string; on: boolean; run: () => void }[] = [
+    { key: 'edit', label: 'Edit appointment', on: canEdit && !isPreview, why: 'Only an upcoming booking can be edited', run: openEdit },
+    { key: 'complete', label: prepaid ? 'Mark as done' : 'Mark as completed', on: isOpenBooking, why: 'This booking is already closed', run: () => void markCompleted() },
+    { key: 'no-show', label: 'No-show (no fee)', on: isOpenBooking && visitOver, why: isOpenBooking ? 'After the appointment’s time is over' : 'This booking is already closed', run: () => noShowFee(false) },
+    ...(noShowFeeSetUp ? [{ key: 'no-show-fee', label: `No-show (collect fee · ${feeMoney})`, on: isOpenBooking && visitOver && params.cardOnFile === '1' && !isPreview,
+      why: params.cardOnFile !== '1' ? 'No card on file' : isOpenBooking ? 'After the appointment’s time is over' : 'This booking is already closed', run: () => noShowFee(true) }] : []),
+    { key: 'resend', label: 'Resend appointment details', on: !isPreview && canEdit && !visitOver, why: 'Only for an upcoming booking', run: () => void resendDetails() },
+    { key: 'cancel', label: 'Cancel appointment', on: isOpenBooking && status !== 'started', why: 'This booking can’t be cancelled now', run: cancelBooking },
+    { key: 'delete', label: 'Delete appointment', on: closed && !clientCancelPending, why: 'Cancel it or mark a no-show first; it then stays on the client’s record until you delete it', run: deleteAppointment },
+  ];
+
   return (
     <View style={[styles.root, { backgroundColor: look.pageTop, paddingTop: topInset }]}>
       <AppBackground />
       <StatusBar barStyle="dark-content" />
+      <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
+        <TouchableOpacity activeOpacity={1} onPress={() => setMenuOpen(false)} style={styles.menuBackdrop} accessibilityLabel="Close menu">
+          <View testID="appointment-menu" style={[styles.menu, { top: topInset + 50, backgroundColor: colors.card, borderColor: colors.border }]}>
+            {menuItems.map((m) => (
+              <TouchableOpacity key={m.key} testID={`appointment-menu-${m.key}`} disabled={!m.on || saving} onPress={() => { setMenuOpen(false); m.run(); }} style={styles.menuItem}>
+                <Text style={[styles.menuText, { color: m.on ? colors.foreground : colors.mutedForeground }]}>{m.label}</Text>
+                {!m.on && m.why ? <Text style={[styles.menuWhy, { color: colors.mutedForeground }]}>{m.why}</Text> : null}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
       <View style={styles.nav}>
         <TouchableOpacity testID="appointment-back" onPress={() => router.back()} style={styles.navSide}>
           <Feather name="arrow-left" size={20} color={colors.primary} />
@@ -611,9 +629,9 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
           <TouchableOpacity testID="appointment-edit" onPress={() => setEditing(false)} style={styles.navSide}>
             <Text style={[styles.editText, { color: colors.primary }]}>Cancel</Text>
           </TouchableOpacity>
-        ) : canEdit ? (
-          <TouchableOpacity testID="appointment-edit" onPress={openEdit} style={styles.navSide}>
-            <Text style={[styles.editText, { color: colors.primary }]}>Edit</Text>
+        ) : !isPreview ? (
+          <TouchableOpacity testID="appointment-menu-open" accessibilityLabel="More actions" onPress={() => setMenuOpen(true)} style={[styles.navSide, { justifyContent: 'flex-end' }]}>
+            <Feather name="more-vertical" size={22} color={colors.foreground} />
           </TouchableOpacity>
         ) : <View style={styles.navSide} />}
       </View>
@@ -804,9 +822,6 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
                   <Text style={[styles.secondaryActionText, { color: colors.foreground }]}>CHARGE {feeName.toUpperCase()} · ${(feeCents / 100).toFixed(2)}</Text>
                 </TouchableOpacity>
               ) : null}
-              <TouchableOpacity testID="appointment-delete" disabled={saving} onPress={deleteAppointment} style={styles.textAction}>
-                <Text style={[styles.textActionText, { color: colors.destructive }]}>Delete booking</Text>
-              </TouchableOpacity>
             </>
           ) : (
             <>
@@ -836,26 +851,7 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
                   <Text style={[styles.secondaryActionText, { color: colors.foreground }]}>USE A MEMBERSHIP VISIT ({memberVisit.left} LEFT)</Text>
                 </TouchableOpacity>
               ) : null}
-              {/* Cancel and no-show replace Delete (owner, 2026-11-03): the booking stays on the client's record. */}
-              {status !== 'completed' ? (
-              <View style={styles.closeRow}>
-                {visitOver ? (
-                <TouchableOpacity testID="appointment-no-show" disabled={saving} onPress={markNoShow} style={[styles.closeAction, { backgroundColor: colors.muted, borderColor: colors.border }]}>
-                  <Feather name="user-x" size={19} color={colors.foreground} />
-                  <Text style={[styles.secondaryActionText, { color: colors.foreground }]}>NO-SHOW</Text>
-                </TouchableOpacity>
-                ) : null}
-                <TouchableOpacity testID="appointment-cancel" disabled={saving} onPress={cancelBooking} style={[styles.closeAction, { backgroundColor: colors.muted, borderColor: colors.border }]}>
-                  <Feather name="x" size={19} color={colors.destructive} />
-                  <Text style={[styles.secondaryActionText, { color: colors.destructive }]}>CANCEL</Text>
-                </TouchableOpacity>
-              </View>
-              ) : null}
-              {!isPreview && canEdit && !visitOver ? (
-                <TouchableOpacity testID="appointment-resend" disabled={resending} onPress={() => void resendDetails()} style={styles.textAction}>
-                  <Text style={[styles.textActionText, { color: colors.primary }]}>{resending ? 'Sending…' : 'Resend appointment details'}</Text>
-                </TouchableOpacity>
-              ) : null}
+              {/* No-show, cancel, resend and delete are in the ⋮ menu (owner, 2026-11-18). */}
               {/* Texting a payment link needs card payments (owner, 2026-11-11): hidden until Stripe is set up. */}
               {!isPreview && !prepaid && paymentsReady !== false ? (
                 <TouchableOpacity testID="appointment-pay-link" disabled={saving} onPress={() => void payLink()} style={styles.textAction}>
@@ -1067,8 +1063,11 @@ function RefundSheet({ open, colors, appointmentId, refundableCents, onClose, on
 }
 
 const styles = StyleSheet.create({
-  closeRow: { flexDirection: 'row', gap: 10, marginTop: 10 },
-  closeAction: { flex: 1, height: 50, borderRadius: 14, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  menuBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.08)' },
+  menu: { position: 'absolute', right: 14, minWidth: 260, maxWidth: 320, borderWidth: 1, borderRadius: 14, paddingVertical: 6, ...cardShadow },
+  menuItem: { paddingHorizontal: 16, paddingVertical: 11 },
+  menuText: { fontSize: 17, fontFamily: 'Inter_500Medium' },
+  menuWhy: { fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 2 },
   textAction: { alignSelf: 'center', paddingVertical: 14 },
   textActionText: { fontSize: 17, fontFamily: 'Inter_500Medium' },
   refundedNote: { fontSize: 15, fontFamily: 'Inter_500Medium', textAlign: 'center', marginTop: 14 },
