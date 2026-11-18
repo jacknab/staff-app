@@ -14,6 +14,7 @@ import { api, ApiError } from '@/lib/live-api';
 import { FormsPanel } from '@/components/FormsPanel';
 import { HelpTitle } from '@/components/HelpTitle';
 import { ClientAvatar } from '@/components/ClientAvatar';
+import { ChoiceSlider, type SliderSide } from '@/components/ChoiceSlider';
 import { SelectField } from '@/components/SelectField';
 
 import { AppBackground } from '@/components/look/AppBackground';
@@ -494,10 +495,12 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
     } finally { setSaving(false); }
   };
   const feeAsk = `$${(feeCents / 100).toFixed(2)}`;
+  // Mark it a no-show, collecting the fee or not (owner, 2026-11-18): asked when it opens, and the slider on the page.
+  const [noShowChoice, setNoShowChoice] = useState<SliderSide | null>(null);
   const askLateCancelFee = () => Alert.alert('Late cancellation',
-    `This booking was cancelled inside your cancellation policy. Charge ${clientName}'s card on file the ${feeAsk} late-cancel fee?`, [
-      { text: `Charge ${feeAsk}`, style: 'destructive', onPress: () => void decideCancellation('charge') },
-      { text: 'Don’t charge', onPress: () => void decideCancellation('no_charge') },
+    `This booking was cancelled inside your cancellation policy. Mark it as a no-show and charge ${clientName}'s card on file the ${feeAsk} fee?`, [
+      { text: `No-show · collect ${feeAsk}`, style: 'destructive', onPress: () => void decideCancellation('no_show_fee') },
+      { text: 'No-show · no fee', onPress: () => void decideCancellation('no_show') },
     ]);
   const asked = useRef(false);
   useEffect(() => {
@@ -792,18 +795,29 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
             </>
           ) : clientCancelPending ? (
             <>
-              {/* A late cancel: charge the late-cancel fee to the card on file, or don't (asked when the booking opens). */}
+              {/* A late cancel: slide to collect the fee or not, then MARK AS NO-SHOW (the deposit request's slider). */}
               <Text testID="client-cancel-note" style={[styles.refundedNote, { color: colors.foreground }]}>
-                {`This booking was cancelled inside your cancellation policy. Charge ${clientName}'s card on file the late-cancel fee?`}
+                {`This booking was cancelled inside your cancellation policy. Mark it as a no-show, with or without the ${feeAsk} fee.`}
               </Text>
-              <TouchableOpacity testID="cancel-decision-fee" disabled={saving} onPress={() => void decideCancellation('charge')} style={[styles.secondaryAction, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <Feather name="credit-card" size={20} color={colors.primary} />
-                <Text style={[styles.secondaryActionText, { color: colors.foreground }]}>{`CHARGE LATE-CANCEL FEE · ${feeAsk}`}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity testID="cancel-decision-no-charge" disabled={saving} onPress={() => void decideCancellation('no_charge')} style={[styles.secondaryAction, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <Feather name="x-circle" size={20} color={colors.foreground} />
-                <Text style={[styles.secondaryActionText, { color: colors.foreground }]}>DON’T CHARGE</Text>
-              </TouchableOpacity>
+              <View style={styles.choiceBlock}>
+                <ChoiceSlider testID="no-show-fee-slider" choice={noShowChoice} onChoice={setNoShowChoice} leftLabel="COLLECT FEE" rightLabel="NO FEE"
+                  accessibilityLabel="No-show fee choice" accessibilityHint={`Slide left to collect the ${feeAsk} fee. Slide right for no fee.`} />
+                <Text style={[styles.choiceInstruction, { color: colors.mutedForeground }]}>Slide the handle left to collect the fee or right for no fee. You can also tap either side.</Text>
+              </View>
+              <View style={[styles.choiceOutcome, { backgroundColor: noShowChoice === 'left' ? colors.secondary : colors.accent }]}>
+                <Feather name={noShowChoice === 'left' ? 'credit-card' : 'check-circle'} size={19} color={noShowChoice === 'left' ? colors.primary : colors.accentForeground} />
+                <Text style={[styles.choiceOutcomeText, { color: noShowChoice === 'left' ? colors.primary : colors.accentForeground }]}>
+                  {noShowChoice === 'left' ? `${feeAsk} will be charged to ${clientName}'s card on file.`
+                    : noShowChoice === 'right' ? 'Marked as a no-show. No fee is charged.'
+                    : 'Choose whether to collect the fee before marking the no-show.'}
+                </Text>
+              </View>
+              <LinearGradient colors={noShowChoice && !saving ? [colors.primary, '#A855F7'] : [colors.muted, colors.muted]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.checkoutGradient}>
+                <TouchableOpacity testID="mark-no-show" disabled={!noShowChoice || saving} onPress={() => noShowChoice && void decideCancellation(noShowChoice === 'left' ? 'no_show_fee' : 'no_show')} style={styles.actionButton}>
+                  <Feather name="user-x" size={19} color={noShowChoice ? colors.primaryForeground : colors.mutedForeground} />
+                  <Text style={[styles.actionText, { color: noShowChoice ? colors.primaryForeground : colors.mutedForeground }]}>{saving ? 'SAVING…' : 'MARK AS NO-SHOW'}</Text>
+                </TouchableOpacity>
+              </LinearGradient>
             </>
           ) : closed ? (
             <>
@@ -1072,6 +1086,10 @@ const styles = StyleSheet.create({
   textAction: { alignSelf: 'center', paddingVertical: 14 },
   textActionText: { fontSize: 17, fontFamily: 'Inter_500Medium' },
   refundedNote: { fontSize: 15, fontFamily: 'Inter_500Medium', textAlign: 'center', marginTop: 14 },
+  choiceBlock: { marginTop: 20 },
+  choiceInstruction: { textAlign: 'center', fontSize: 13, lineHeight: 20, fontFamily: 'Inter_400Regular', marginTop: 9 },
+  choiceOutcome: { minHeight: 58, borderRadius: 14, paddingHorizontal: 13, paddingVertical: 11, flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 16 },
+  choiceOutcomeText: { flex: 1, fontSize: 15, lineHeight: 20, fontFamily: 'Inter_500Medium' },
   whenRow: { minHeight: 54, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 10, ...cardShadow },
   whenText: { flex: 1, fontSize: 17, fontFamily: 'Inter_500Medium' },
   whenChange: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },

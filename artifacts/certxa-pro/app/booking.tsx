@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Feather } from '@expo/vector-icons';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Alert, Animated, PanResponder, Platform, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Platform, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { SelectField } from '@/components/SelectField';
@@ -11,6 +11,7 @@ import { api } from '@/lib/live-api';
 import { businessToday, zonedTimeLabel } from '@/lib/businessTime';
 import { HelpTitle } from '@/components/HelpTitle';
 import { ClientAvatar } from '@/components/ClientAvatar';
+import { ChoiceSlider } from '@/components/ChoiceSlider';
 
 import { AppBackground } from '@/components/look/AppBackground';
 import { usePaymentsReady } from '@/lib/usePaymentsReady';
@@ -29,63 +30,6 @@ function minutesLabel(minutes: number) {
 }
 function isoDay(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-}
-
-function PaymentChoiceSlider({ choice, onChoice, colors }: {
-  choice: PaymentChoice | null;
-  onChoice: (choice: PaymentChoice) => void;
-  colors: ReturnType<typeof useColors>;
-}) {
-  const offset = useRef(new Animated.Value(0)).current;
-  const startOffset = useRef(0);
-  const maxTravel = useRef(0);
-  const animateTo = (next: PaymentChoice) => Animated.spring(offset, {
-    toValue: next === 'request' ? -maxTravel.current : maxTravel.current,
-    useNativeDriver: true, speed: 22, bounciness: 5,
-  }).start();
-  const responder = useMemo(() => PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: () => true,
-    onPanResponderGrant: () => offset.stopAnimation((value) => { startOffset.current = value; }),
-    onPanResponderMove: (_, gesture) => {
-      const limit = maxTravel.current;
-      offset.setValue(Math.max(-limit, Math.min(limit, startOffset.current + gesture.dx)));
-    },
-    onPanResponderRelease: (_, gesture) => {
-      if (Math.abs(gesture.dx) < 12) {
-        if (choice) animateTo(choice); else offset.setValue(0);
-        return;
-      }
-      const next: PaymentChoice = startOffset.current + gesture.dx < 0 ? 'request' : 'skip';
-      onChoice(next);
-      animateTo(next);
-    },
-    onPanResponderTerminate: () => { if (choice) animateTo(choice); else offset.setValue(0); },
-  }), [choice, offset, onChoice]);
-
-  return (
-    <View style={[styles.choiceSlider, { backgroundColor: colors.muted, borderColor: colors.border }]} onLayout={(event) => { maxTravel.current = Math.max(0, event.nativeEvent.layout.width / 2 - 31); }}>
-      <TouchableOpacity accessibilityRole="button" accessibilityState={{ selected: choice === 'request' }} onPress={() => { onChoice('request'); animateTo('request'); }} style={styles.sliderSide}>
-        <Text style={[styles.sliderLabel, { color: choice === 'request' ? colors.primary : colors.mutedForeground }]}>YES</Text>
-      </TouchableOpacity>
-      <View style={styles.sliderCenter} pointerEvents="none">
-        <View style={[styles.sliderRail, { backgroundColor: choice === 'request' ? colors.primary : choice === 'skip' ? colors.accentForeground : colors.border }]} />
-      </View>
-      <TouchableOpacity accessibilityRole="button" accessibilityState={{ selected: choice === 'skip' }} onPress={() => { onChoice('skip'); animateTo('skip'); }} style={styles.sliderSide}>
-        <Text style={[styles.sliderLabel, { color: choice === 'skip' ? colors.accentForeground : colors.mutedForeground }]}>NO</Text>
-      </TouchableOpacity>
-      <Animated.View
-        {...responder.panHandlers}
-        accessibilityRole="switch"
-        accessibilityLabel="Payment request choice"
-        accessibilityHint="Slide left for yes, send a payment request. Slide right for no, confirm without a request."
-        accessibilityState={{ checked: choice === 'request', disabled: false }}
-        style={[styles.sliderThumb, { backgroundColor: colors.card, borderColor: colors.border, transform: [{ translateX: offset }] }]}
-      >
-        <Feather name="shuffle" size={19} color={colors.primary} />
-      </Animated.View>
-    </View>
-  );
 }
 
 /** The ten digits of a US phone number, however it was typed or stored: "(720) 243-1234", "+1 720…", "7202431234". */
@@ -674,7 +618,9 @@ export default function BookingScreen() {
                 <Text style={[styles.choiceCaption, { color: paymentChoice === 'request' ? colors.primary : colors.mutedForeground }]}>YES, SEND IT</Text>
                 <Text style={[styles.choiceCaption, { color: paymentChoice === 'skip' ? colors.accentForeground : colors.mutedForeground }]}>NO, CONFIRM</Text>
               </View>
-              <PaymentChoiceSlider choice={paymentChoice} onChoice={setPaymentChoice} colors={colors} />
+              <ChoiceSlider testID="payment-choice-slider" choice={paymentChoice === 'request' ? 'left' : paymentChoice === 'skip' ? 'right' : null}
+                onChoice={(side) => setPaymentChoice(side === 'left' ? 'request' : 'skip')} leftLabel="YES" rightLabel="NO"
+                accessibilityLabel="Payment request choice" accessibilityHint="Slide left for yes, send a payment request. Slide right for no, confirm without a request." />
               <Text style={[styles.choiceInstruction, { color: colors.mutedForeground }]}>Slide the handle left for yes or right for no. You can also tap either side.</Text>
             </View>
 
@@ -918,12 +864,6 @@ const styles = StyleSheet.create({
   choiceBlock: { marginTop: 29 },
   choiceLabels: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 4, marginBottom: 9 },
   choiceCaption: { fontSize: 12, letterSpacing: 0.75, fontFamily: 'Inter_700Bold' },
-  choiceSlider: { height: 62, borderWidth: 1, borderRadius: 31, flexDirection: 'row', alignItems: 'center', position: 'relative', overflow: 'hidden' },
-  sliderSide: { flex: 1, height: '100%', alignItems: 'center', justifyContent: 'center' },
-  sliderLabel: { fontSize: 14, letterSpacing: 1.2, fontFamily: 'Inter_700Bold' },
-  sliderCenter: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
-  sliderRail: { width: 2, height: 22, borderRadius: 1 },
-  sliderThumb: { position: 'absolute', left: '50%', marginLeft: -28, top: 2, width: 54, height: 56, borderRadius: 28, borderWidth: 1, alignItems: 'center', justifyContent: 'center', elevation: 2 },
   choiceInstruction: { textAlign: 'center', fontSize: 13, lineHeight: 20, fontFamily: 'Inter_400Regular', marginTop: 9 },
   choiceOutcome: { minHeight: 58, borderRadius: 14, paddingHorizontal: 13, paddingVertical: 11, flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 20 },
   choiceOutcomeText: { flex: 1, fontSize: 14, lineHeight: 20, fontFamily: 'Inter_500Medium' },
