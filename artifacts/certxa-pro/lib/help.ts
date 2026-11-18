@@ -132,7 +132,7 @@ export const HELP: Record<string, HelpPage> = {
         'A note shows when their number is a landline and can’t get texts.',
       ] },
       { heading: 'Their numbers', points: [
-        'Visits, lifetime spend, average visit, the last 12 months, last and next visit, and loyalty points.',
+        'Visits (with their no-shows on the right), lifetime spend, average visit, the last 12 months, and last and next visit.',
         'Prepaid packages they bought, with the visits left.',
         'Memberships: what’s left this period, when it renews or ends, Cancel membership, and Add membership (charge the card on file or send a link to join).',
       ] },

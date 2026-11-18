@@ -400,6 +400,7 @@ export default function ClientProfileScreen() {
           ))}
 
           <View style={styles.stats}>
+            {/* No loyalty points in Certxa Pro, and no-shows sit on the Visits card's right (owner, 2026-11-19). */}
             {[
               ['Visits', String(client.totalVisits)],
               ['Lifetime spend', money(client.totalSpentCents)],
@@ -407,12 +408,18 @@ export default function ClientProfileScreen() {
               ['Last 12 months', money(client.spent12mCents)],
               ['Last visit', dateLabel(client.lastVisitAt)],
               ['Next visit', upcoming[0] ? dateLabel(upcoming[0].date) : 'Not booked'],
-              ['No-shows', String(noShows)],
-              ...(client.loyaltyPoints ? [['Loyalty points', String(client.loyaltyPoints)]] : []),
             ].map(([label, value]) => (
-              <View key={label} style={[styles.stat, card]}>
-                <Text style={[styles.statValue, { color: colors.foreground }]}>{value}</Text>
-                <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>{label}</Text>
+              <View key={label} style={[styles.stat, card, label === 'Visits' ? styles.statSplit : null]}>
+                <View>
+                  <Text style={[styles.statValue, { color: colors.foreground }]}>{value}</Text>
+                  <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>{label}</Text>
+                </View>
+                {label === 'Visits' ? (
+                  <View testID="client-no-shows" style={{ alignItems: 'flex-end' }}>
+                    <Text style={[styles.statValue, { color: noShows > 0 ? colors.accentForeground : colors.foreground }]}>{String(noShows)}</Text>
+                    <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>No-shows</Text>
+                  </View>
+                ) : null}
               </View>
             ))}
           </View>
@@ -580,6 +587,7 @@ const styles = StyleSheet.create({
   alertText: { flex: 1, fontSize: 16, lineHeight: 22, fontFamily: 'Inter_600SemiBold' },
   stats: { flexDirection: 'row', flexWrap: 'wrap', gap: 9, marginTop: 16 },
   stat: { width: '48%', flexGrow: 1, borderWidth: 1, borderRadius: 14, padding: 12, ...cardShadow },
+  statSplit: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   statValue: { fontSize: 18, fontFamily: 'Inter_600SemiBold' },
   statLabel: { fontSize: 14, fontFamily: 'Inter_400Regular', marginTop: 3 },
   section: { marginTop: 26, marginBottom: 12 },
