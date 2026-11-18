@@ -274,6 +274,8 @@ export default function CalendarScreen() {
   // Tablets (owner, 2026-11-19): a bigger + and a taller sheet that opens over the calendar's own side of the screen
   // (the right half next to Home), not the middle.
   const isTablet = useIsTablet();
+  // Bigger buttons, dates and booking cards on tablets (owner, 2026-11-19: easy to tap and read).
+  const tb: Partial<typeof tabletStyles> = isTablet ? tabletStyles : {};
   const rootRef = useRef<View>(null);
   const [sheetSpot, setSheetSpot] = useState<{ x: number; width: number } | null>(null);
   const addSomething = () => {
@@ -443,23 +445,23 @@ export default function CalendarScreen() {
     const isPast = dateKey(day) < todayKey;
     return (
       <View key={dateKey(day)} style={[styles.weekDay, index > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
-        <TouchableOpacity onPress={() => selectDate(day, true)} style={[styles.weekDayHeader, { backgroundColor: isToday ? `${colors.primary}0D` : isPast ? colors.muted : colors.card }]}>
-          <View style={[styles.weekBadge, { backgroundColor: isToday ? colors.primary : colors.muted }]}>
-            <Text style={[styles.weekBadgeDay, { color: isToday ? colors.primaryForeground : colors.mutedForeground }]}>{day.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()}</Text>
-            <Text style={[styles.weekBadgeNumber, { color: isToday ? colors.primaryForeground : isPast ? colors.mutedForeground : colors.foreground }]}>{day.getDate()}</Text>
+        <TouchableOpacity onPress={() => selectDate(day, true)} style={[styles.weekDayHeader, tb.weekDayHeader, { backgroundColor: isToday ? `${colors.primary}0D` : isPast ? colors.muted : colors.card }]}>
+          <View style={[styles.weekBadge, tb.weekBadge, { backgroundColor: isToday ? colors.primary : colors.muted }]}>
+            <Text style={[styles.weekBadgeDay, tb.weekBadgeDay, { color: isToday ? colors.primaryForeground : colors.mutedForeground }]}>{day.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()}</Text>
+            <Text style={[styles.weekBadgeNumber, tb.weekBadgeNumber, { color: isToday ? colors.primaryForeground : isPast ? colors.mutedForeground : colors.foreground }]}>{day.getDate()}</Text>
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.weekDayTitle, { color: isToday ? colors.primary : isPast ? colors.mutedForeground : colors.foreground }]}>
+            <Text style={[styles.weekDayTitle, tb.weekDayTitle, { color: isToday ? colors.primary : isPast ? colors.mutedForeground : colors.foreground }]}>
               {isToday ? 'Today' : day.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
             </Text>
-            <Text style={[styles.weekDayCount, { color: colors.mutedForeground }]}>{dayAppointments.length === 0 ? 'No appointments' : `${dayAppointments.length} appointment${dayAppointments.length === 1 ? '' : 's'}`}</Text>
+            <Text style={[styles.weekDayCount, tb.weekDayCount, { color: colors.mutedForeground }]}>{dayAppointments.length === 0 ? 'No appointments' : `${dayAppointments.length} appointment${dayAppointments.length === 1 ? '' : 's'}`}</Text>
           </View>
-          {isToday ? <View style={[styles.todayPill, { backgroundColor: colors.primary }]}><Text style={[styles.todayPillText, { color: colors.primaryForeground }]}>Today</Text></View> : null}
+          {isToday ? <View style={[styles.todayPill, { backgroundColor: colors.primary }]}><Text style={[styles.todayPillText, tb.todayPillText, { color: colors.primaryForeground }]}>Today</Text></View> : null}
         </TouchableOpacity>
         {dayAppointments.length === 0 ? (
           <View style={styles.weekEmpty}>
             <View style={[styles.weekEmptyBar, { backgroundColor: colors.border }]} />
-            <Text style={[styles.weekEmptyText, { color: colors.mutedForeground }]}>No bookings</Text>
+            <Text style={[styles.weekEmptyText, tb.weekEmptyText, { color: colors.mutedForeground }]}>No bookings</Text>
           </View>
         ) : (
           <View style={styles.weekCards}>
@@ -467,18 +469,18 @@ export default function CalendarScreen() {
               const minutes = Number(String(item.duration).match(/\d+/)?.[0] ?? 60);
               const status = item.status === 'pending' && item.clientConfirmed ? WEEK_STATUS.confirmed : WEEK_STATUS[item.status] ?? WEEK_STATUS.pending;
               return (
-                <TouchableOpacity key={item.id} onPress={() => openAppointment(item)} style={[styles.weekCard, { backgroundColor: colors.card, borderColor: colors.border }]} testID={`week-appt-${item.appointmentId}`}>
-                  <View style={[styles.weekStripe, { backgroundColor: item.serviceColor ?? colors.primary }]} />
+                <TouchableOpacity key={item.id} onPress={() => openAppointment(item)} style={[styles.weekCard, tb.weekCard, { backgroundColor: colors.card, borderColor: colors.border }]} testID={`week-appt-${item.appointmentId}`}>
+                  <View style={[styles.weekStripe, tb.weekStripe, { backgroundColor: item.serviceColor ?? colors.primary }]} />
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <View style={styles.weekCardTop}>
-                      <View style={styles.weekTime}>
-                        <Feather name="clock" size={12} color={colors.mutedForeground} />
-                        <Text style={[styles.weekTimeText, { color: colors.mutedForeground }]}>{formatClock(item.startMinutes)} – {formatClock(item.startMinutes + minutes)}</Text>
+                      <View style={[styles.weekTime, tb.weekTime, tb.weekTime]}>
+                        <Feather name="clock" size={isTablet ? 15 : 12} color={colors.mutedForeground} />
+                        <Text style={[styles.weekTimeText, tb.weekTimeText, { color: colors.mutedForeground }]}>{formatClock(item.startMinutes)} – {formatClock(item.startMinutes + minutes)}</Text>
                       </View>
-                      <View style={[styles.weekStatus, { backgroundColor: status.bg }]}><Text style={[styles.weekStatusText, { color: status.text }]}>{status.label}</Text></View>
+                      <View style={[styles.weekStatus, tb.weekStatus, { backgroundColor: status.bg }]}><Text style={[styles.weekStatusText, tb.weekStatusText, { color: status.text }]}>{status.label}</Text></View>
                     </View>
-                    <Text numberOfLines={1} style={[styles.weekName, { color: colors.foreground }]}>{item.name.split(' ')[0] || item.name}</Text>
-                    <Text numberOfLines={1} style={[styles.weekService, { color: colors.mutedForeground }]}>{item.service}</Text>
+                    <Text numberOfLines={1} style={[styles.weekName, tb.weekName, { color: colors.foreground }]}>{item.name.split(' ')[0] || item.name}</Text>
+                    <Text numberOfLines={1} style={[styles.weekService, tb.weekService, { color: colors.mutedForeground }]}>{item.service}</Text>
                   </View>
                 </TouchableOpacity>
               );
@@ -499,7 +501,7 @@ export default function CalendarScreen() {
             isTablet && sheetSpot ? { alignSelf: 'flex-start', marginLeft: sheetSpot.x, width: sheetSpot.width, maxWidth: sheetSpot.width } : null]}>
             <View style={styles.overlayHead}>
               <Text style={[styles.overlayTitle, { color: look.heading }]}>Calendar</Text>
-              <TouchableOpacity testID="calendar-add-close" accessibilityLabel="Close" onPress={() => setAddOpen(false)} style={styles.iconButton}>
+              <TouchableOpacity testID="calendar-add-close" accessibilityLabel="Close" onPress={() => setAddOpen(false)} style={[styles.iconButton, tb.iconButton, tb.iconButton]}>
                 <Feather name="x" size={24} color={look.heading} />
               </TouchableOpacity>
             </View>
@@ -533,8 +535,8 @@ export default function CalendarScreen() {
             <HelpTitle help="calendar" style={[styles.pageTitle, { color: colors.foreground }]}>Calendar</HelpTitle>
           </View>
           <View style={styles.headerActions}>
-            <TouchableOpacity testID="calendar-refresh" accessibilityLabel="Refresh calendar" onPress={() => void refresh()} style={styles.iconButton}>
-              <Feather name="refresh-cw" size={19} color={colors.primary} />
+            <TouchableOpacity testID="calendar-refresh" accessibilityLabel="Refresh calendar" onPress={() => void refresh()} style={[styles.iconButton, tb.iconButton, tb.iconButton]}>
+              <Feather name="refresh-cw" size={isTablet ? 25 : 19} color={colors.primary} />
             </TouchableOpacity>
             <TouchableOpacity testID="add-appointment" accessibilityLabel="Add or change the view" onPress={addSomething} style={[styles.addButton, isTablet && styles.addButtonTablet, { backgroundColor: colors.primary }]}>
               <Feather name="plus" size={isTablet ? 32 : 24} color={colors.primaryForeground} />
@@ -570,9 +572,9 @@ export default function CalendarScreen() {
                 const today = dateKey(day) === todayKey;
                 const booked = (bookingsByDay[dateKey(day)]?.length ?? 0) > 0;
                 return (
-                  <TouchableOpacity key={dateKey(day)} testID={`calendar-day-${day.getDate()}`} onPress={() => selectDate(day)} style={[styles.dayCell, active && { backgroundColor: colors.primary }]}>
-                    <Text style={[styles.dayName, { color: active ? colors.primaryForeground : today ? colors.primary : colors.mutedForeground }]}>{day.toLocaleDateString('en-US', { weekday: 'short' }).slice(0, 1)}</Text>
-                    <Text style={[styles.dayNumber, { color: active ? colors.primaryForeground : today ? colors.primary : colors.foreground }]}>{day.getDate()}</Text>
+                  <TouchableOpacity key={dateKey(day)} testID={`calendar-day-${day.getDate()}`} onPress={() => selectDate(day)} style={[styles.dayCell, tb.dayCell, active && { backgroundColor: colors.primary }]}>
+                    <Text style={[styles.dayName, tb.dayName, { color: active ? colors.primaryForeground : today ? colors.primary : colors.mutedForeground }]}>{day.toLocaleDateString('en-US', { weekday: 'short' }).slice(0, 1)}</Text>
+                    <Text style={[styles.dayNumber, tb.dayNumber, { color: active ? colors.primaryForeground : today ? colors.primary : colors.foreground }]}>{day.getDate()}</Text>
                     <View style={[styles.dayDot, { backgroundColor: !booked ? 'transparent' : active ? colors.primaryForeground : colors.primary }]} />
                   </TouchableOpacity>
                 );
@@ -588,7 +590,7 @@ export default function CalendarScreen() {
         const grid = (
     <View style={[styles.monthGrid, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <View style={styles.weekdayRow}>
-        {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((weekday, index) => <Text key={`${weekday}-${index}`} style={[styles.weekdayLabel, { color: colors.mutedForeground }]}>{weekday}</Text>)}
+        {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((weekday, index) => <Text key={`${weekday}-${index}`} style={[styles.weekdayLabel, tb.weekdayLabel, { color: colors.mutedForeground }]}>{weekday}</Text>)}
       </View>
       <View style={styles.monthCells}>
         {cells.map((day) => {
@@ -597,9 +599,9 @@ export default function CalendarScreen() {
           const isToday = dateKey(day) === todayKey;
           const hasBookings = (bookingsByDay[dateKey(day)]?.length ?? 0) > 0;
           return (
-            <TouchableOpacity key={dateKey(day)} testID={`month-day-${dateKey(day)}`} onPress={() => pickMonthDay(day)} style={styles.monthCell}>
-              <View style={[styles.monthNumber, active && { backgroundColor: colors.primary }]}>
-                <Text style={[styles.monthNumberText, { color: active ? colors.primaryForeground : isToday ? colors.primary : inMonth ? colors.foreground : colors.mutedForeground }]}>{day.getDate()}</Text>
+            <TouchableOpacity key={dateKey(day)} testID={`month-day-${dateKey(day)}`} onPress={() => pickMonthDay(day)} style={[styles.monthCell, tb.monthCell, tb.monthCell]}>
+              <View style={[styles.monthNumber, tb.monthNumber, active && { backgroundColor: colors.primary }]}>
+                <Text style={[styles.monthNumberText, tb.monthNumberText, { color: active ? colors.primaryForeground : isToday ? colors.primary : inMonth ? colors.foreground : colors.mutedForeground }]}>{day.getDate()}</Text>
               </View>
               <View style={[styles.monthDot, { backgroundColor: !hasBookings ? 'transparent' : active ? colors.primary : colors.primary }]} />
             </TouchableOpacity>
@@ -612,11 +614,11 @@ export default function CalendarScreen() {
         const total = monthDays.reduce((sum, day) => sum + (bookingsByDay[dateKey(day)]?.length ?? 0), 0);
         const list = (
           <>
-            <View style={[styles.weekSummary, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Text style={[styles.weekSummaryTitle, { color: colors.foreground }]}>
+            <View style={[styles.weekSummary, tb.weekSummary, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Text style={[styles.weekSummaryTitle, tb.weekSummaryTitle, { color: colors.foreground }]}>
                 {monthDay ? selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : selectedDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
               </Text>
-              <Text style={[styles.weekSummaryCount, { color: colors.mutedForeground }]}>
+              <Text style={[styles.weekSummaryCount, tb.weekSummaryCount, { color: colors.mutedForeground }]}>
                 {total === 0 ? `No appointments ${monthDay ? 'this day' : 'this month'}` : `${total} appointment${total === 1 ? '' : 's'} ${monthDay ? 'this day' : 'this month'}`}
               </Text>
             </View>
@@ -643,9 +645,9 @@ export default function CalendarScreen() {
             const total = days.reduce((sum, day) => sum + (bookingsByDay[dateKey(day)]?.length ?? 0), 0);
             const short = (d: Date, year = false) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', ...(year ? { year: 'numeric' } : {}) });
             return (
-              <View style={[styles.weekSummary, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <Text style={[styles.weekSummaryTitle, { color: colors.foreground }]}>{short(days[0])} – {short(days[6], true)}</Text>
-                <Text style={[styles.weekSummaryCount, { color: colors.mutedForeground }]}>{total === 0 ? 'No appointments this week' : `${total} appointment${total === 1 ? '' : 's'} this week`}</Text>
+              <View style={[styles.weekSummary, tb.weekSummary, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Text style={[styles.weekSummaryTitle, tb.weekSummaryTitle, { color: colors.foreground }]}>{short(days[0])} – {short(days[6], true)}</Text>
+                <Text style={[styles.weekSummaryCount, tb.weekSummaryCount, { color: colors.mutedForeground }]}>{total === 0 ? 'No appointments this week' : `${total} appointment${total === 1 ? '' : 's'} this week`}</Text>
               </View>
             );
           })()}
@@ -878,4 +880,34 @@ const styles = StyleSheet.create({
   confirmDropText: { fontSize: 16, fontFamily: 'Inter_700Bold' },
   cancelDropButton: { minHeight: 40, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
   cancelDropText: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
+});
+
+const tabletStyles = StyleSheet.create({
+  iconButton: { width: 52, height: 52, borderRadius: 26 },
+  dayCell: { width: 56, paddingVertical: 8 },
+  dayName: { fontSize: 15 },
+  dayNumber: { fontSize: 21 },
+  weekdayLabel: { fontSize: 15 },
+  monthCell: { height: 72 },
+  monthNumber: { width: 40, height: 40, borderRadius: 20 },
+  monthNumberText: { fontSize: 20 },
+  weekSummary: { paddingHorizontal: 16, paddingVertical: 13 },
+  weekSummaryTitle: { fontSize: 18 },
+  weekSummaryCount: { fontSize: 15 },
+  weekBadge: { width: 50, height: 50, borderRadius: 25 },
+  weekBadgeDay: { fontSize: 12 },
+  weekBadgeNumber: { fontSize: 19, lineHeight: 21 },
+  weekDayHeader: { paddingVertical: 12 },
+  weekDayTitle: { fontSize: 18 },
+  weekDayCount: { fontSize: 15 },
+  weekCard: { paddingHorizontal: 16, paddingVertical: 14, borderRadius: 16 },
+  weekTime: { gap: 6 },
+  weekTimeText: { fontSize: 16 },
+  weekStatus: { paddingHorizontal: 10, paddingVertical: 4 },
+  weekStatusText: { fontSize: 14 },
+  weekName: { fontSize: 20, marginTop: 6 },
+  weekService: { fontSize: 17, marginTop: 2 },
+  weekStripe: { width: 5 },
+  weekEmptyText: { fontSize: 15 },
+  todayPillText: { fontSize: 14 },
 });

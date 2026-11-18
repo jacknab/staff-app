@@ -3,7 +3,7 @@
  * app.json allows every orientation, and phones are locked to portrait here. expo-screen-orientation is native code
  * added in Build Nov 19 · G: older installed builds don't have it, so it is loaded carefully and they just stay upright.
  */
-import { Dimensions } from 'react-native';
+import { Dimensions, StatusBar } from 'react-native';
 
 export function setScreenTurning() {
   try {
@@ -16,4 +16,13 @@ export function setScreenTurning() {
   } catch {
     // A build without expo-screen-orientation: its screen is fixed upright by that build's own settings.
   }
+}
+
+/**
+ * Full screen on tablets (owner, 2026-11-19): the status bar along the top (time, battery) is hidden so the app has the
+ * whole screen; a swipe down from the top edge still shows it for a moment. Phones keep it.
+ */
+export function setTabletFullScreen() {
+  const { width, height } = Dimensions.get('screen');
+  if (Math.min(width, height) >= 600) StatusBar.setHidden(true, 'fade');
 }
