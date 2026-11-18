@@ -45,7 +45,7 @@ import { look, cardShadow } from '@/components/look/tokens';
 // Stripe M2 does not require that Apple entitlement.
 const TAP_TO_PAY_ENABLED = true;
 // Shown on the payment screen so a tester can tell which build is installed.
-const BUILD_LABEL = 'Build Nov 17 · H';
+const BUILD_LABEL = 'Build Nov 18 · A';
 const EXPO_GO_PREVIEW = process.env.EXPO_PUBLIC_EXPO_GO_PREVIEW === '1';
 
 type PaymentStep = 'idle' | 'tap_intro' | 'initializing' | 'discovering' | 'connecting' | 'ready' | 'processing' | 'capture_pending' | 'success' | 'error';
@@ -72,7 +72,26 @@ function errorMessage(cause: unknown) {
 export default function CheckoutScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { refresh: refreshBookings } = useBookingData();
+  const { refresh: refreshBookings, setCalendarDate } = useBookingData();
+  // Book the next appointment after checkout (owner, 2026-11-18, GlossGenius style): pick how many weeks out, then the
+  // calendar on that day, Instant Book (same weekday, time and services) or the booking form.
+  const [nextWeeks, setNextWeeks] = useState<number | null>(null);
+  const [rebookNote, setRebookNote] = useState('');
+  const [rebooking, setRebooking] = useState(false);
+  const nextDay = () => { const d = new Date(); d.setDate(d.getDate() + (nextWeeks ?? 0) * 7); return d; };
+  const instantBook = async () => {
+    if (!nextWeeks || rebooking) return;
+    setRebooking(true); setRebookNote('');
+    try {
+      const r = await api.post<{ label: string; clash: boolean }>(`/api/appointments/${appointmentId}/rebook`, { weeks: nextWeeks });
+      setRebookNote(r.clash ? `Booked for ${r.label}. That time overlaps another booking or blocked time, so check your calendar.` : `Booked for ${r.label}.`);
+      void refreshBookings();
+    } catch (cause) {
+      setRebookNote(errorMessage(cause));
+    } finally {
+      setRebooking(false);
+    }
+  };
   const params = useLocalSearchParams<{ appointmentId?: string; clientName?: string; serviceName?: string; amountCents?: string; depositCents?: string; phone?: string; email?: string; quickSale?: string; clientId?: string; serviceIds?: string }>();
   const [digits, setDigits] = useState('0');
   const [tipCents, setTipCents] = useState(0);
@@ -766,6 +785,7 @@ export default function CheckoutScreen() {
     setGiftCardCode('');
     setGiftOpen(false);
     setCashOpen(false); setCashGiven(''); setChangeCents(0); setPaidSummary('');
+    setNextWeeks(null); setRebookNote('');
     setProducts([]); setGiftPaidCents(0); setCashPartCents(0); setCreditPaidCents(0); setCreditBalanceCents(0);
     void clearPendingTerminalCapture();
   };
@@ -826,8 +846,18 @@ export default function CheckoutScreen() {
             </View> : null}
             {/* Quick Notes for the visit just paid (owner, 2026-11-11; app/quick-notes.tsx). */}
             {!isQuickSale && Number(appointmentId) > 0 ? <TouchableOpacity testID="checkout-quick-notes" onPress={() => router.push({ pathname: '/quick-notes' as any, params: { appointmentId: String(appointmentId) } })} style={[styles.primaryButton, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, marginBottom: 10 }]}><Feather name="edit-3" size={19} color={colors.foreground} /><Text style={[styles.primaryButtonText, { color: colors.foreground }]}>Quick Notes</Text></TouchableOpacity> : null}
-            {/* Book the client's next visit with the same services (owner, 2026-11-15). */}
-            {!isQuickSale && String(params.serviceIds ?? '') ? <TouchableOpacity testID="checkout-rebook" onPress={() => { const next = { clientId: String(params.clientId ?? ''), phone: String(params.phone ?? ''), serviceIds: String(params.serviceIds ?? '') }; resetCheckout(); router.push({ pathname: '/booking', params: next }); }} style={[styles.primaryButton, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, marginBottom: 10 }]}><Feather name="calendar" size={19} color={colors.foreground} /><Text style={[styles.primaryButtonText, { color: colors.foreground }]}>Rebook</Text></TouchableOpacity> : null}
+            {/* Book the next appointment (owner, 2026-11-18, GlossGenius style; replaces the 11-15 Rebook button). */}
+            {!isQuickSale && Number(appointmentId) > 0 ? <View testID="rebook-block" style={{ width: '100%', gap: 8, marginBottom: 14 }}>
+              <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Book next appointment</Text>
+              <SelectField testID="rebook-weeks" title="Next appointment in" placeholder="Choose when" value={nextWeeks} onChange={(w) => { setNextWeeks(w); setRebookNote(''); }}
+                options={[1, 2, 3, 4, 5, 6, 8, 10, 12].map((w) => ({ value: w, label: w === 1 ? 'In 1 week' : `In ${w} weeks` }))} />
+              {nextWeeks ? <>
+                <TouchableOpacity testID="rebook-calendar" onPress={() => { const d = nextDay(); clearCheckout(); setCalendarDate(d); router.replace('/(tabs)/calendar'); }} style={[styles.primaryButton, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, marginBottom: 0 }]}><Text style={[styles.primaryButtonText, { color: colors.foreground }]}>See my calendar</Text></TouchableOpacity>
+                <TouchableOpacity testID="rebook-instant" disabled={rebooking} onPress={() => void instantBook()} style={[styles.primaryButton, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, marginBottom: 0 }]}><Text style={[styles.primaryButtonText, { color: colors.foreground }]}>{rebooking ? 'Booking…' : 'Instant book'}</Text></TouchableOpacity>
+                <TouchableOpacity testID="rebook-choose" onPress={() => { const d = nextDay(); const next = { clientId: String(params.clientId ?? ''), phone: String(params.phone ?? ''), serviceIds: String(params.serviceIds ?? ''), day: `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}` }; clearCheckout(); router.push({ pathname: '/booking', params: next }); }} style={[styles.primaryButton, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, marginBottom: 0 }]}><Text style={[styles.primaryButtonText, { color: colors.foreground }]}>Choose another time</Text></TouchableOpacity>
+              </> : null}
+              {rebookNote ? <Text testID="rebook-note" style={[styles.setupText, { color: colors.primary }]}>{rebookNote}</Text> : null}
+            </View> : null}
             <TouchableOpacity testID="new-checkout" onPress={resetCheckout} style={[styles.primaryButton, { backgroundColor: colors.primary }]}><Text style={[styles.primaryButtonText, { color: colors.primaryForeground }]}>{isQuickSale ? 'New sale' : 'New checkout'}</Text></TouchableOpacity>
           </View>
         ) : (
