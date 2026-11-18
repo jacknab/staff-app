@@ -69,7 +69,7 @@ export default function HomeScreen() {
   }, [ownStaffId, timeZone]);
   // Website messages not read yet: the envelope's count (owner, 2026-11-07).
   const [inboxUnread, setInboxUnread] = useState(0);
-  // Bookings clients cancelled, waiting for the owner's choice (GlossGenius style, 2026-11-17; Booking details).
+  // Late cancellations (client or pro, inside the cancellation policy, card on file) waiting for the fee choice (2026-11-18).
   const [cancels, setCancels] = useState<Ticket[]>([]);
   // The weekly revenue goal (owner, 2026-11-18, GlossGenius; app/revenue-goal.tsx).
   const [goal, setGoal] = useState<{ goalCents: number; week: { cents: number } } | null>(null);
@@ -153,8 +153,8 @@ export default function HomeScreen() {
         <View style={[styles.list, card]} testID="home-attention">
           {[
             ...cancels.map((t) => ({
-              key: `c${t.id}`, title: `Cancelled by client · ${clientName(t)}`,
-              sub: `${t.service?.name || 'Appointment'} · was ${zonedDateLabel(t.date, timeZone)}, ${zonedTimeLabel(t.date, timeZone)} · choose what to do`,
+              key: `c${t.id}`, title: `Late cancellation · ${clientName(t)}`,
+              sub: `${t.service?.name || 'Appointment'} · was ${zonedDateLabel(t.date, timeZone)}, ${zonedTimeLabel(t.date, timeZone)} · charge the fee?`,
               open: () => router.push(`/appointment/${t.id}`), testID: `home-cancel-${t.id}`,
             })),
             ...requests.slice(0, 5).map((r) => ({

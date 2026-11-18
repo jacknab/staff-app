@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { callClient } from '@/lib/voice';
 import { addressLine, appointmentParams, mapAppointment, type ApiAppointment, type HouseCallAddress } from '@/contexts/BookingContext';
 import { Feather } from '@expo/vector-icons';
@@ -98,6 +98,7 @@ type AppointmentRouteParams = {
     cardOnFile?: string;
     clientConfirmed?: string;
     clientCancelPending?: string;
+    feeDecision?: string;
     feePercent?: string;
     feeCents?: string;
     feeChargedCents?: string;
@@ -395,6 +396,8 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
       if (!isPreview) {
         const r = await api.post<any>(`/api/appointments/${appointmentId}/${path}`, body ?? {});
         await refresh();
+        // Cancelled inside the cancellation policy with a card on file: ask about the late-cancel fee now.
+        if (path === 'cancel' && r?.appointment?.clientCancelPending) setFlagged(true);
         if (path === 'cancel' && body?.notifyClient && r?.notification?.status === 'not_sent') {
           Alert.alert('Cancelled', 'The booking is cancelled, but the text to the client could not be sent.');
         }
@@ -414,6 +417,7 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
   ]);
   // The fee (decided 10-22): only when the pro taps it, to the client's card on file. The amount is the one agreed
   // when the client booked (saved with the booking, 11-07); older bookings: the fee % of the booking.
+  const [waivedHere, setWaivedHere] = useState(false);
   const [feeCharged, setFeeCharged] = useState<number | null>(params.feeChargedCents ? Number(params.feeChargedCents) : null);
   const feePercent = Number(params.feePercent || 0);
   // Else of the booking's price without the travel fee — the same amount the server charges.
@@ -427,7 +431,8 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
     : feeRetry.status === 'partial' ? `We couldn't collect the full ${feeLabel.toLowerCase()} fee of $${(feeRetry.owedCents / 100).toFixed(2)}. Collected $${((feeRetry.collectedCents ?? 0) / 100).toFixed(2)}, and the card won't be charged again.`
     : feeRetry.status === 'gave_up' ? `${feeLabel} fee of $${(feeRetry.owedCents / 100).toFixed(2)} couldn't be collected${feeRetry.error ? `: ${feeRetry.error}` : ''}. We stopped trying the card.`
     : null;
-  const canChargeFee = closed && feeCharged == null && depositPaidCents <= 0 && feeRetry?.status !== 'gave_up' && params.cardOnFile === '1' && feePercent > 0 && feeCents >= 50 && !isPreview;
+  // Not after the pro chose not to charge a late cancel (Don't charge).
+  const canChargeFee = closed && feeCharged == null && params.feeDecision !== 'waived' && !waivedHere && depositPaidCents <= 0 && feeRetry?.status !== 'gave_up' && params.cardOnFile === '1' && feePercent > 0 && feeCents >= 50 && !isPreview;
   // What happened to the deposit: refunded automatically for a client's cancel within the policy, kept if late or a no-show.
   const depositMoney = `$${(depositPaidCents / 100).toFixed(2)}`;
   const depositLine = status === 'no_show' ? `No-show · deposit ${depositMoney} kept`
@@ -468,34 +473,35 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
     } finally { setSaving(false); }
   };
 
-  // ── Cancelled by the client (owner, 2026-11-17, GlossGenius style): it waits for the owner to choose. Nothing was
-  // charged when the client cancelled. A deposit that was kept is the penalty, so then no fee and no delete. ──
+  // ── A late cancel (owner, 2026-11-18): cancelled by the client or by the pro inside the booking's cancellation policy,
+  // with a card on file. The server flags it (migration 0387) and it waits on Home until the pro chooses to charge the
+  // late-cancel fee to the card or not. Opening it asks at once. ──
   const [cancelDecided, setCancelDecided] = useState(false);
-  const clientCancelPending = status === 'cancelled' && params.clientCancelPending === '1' && !cancelDecided && !isPreview;
-  const depositKept = depositPaidCents > 0 && params.cancelledInPolicy === '0';
-  const canCollectCancelFee = !depositKept && params.cardOnFile === '1' && feePercent > 0 && feeCents >= 50 && feeCharged == null;
-  const decideCancellation = async (decision: 'delete' | 'no_show' | 'no_show_fee') => {
+  const [flagged, setFlagged] = useState(params.clientCancelPending === '1');
+  const clientCancelPending = status === 'cancelled' && flagged && !cancelDecided && !isPreview;
+  const decideCancellation = async (decision: 'charge' | 'no_charge') => {
     setSaving(true); setError('');
     try {
-      const r = await api.post<{ deleted?: boolean; feeError?: string | null; feeChargedCents?: number | null }>(`/api/pro/appointments/${appointmentId}/cancellation`, { decision });
+      const r = await api.post<{ feeError?: string | null; feeChargedCents?: number | null }>(`/api/pro/appointments/${appointmentId}/cancellation`, { decision });
       setCancelDecided(true);
+      if (decision === 'no_charge') setWaivedHere(true);
       await refresh();
-      if (r?.deleted) { router.back(); return; }
-      setStatus('no_show');
       if (r?.feeChargedCents != null) setFeeCharged(Number(r.feeChargedCents));
-      if (r?.feeError) Alert.alert('Fee not charged', String(r.feeError));
+      if (r?.feeError) Alert.alert('Fee not charged yet', String(r.feeError));
     } catch (cause) {
       setError(cause instanceof ApiError ? cause.message : 'Could not update the booking.');
     } finally { setSaving(false); }
   };
-  const confirmDecision = (decision: 'delete' | 'no_show' | 'no_show_fee') => {
-    const fee = `$${(feeCents / 100).toFixed(2)}`;
-    const [title, body, action] = decision === 'delete'
-      ? ['Delete this appointment?', `${clientName}'s booking is removed. No fee is charged.`, 'Delete Appointment']
-      : decision === 'no_show' ? ['Mark as no-show?', 'No fee is charged.', 'Mark as No-Show']
-      : ['Mark as no-show and charge the fee?', `${fee} will be charged to ${clientName}'s card on file.`, `Charge ${fee}`];
-    Alert.alert(title, body, [{ text: 'Not now', style: 'cancel' }, { text: action, style: decision === 'no_show' ? 'default' : 'destructive', onPress: () => void decideCancellation(decision) }]);
-  };
+  const feeAsk = `$${(feeCents / 100).toFixed(2)}`;
+  const askLateCancelFee = () => Alert.alert('Late cancellation',
+    `This booking was cancelled inside your cancellation policy. Charge ${clientName}'s card on file the ${feeAsk} late-cancel fee?`, [
+      { text: `Charge ${feeAsk}`, style: 'destructive', onPress: () => void decideCancellation('charge') },
+      { text: 'Don’t charge', onPress: () => void decideCancellation('no_charge') },
+    ]);
+  const asked = useRef(false);
+  useEffect(() => {
+    if (clientCancelPending && !asked.current) { asked.current = true; askLateCancelFee(); }
+  }, [clientCancelPending]);
 
   // ── History (owner, 2026-11-17): every change to this booking, who made it, and the old and new values ──
   // "How did you hear about us?" (owner, 2026-11-18, GlossGenius): when the business asks it and this client hasn't answered.
@@ -781,28 +787,18 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
             </>
           ) : clientCancelPending ? (
             <>
-              {/* Cancelled by the client: the owner chooses (GlossGenius style). */}
+              {/* A late cancel: charge the late-cancel fee to the card on file, or don't (asked when the booking opens). */}
               <Text testID="client-cancel-note" style={[styles.refundedNote, { color: colors.foreground }]}>
-                {`${clientName} cancelled this booking${params.cancelledInPolicy === '1' ? ' within your cancellation policy' : params.cancelledInPolicy === '0' ? ' after your cancellation window' : ''}${depositKept ? `, and the ${depositMoney} deposit was kept` : ''}. Choose what to do:`}
+                {`This booking was cancelled inside your cancellation policy. Charge ${clientName}'s card on file the late-cancel fee?`}
               </Text>
-              {!depositKept ? (
-                <TouchableOpacity testID="cancel-decision-delete" disabled={saving} onPress={() => confirmDecision('delete')} style={[styles.secondaryAction, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  <Feather name="trash-2" size={20} color={colors.foreground} />
-                  <Text style={[styles.secondaryActionText, { color: colors.foreground }]}>DELETE APPOINTMENT</Text>
-                </TouchableOpacity>
-              ) : null}
-              <TouchableOpacity testID="cancel-decision-no-show" disabled={saving} onPress={() => confirmDecision('no_show')} style={[styles.secondaryAction, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <Feather name="user-x" size={20} color={colors.foreground} />
-                <Text style={[styles.secondaryActionText, { color: colors.foreground }]}>MARK AS NO-SHOW (NO FEE)</Text>
+              <TouchableOpacity testID="cancel-decision-fee" disabled={saving} onPress={() => void decideCancellation('charge')} style={[styles.secondaryAction, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Feather name="credit-card" size={20} color={colors.primary} />
+                <Text style={[styles.secondaryActionText, { color: colors.foreground }]}>{`CHARGE LATE-CANCEL FEE · ${feeAsk}`}</Text>
               </TouchableOpacity>
-              {canCollectCancelFee ? (
-                <TouchableOpacity testID="cancel-decision-fee" disabled={saving} onPress={() => confirmDecision('no_show_fee')} style={[styles.secondaryAction, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  <Feather name="credit-card" size={20} color={colors.primary} />
-                  <Text style={[styles.secondaryActionText, { color: colors.foreground }]}>{`MARK AS NO-SHOW (COLLECT FEE · $${(feeCents / 100).toFixed(2)})`}</Text>
-                </TouchableOpacity>
-              ) : !depositKept && feePercent > 0 && params.cardOnFile !== '1' ? (
-                <Text style={[styles.refundedNote, { color: colors.mutedForeground }]}>No card on file, so the fee can't be charged.</Text>
-              ) : null}
+              <TouchableOpacity testID="cancel-decision-no-charge" disabled={saving} onPress={() => void decideCancellation('no_charge')} style={[styles.secondaryAction, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Feather name="x-circle" size={20} color={colors.foreground} />
+                <Text style={[styles.secondaryActionText, { color: colors.foreground }]}>DON’T CHARGE</Text>
+              </TouchableOpacity>
             </>
           ) : closed ? (
             <>

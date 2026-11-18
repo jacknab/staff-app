@@ -84,6 +84,7 @@ export type AppointmentRecord = {
   cardOnFile?: boolean;
   /** Cancelled by the client and waiting for the owner's choice (GlossGenius style, 2026-11-17). */
   clientCancelPending?: boolean;
+  feeDecision?: string | null;
   feePercent?: number | null;
   /** The fee agreed when the client booked online; null for older bookings (worked out from the %). */
   feeCents?: number | null;
@@ -143,7 +144,7 @@ type ApiCustomer = {
   allergies?: string | null; isVip?: boolean | null; tags?: string[] | null; avatarUrl?: string | null;
 };
 type ApiService = { id: number; parentServiceId?: number | null; isActive?: boolean | null; calendarColor?: string | null; categoryId?: number | null; offeredAt?: string | null; name?: string | null; duration?: number | string | null; price?: number | string | null };
-export type ApiAppointment = { clientConfirmedAt?: string | null; processingStartMin?: number | null; processingMin?: number | null; clientCancelPending?: boolean | null; feeRetry?: { status: string; owedCents: number; collectedCents: number | null; error: string | null } | null; depositRefundRetry?: string | null; cancelledInPolicy?: boolean | null; depositRefundedCents?: number | null; depositRefundFailed?: boolean | null; cardOnFile?: boolean | null; feePercent?: number | null; feeCents?: number | null; feeChargedCents?: number | null; totalPaid?: number | null; refundedCents?: number | null; calendarHidden?: boolean | null; paymentStatus?: string | null; depositCollected?: number | null; visitAt?: string | null; clientAddress?: HouseCallAddress | null; travelFee?: number | null; appointmentAddons?: { addon?: { id?: number; name?: string | null; price?: number | string | null } | null }[] | null; customLines?: { label?: string; price?: number | string | null }[] | null; id: number; date: string; duration?: number | null; status?: string | null; notes?: string | null; customer?: ApiCustomer | null; service?: ApiService | null };
+export type ApiAppointment = { clientConfirmedAt?: string | null; processingStartMin?: number | null; processingMin?: number | null; clientCancelPending?: boolean | null; feeDecision?: string | null; feeRetry?: { status: string; owedCents: number; collectedCents: number | null; error: string | null } | null; depositRefundRetry?: string | null; cancelledInPolicy?: boolean | null; depositRefundedCents?: number | null; depositRefundFailed?: boolean | null; cardOnFile?: boolean | null; feePercent?: number | null; feeCents?: number | null; feeChargedCents?: number | null; totalPaid?: number | null; refundedCents?: number | null; calendarHidden?: boolean | null; paymentStatus?: string | null; depositCollected?: number | null; visitAt?: string | null; clientAddress?: HouseCallAddress | null; travelFee?: number | null; appointmentAddons?: { addon?: { id?: number; name?: string | null; price?: number | string | null } | null }[] | null; customLines?: { label?: string; price?: number | string | null }[] | null; id: number; date: string; duration?: number | null; status?: string | null; notes?: string | null; customer?: ApiCustomer | null; service?: ApiService | null };
 
 const BookingContext = createContext<BookingContextValue | null>(null);
 
@@ -202,7 +203,7 @@ export function mapAppointment(appointment: ApiAppointment, timeZone: string): A
     addonLines: (appointment.appointmentAddons ?? []).map((row) => ({ label: String(row?.addon?.name ?? 'Add-on'), price: Number(row?.addon?.price ?? 0) || 0 })),
     totalPaidCents: appointment.totalPaid != null ? Math.round(Number(appointment.totalPaid) * 100) : null,
     refundedCents: Number(appointment.refundedCents ?? 0) || 0,
-    cardOnFile: !!appointment.cardOnFile, clientCancelPending: !!appointment.clientCancelPending, feePercent: appointment.feePercent != null ? Number(appointment.feePercent) : null,
+    cardOnFile: !!appointment.cardOnFile, clientCancelPending: !!appointment.clientCancelPending, feeDecision: appointment.feeDecision ?? null, feePercent: appointment.feePercent != null ? Number(appointment.feePercent) : null,
     feeCents: appointment.feeCents != null ? Number(appointment.feeCents) : null,
     feeChargedCents: appointment.feeChargedCents != null ? Number(appointment.feeChargedCents) : null };
 }
@@ -342,6 +343,7 @@ export function appointmentParams(item: AppointmentRecord) {
       refundedCents: String(item.refundedCents ?? 0),
       cardOnFile: item.cardOnFile ? '1' : '0',
       clientCancelPending: item.clientCancelPending ? '1' : '0',
+      feeDecision: item.feeDecision ?? '',
       feePercent: item.feePercent != null ? String(item.feePercent) : '',
       feeCents: item.feeCents != null ? String(item.feeCents) : '',
       feeChargedCents: item.feeChargedCents != null ? String(item.feeChargedCents) : '',
