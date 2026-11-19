@@ -46,7 +46,7 @@ import { look, cardShadow } from '@/components/look/tokens';
 // Stripe M2 does not require that Apple entitlement.
 const TAP_TO_PAY_ENABLED = true;
 // Shown on the payment screen so a tester can tell which build is installed.
-const BUILD_LABEL = 'Build Nov 19 · R';
+const BUILD_LABEL = 'Build Nov 19 · S';
 const EXPO_GO_PREVIEW = process.env.EXPO_PUBLIC_EXPO_GO_PREVIEW === '1';
 
 type PaymentStep = 'idle' | 'tap_intro' | 'initializing' | 'discovering' | 'connecting' | 'ready' | 'processing' | 'capture_pending' | 'success' | 'error';
@@ -93,7 +93,7 @@ export default function CheckoutScreen() {
       setRebooking(false);
     }
   };
-  const params = useLocalSearchParams<{ appointmentId?: string; clientName?: string; serviceName?: string; amountCents?: string; depositCents?: string; phone?: string; email?: string; quickSale?: string; clientId?: string; serviceIds?: string }>();
+  const params = useLocalSearchParams<{ appointmentId?: string; clientName?: string; serviceName?: string; amountCents?: string; depositCents?: string; phone?: string; email?: string; quickSale?: string; clientId?: string; serviceIds?: string; tipCents?: string; discountCents?: string }>();
   const [digits, setDigits] = useState('0');
   const [tipCents, setTipCents] = useState(0);
   const [appointmentId, setAppointmentId] = useState('');
@@ -123,6 +123,15 @@ export default function CheckoutScreen() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.appointmentId]);
+  // The tablet POS's Tip Adjust key (owner, 2026-11-19): the tip is already chosen, so the tip screen is skipped.
+  useEffect(() => {
+    if (params.tipCents == null || step !== 'idle' || !params.appointmentId) return;
+    const tip = Math.max(0, Math.round(Number(params.tipCents) || 0));
+    setTipCents(tip);
+    setDigits(String((Number(params.amountCents) || 0) + tip));
+    setStep('tap_intro');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.appointmentId, params.tipCents]);
   // A POS quick sale (app/(tabs)/pos.tsx) is its own ticket; leaving before paying removes it again.
   const isQuickSale = params.quickSale === '1';
 
@@ -285,6 +294,11 @@ export default function CheckoutScreen() {
     baseCentsParam,
     customDiscountCents > 0 ? customDiscountCents : Math.round(baseCentsParam * discountPercent / 100),
   );
+  // The tablet POS's Discount key (owner, 2026-11-19): put in as the amount off, which the pro can still change here.
+  useEffect(() => {
+    const off = Math.round(Number(params.discountCents) || 0);
+    if (off > 0) { setDiscountPercent(0); setCustomDiscount((off / 100).toFixed(2)); }
+  }, [params.appointmentId, params.discountCents]);
   // A member's discount (owner, 2026-11-15; routes/proMemberships.ts): put in as the amount off, which the pro can change.
   const [memberDiscount, setMemberDiscount] = useState<{ name: string; percent: number } | null>(null);
   useEffect(() => {
