@@ -9,11 +9,16 @@ import { Feather } from '@expo/vector-icons';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text, TextInput } from '@/components/AppText';
 import { useRouter } from 'expo-router';
-import { CatalogScreen, Choice, Empty, ErrorLine, Field, Label, List, Loading, Pair, QuietButton, Row, SaveButton, SectionTitle, errorText, money } from '@/components/catalog/CatalogKit';
+import { CatalogScreen, Choice, ErrorLine, Field, Label, List, Loading, Pair, QuietButton, Row, SaveButton, SectionTitle, errorText, money } from '@/components/catalog/CatalogKit';
 import { SelectField } from '@/components/SelectField';
 import { useColors } from '@/hooks/useColors';
 import { usePaymentsReady } from '@/lib/usePaymentsReady';
 import { api } from '@/lib/live-api';
+import { useWindowDimensions } from 'react-native';
+import { EmptyHero } from '@/components/EmptyHero';
+import { PageIntro } from '@/components/PageIntro';
+import { HELP_PANEL_MIN_WIDTH } from '@/components/TabletFrame';
+import { TABLET_INTRO } from '@/lib/tabletIntro';
 
 type Interval = 'month' | 'year';
 type Plan = { id: number; name: string; description: string | null; priceCents: number; interval: Interval; discountPercent: number; isActive: boolean; members: number; includes: Array<{ serviceId: number; visits: number; name: string }> };
@@ -33,6 +38,8 @@ export default function MembershipsScreen() {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const { width } = useWindowDimensions();
+  const startNew = () => { setError(''); setDraft({ id: 0, name: '', description: '', price: '', interval: 'month', discount: '', includes: [{ serviceId: 0, visits: '1' }] }); };
 
   const load = useCallback(async () => {
     try {
@@ -91,7 +98,7 @@ export default function MembershipsScreen() {
       title={draft ? (draft.id > 0 ? 'Edit membership' : 'New membership') : 'Memberships'}
       onBack={() => (draft ? (setDraft(null), setError('')) : router.back())}
       inner={!!draft}
-      onAdd={draft ? undefined : () => { setError(''); setDraft({ id: 0, name: '', description: '', price: '', interval: 'month', discount: '', includes: [{ serviceId: 0, visits: '1' }] }); }}
+      onAdd={draft ? undefined : startNew}
       addLabel="Add a membership"
       testID="memberships"
     >
@@ -136,13 +143,22 @@ export default function MembershipsScreen() {
           {payments === false ? (
             <Row testID="memberships-setup-payments" title="Set up card payments first" hint="Members pay by card every month or year." onPress={() => router.push('/payments-intro')} />
           ) : null}
-          {plans.length === 0 && !error ? <Empty>No memberships yet. Tap + to make one, for example 1 gel fill a month for $45.</Empty> : null}
-          <List>
+          {/* Nothing made yet (owner's mock-up, 2026-11-20): the big intro with Create a Membership; on a phone or an upright
+              tablet the intro panel's rows go under it. */}
+          {plans.length === 0 && !error ? (
+            <>
+              <EmptyHero testID="memberships-empty" compact={width < 600} icons={['calendar', 'credit-card', 'percent']} badge="star" title="Create Memberships"
+                text="Build recurring plans, give exclusive benefits, and keep clients coming back."
+                button="Create a Membership" onPress={startNew} note="No memberships yet. Tap + to make one." />
+              {width < HELP_PANEL_MIN_WIDTH ? <PageIntro compact={width < 600} intro={TABLET_INTRO.memberships} /> : null}
+            </>
+          ) : null}
+          {plans.length > 0 ? <List>
             {plans.map((p) => (
               <Row key={p.id} testID={`membership-plan-${p.id}`} dim={!p.isActive} title={p.name} hint={p.isActive ? planHint(p) : 'Not offered'} right={`${money(p.priceCents / 100)}/${p.interval === 'month' ? 'mo' : 'yr'}`}
                 onPress={() => { setError(''); setDraft({ id: p.id, name: p.name, description: p.description ?? '', price: (p.priceCents / 100).toFixed(2), interval: p.interval, discount: p.discountPercent ? String(p.discountPercent) : '', includes: p.includes.map((i) => ({ serviceId: i.serviceId, visits: String(i.visits) })) }); }} />
             ))}
-          </List>
+          </List> : null}
           {members.length > 0 ? (
             <>
               <SectionTitle>MEMBERS</SectionTitle>

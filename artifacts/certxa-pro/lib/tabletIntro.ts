@@ -23,4 +23,13 @@ export const TABLET_INTRO: Record<string, TabletIntro> = {
     ],
     examples: ['6 Services Package', '10-Visit Package', 'Monthly Membership', 'Wellness Package'],
   },
+  memberships: {
+    intro: 'Offer recurring plans (monthly, yearly, or custom) that give clients ongoing value and exclusive benefits.',
+    cards: [
+      { icon: 'calendar', title: 'What is a membership?', text: 'A recurring plan that gives clients access to services, discounts, or special perks.' },
+      { icon: 'settings', title: 'How it works', text: 'Create a plan, set the price and billing cycle (monthly, yearly, or custom), add the included benefits, and publish it.' },
+      { icon: 'users', title: 'Client benefits', text: 'Clients get consistent value, exclusive offers, and an easy way to manage their plan in their account.' },
+    ],
+    examples: ['Monthly Wellness Plan', 'Self-Care Membership', 'VIP Membership', 'Annual Membership'],
+  },
 };

@@ -10,9 +10,11 @@ import { look } from '@/components/look/tokens';
 
 type Icon = keyof typeof Feather.glyphMap;
 
-export function EmptyHero({ icons, title, text, button, onPress, note, testID, compact = false }: {
+export function EmptyHero({ icons, badge, title, text, button, onPress, note, testID, compact = false }: {
   /** Left, middle and right cards. */
   icons: [Icon, Icon, Icon];
+  /** A small round violet badge on the middle card's icon (Memberships: a star). */
+  badge?: Icon;
   title: string;
   text: string;
   button: string;
@@ -32,7 +34,10 @@ export function EmptyHero({ icons, title, text, button, onPress, note, testID, c
         </View>
         <View style={styles.cards}>
           <View style={[styles.side, { transform: [{ rotate: '-10deg' }], marginRight: compact ? -18 : -26 }]}><Feather name={icons[0]} size={compact ? 32 : 44} color="#B9A2F2" /></View>
-          <View style={styles.middle}><Feather name={icons[1]} size={compact ? 58 : 84} color={look.violet} /></View>
+          <View style={styles.middle}>
+            <Feather name={icons[1]} size={compact ? 58 : 84} color={look.violet} />
+            {badge ? <View style={styles.badge}><Feather name={badge} size={compact ? 16 : 24} color="#FFFFFF" /></View> : null}
+          </View>
           <View style={[styles.side, { transform: [{ rotate: '10deg' }], marginLeft: compact ? -18 : -26 }]}><Feather name={icons[2]} size={compact ? 32 : 44} color="#B9A2F2" /></View>
         </View>
       </View>
@@ -58,6 +63,7 @@ const big = StyleSheet.create({
   cards: { flexDirection: 'row', alignItems: 'center' },
   side: { ...card, width: 128, height: 140, borderRadius: 24, backgroundColor: '#F6F2FE' },
   middle: { ...card, width: 172, height: 172, borderRadius: 30, zIndex: 1 },
+  badge: { position: 'absolute', top: 26, right: 22, width: 50, height: 50, borderRadius: 25, backgroundColor: look.violet, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: '#FFFFFF' },
   title: { fontSize: 38, lineHeight: 46, letterSpacing: -0.8, fontFamily: 'Inter_700Bold', color: look.heading, textAlign: 'center' },
   text: { fontSize: 22, lineHeight: 31, fontFamily: 'Inter_400Regular', color: look.subtle, textAlign: 'center', marginTop: 12, maxWidth: 520 },
   button: { flexDirection: 'row', alignItems: 'center', gap: 12, height: 64, paddingHorizontal: 54, borderRadius: 32, backgroundColor: look.violet, marginTop: 34,
@@ -74,6 +80,7 @@ const small = StyleSheet.create({
   spark: { width: 5, height: 14, borderRadius: 3, backgroundColor: look.violet },
   side: { ...card, width: 90, height: 100, borderRadius: 18, backgroundColor: '#F6F2FE' },
   middle: { ...card, width: 120, height: 120, borderRadius: 24, zIndex: 1 },
+  badge: { position: 'absolute', top: 16, right: 14, width: 34, height: 34, borderRadius: 17, backgroundColor: look.violet, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#FFFFFF' },
   title: { fontSize: 28, lineHeight: 34, letterSpacing: -0.5, fontFamily: 'Inter_700Bold', color: look.heading, textAlign: 'center' },
   text: { fontSize: 17, lineHeight: 24, fontFamily: 'Inter_400Regular', color: look.subtle, textAlign: 'center', marginTop: 8 },
   button: { ...big.button, height: 54, paddingHorizontal: 34, borderRadius: 27, marginTop: 24 },
