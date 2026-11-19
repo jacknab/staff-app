@@ -47,7 +47,7 @@ import { look, cardShadow } from '@/components/look/tokens';
 // Stripe M2 does not require that Apple entitlement.
 const TAP_TO_PAY_ENABLED = true;
 // Shown on the payment screen so a tester can tell which build is installed.
-const BUILD_LABEL = 'Build Nov 19 · X';
+const BUILD_LABEL = 'Build Nov 19 · Y';
 const EXPO_GO_PREVIEW = process.env.EXPO_PUBLIC_EXPO_GO_PREVIEW === '1';
 
 type PaymentStep = 'idle' | 'tap_intro' | 'initializing' | 'discovering' | 'connecting' | 'ready' | 'processing' | 'capture_pending' | 'success' | 'error';
@@ -944,7 +944,9 @@ export default function CheckoutScreen() {
       <View style={[styles.root, { backgroundColor: look.pageTop, paddingTop: topInset }]}>
         <AppBackground />
         <StatusBar barStyle="dark-content" />
-        <View style={styles.tapHeader}>
+        {/* In the tablet POS the ways to pay are a page of their own (owner, 2026-11-19): no header and no Amount due (the
+            ticket beside it shows the total), and EXIT at the bottom puts the POS back as it was. */}
+        {inPane && isTapIntro ? null : <View style={styles.tapHeader}>
           {/* Back: from a card payment to the ways to pay; from the ways to pay out of the checkout. Not while a card payment
               is going through, or one is waiting to be finalized. */}
           {isSuccess ? <View style={{ width: 84 }} /> : (
@@ -956,7 +958,7 @@ export default function CheckoutScreen() {
           )}
           <Text style={[styles.eyebrow, { color: colors.mutedForeground }]}>IN-PERSON CHECKOUT</Text>
           <View style={{ width: 84 }} />
-        </View>
+        </View>}
         {isSuccess ? (
           <View style={styles.successContent}>
             <View style={[styles.successBadge, { backgroundColor: colors.secondary }]}><Feather name="check" size={32} color={colors.primary} /></View>
@@ -994,12 +996,12 @@ export default function CheckoutScreen() {
             <TouchableOpacity testID="new-checkout" onPress={resetCheckout} style={[styles.primaryButton, { backgroundColor: colors.primary }]}><Text style={[styles.primaryButtonText, { color: colors.primaryForeground }]}>{isQuickSale ? 'New sale' : 'New checkout'}</Text></TouchableOpacity>
           </View>
         ) : (
-          <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.tapContent, { flexGrow: 1, paddingBottom: insets.bottom + 84 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.tapContent, { flexGrow: 1, paddingBottom: inPane ? 16 : insets.bottom + 84 }, inPane && { paddingTop: 18, paddingHorizontal: 18 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
              {isTapIntro ? null : <View style={[styles.nfcCircle, { backgroundColor: isReady || isCapturePending ? colors.secondary : colors.muted }]}><Feather name={isCapturePending ? 'alert-circle' : isReady ? 'radio' : 'loader'} size={32} color={isReady || isCapturePending ? colors.primary : colors.mutedForeground} /></View>}
              <Text style={[styles.tapTitle, { color: colors.foreground }]}>{isCapturePending ? 'Payment needs finalizing' : isTapIntro ? 'Take payment' : isReady ? 'Ready for payment' : `Connecting ${readerMode === 'm2' ? 'Stripe M2' : 'Tap to Pay'}`}</Text>
              {/* Hidden on checkout (owner, 2026-11-18): the line under "Take payment" (error or "Card, cash or gift card."). Remove this comment to bring it back.
              <Text style={[styles.tapSub, { color: colors.mutedForeground }]}>{error || (isTapIntro ? 'Card, cash or gift card.' : statusText)}</Text> */}
-            <View style={[styles.amountCard, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.eyebrow, { color: colors.mutedForeground }]}>AMOUNT DUE</Text><Text style={[styles.tapAmount, { color: colors.foreground }]}>{dollars(digits)}</Text><Text style={[styles.serviceLabel, { color: colors.mutedForeground }]}>{clientName.trim() || 'Certxa appointment'} · {isQuickSale ? String(params.serviceName || 'Quick sale') : `Appointment #${appointmentId || '—'}`}</Text></View>
+            {inPane && isTapIntro ? null : <View style={[styles.amountCard, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.eyebrow, { color: colors.mutedForeground }]}>AMOUNT DUE</Text><Text style={[styles.tapAmount, { color: colors.foreground }]}>{dollars(digits)}</Text><Text style={[styles.serviceLabel, { color: colors.mutedForeground }]}>{clientName.trim() || 'Certxa appointment'} · {isQuickSale ? String(params.serviceName || 'Quick sale') : `Appointment #${appointmentId || '—'}`}</Text></View>}
             {/* Hidden on checkout (owner, 2026-11-18): the error box. Remove this comment to bring it back.
             {error ? <View style={[styles.errorNotice, { backgroundColor: colors.accent }]}><Feather name="alert-circle" size={17} color={colors.accentForeground} /><Text style={[styles.previewText, { color: colors.accentForeground }]}>{error}</Text></View> : null} */}
              {/* Hidden on checkout (owner, 2026-11-18): Discount (with promo code). Remove this comment to bring it back.
@@ -1121,6 +1123,12 @@ export default function CheckoutScreen() {
                </TouchableOpacity>
                {splitOpen ? <Text testID="split-note" style={[styles.setupText, { color: colors.mutedForeground, textAlign: 'center' }]}>Take part of the bill in cash (type the amount), or use a gift card or credit. Then choose how to pay the rest.</Text> : null}
              </> : null}
+             {inPane && isTapIntro ? (
+               <TouchableOpacity testID="pos-pay-exit" disabled={recording || isBusy || !!charging} onPress={leaveCheckout} style={[styles.exitButton, { borderColor: colors.border, backgroundColor: colors.card }]}>
+                 <Feather name="x" size={22} color={colors.foreground} />
+                 <Text style={[styles.exitText, { color: colors.foreground }]}>EXIT</Text>
+               </TouchableOpacity>
+             ) : null}
              <Text testID="build-label" style={[styles.tapSub, { fontSize: 13, marginTop: 10, color: colors.mutedForeground }]}>{BUILD_LABEL}</Text>
           </ScrollView>
         )}
@@ -1182,6 +1190,9 @@ const styles = StyleSheet.create({
   orRow: { width: '100%', flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 18 },
   orLine: { flex: 1, height: StyleSheet.hairlineWidth },
   orText: { fontSize: 15, fontFamily: 'Inter_400Regular' },
+  exitButton: { width: '100%', height: 60, borderRadius: 16, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 'auto', paddingTop: 0,
+    shadowColor: '#2E1065', shadowOpacity: 0.12, shadowRadius: 4, shadowOffset: { width: 0, height: 3 }, elevation: 3 },
+  exitText: { fontSize: 18, fontFamily: 'Inter_700Bold', letterSpacing: 1 },
   splitButton: { width: '100%', height: 54, borderRadius: 27, alignItems: 'center', justifyContent: 'center', marginTop: 14 },
   splitText: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
   root: { flex: 1 },

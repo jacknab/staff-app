@@ -451,10 +451,11 @@ const styles = StyleSheet.create({
   keypadUnder: { width: 'auto' },
   // The grid ends above the app-icons button (bottom right, components/TabletLauncher.tsx), so its last key — Back — is
   // never under it; the gear sits in that row on the left.
-  catalogColumn: { flex: 1, minHeight: 0, gap: 12, paddingBottom: 4 },
-  catalog: { flex: 1, minHeight: 0 },
+  // minWidth 0: whatever the right side shows (the grid or the payment list) never pushes into the ticket and keypad.
+  catalogColumn: { flex: 1, minHeight: 0, minWidth: 0, gap: 12, paddingBottom: 4 },
+  catalog: { flex: 1, minHeight: 0, minWidth: 0 },
   payPanel: { padding: 0, overflow: 'hidden' },
-  locked: { flexDirection: 'row', gap: 14, minHeight: 0 },
+  locked: { flexDirection: 'row', gap: 14, minHeight: 0, flexShrink: 0 },
   lockedOn: { opacity: 0.55 },
   gearShadow: { alignSelf: 'flex-start', borderRadius: 22, shadowColor: '#4C1D95', shadowOpacity: 0.35, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 8 },
   gear: { width: 62, height: 62, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
