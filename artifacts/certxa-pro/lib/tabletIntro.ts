@@ -3,12 +3,15 @@
  * plain help page (components/TabletFrame.tsx). Keyed by the same id as the screen's help page (lib/help.ts), whose
  * title it shows. A screen without an entry here shows its help page instead.
  */
-import type { Feather } from '@expo/vector-icons';
+import type { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+
+/** A line icon: Feather by name, or { mci } from Material Community Icons for the few Feather lacks (a bullhorn). */
+export type IntroIcon = keyof typeof Feather.glyphMap | { mci: keyof typeof MaterialCommunityIcons.glyphMap };
 
 export type TabletIntro = {
   intro: string;
   /** Icon tile, heading and a line or two each. */
-  cards: { icon: keyof typeof Feather.glyphMap; title: string; text: string }[];
+  cards: { icon: IntroIcon; title: string; text: string }[];
   /** "Popular examples" chips. */
   examples?: string[];
 };
@@ -40,5 +43,14 @@ export const TABLET_INTRO: Record<string, TabletIntro> = {
       { icon: 'shield', title: 'Client benefits', text: 'A quick, paperless experience that keeps their information secure and on file for future visits.' },
     ],
     examples: ['Client Intake Form', 'Service Agreement', 'Consent Waiver', 'Policy Acknowledgment'],
+  },
+  campaigns: {
+    intro: 'Run targeted marketing campaigns to attract new clients, fill open time, and boost repeat visits.',
+    cards: [
+      { icon: { mci: 'bullhorn-outline' }, title: 'What is a campaign?', text: 'A marketing message (e.g., promotion, announcement, or reminder) sent to your clients.' },
+      { icon: 'settings', title: 'How it works', text: 'Choose your audience, write your message, and send it by text (SMS) or email.' },
+      { icon: 'trending-up', title: 'Client benefits', text: 'Get updates, special offers, and timely reminders for the services they love.' },
+    ],
+    examples: ['Seasonal Promotion', 'New Service Launch', 'Last-Minute Openings', 'Loyalty Offer'],
   },
 };

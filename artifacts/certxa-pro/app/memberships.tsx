@@ -17,7 +17,7 @@ import { api } from '@/lib/live-api';
 import { useWindowDimensions } from 'react-native';
 import { EmptyHero } from '@/components/EmptyHero';
 import { PageIntro } from '@/components/PageIntro';
-import { HELP_PANEL_MIN_WIDTH } from '@/components/TabletFrame';
+import { useIntroBeside } from '@/components/TabletFrame';
 import { TABLET_INTRO } from '@/lib/tabletIntro';
 
 type Interval = 'month' | 'year';
@@ -39,6 +39,7 @@ export default function MembershipsScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const { width } = useWindowDimensions();
+  const introBeside = useIntroBeside();
   const startNew = () => { setError(''); setDraft({ id: 0, name: '', description: '', price: '', interval: 'month', discount: '', includes: [{ serviceId: 0, visits: '1' }] }); };
 
   const load = useCallback(async () => {
@@ -150,7 +151,7 @@ export default function MembershipsScreen() {
               <EmptyHero testID="memberships-empty" compact={width < 600} icons={['calendar', 'credit-card', 'percent']} badge="star" title="Create Memberships"
                 text="Build recurring plans, give exclusive benefits, and keep clients coming back."
                 button="Create a Membership" onPress={startNew} note="No memberships yet. Tap + to make one." />
-              {width < HELP_PANEL_MIN_WIDTH ? <PageIntro compact={width < 600} intro={TABLET_INTRO.memberships} /> : null}
+              {!introBeside ? <PageIntro compact={width < 600} intro={TABLET_INTRO.memberships} /> : null}
             </>
           ) : null}
           {plans.length > 0 ? <List>

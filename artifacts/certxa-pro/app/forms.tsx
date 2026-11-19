@@ -16,7 +16,7 @@ import { api } from '@/lib/live-api';
 import { useWindowDimensions } from 'react-native';
 import { EmptyHero } from '@/components/EmptyHero';
 import { PageIntro } from '@/components/PageIntro';
-import { HELP_PANEL_MIN_WIDTH } from '@/components/TabletFrame';
+import { useIntroBeside } from '@/components/TabletFrame';
 import { TABLET_INTRO } from '@/lib/tabletIntro';
 
 type FieldType = 'text' | 'long_text' | 'yes_no' | 'choice' | 'multi' | 'date' | 'agree' | 'info' | 'signature';
@@ -49,6 +49,7 @@ export default function FormsScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const { width } = useWindowDimensions();
+  const introBeside = useIntroBeside();
   const startNew = () => { setError(''); setPicking(true); };
 
   const load = useCallback(async () => {
@@ -204,7 +205,7 @@ export default function FormsScreen() {
               <EmptyHero testID="forms-empty" compact={width < 600} icons={['shield', 'clipboard', 'user']} badge="edit-2" title="Create Forms & Waivers"
                 text="Collect client information, agreements, and consent forms digitally."
                 button="Create a Form or Waiver" onPress={startNew} note="No forms yet. Tap + to make one." />
-              {width < HELP_PANEL_MIN_WIDTH ? <PageIntro compact={width < 600} intro={TABLET_INTRO.forms} /> : null}
+              {!introBeside ? <PageIntro compact={width < 600} intro={TABLET_INTRO.forms} /> : null}
             </>
           ) : null}
           {forms.length > 0 ? (

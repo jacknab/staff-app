@@ -8,6 +8,7 @@ import { StyleSheet, View } from 'react-native';
 import { Text } from '@/components/AppText';
 import { look } from '@/components/look/tokens';
 import type { TabletIntro } from '@/lib/tabletIntro';
+import { IntroIcon } from '@/components/IntroIcon';
 
 export function PageIntro({ title, intro, compact = false }: { title?: string; intro: TabletIntro; compact?: boolean }) {
   const s = compact ? small : styles;
@@ -18,7 +19,7 @@ export function PageIntro({ title, intro, compact = false }: { title?: string; i
       <View style={s.cards}>
         {intro.cards.map((c) => (
           <View key={c.title} style={s.card}>
-            <View style={s.icon}><Feather name={c.icon} size={compact ? 24 : 30} color={look.violet} /></View>
+            <View style={s.icon}><IntroIcon icon={c.icon} size={compact ? 24 : 30} color={look.violet} /></View>
             <View style={{ flex: 1 }}>
               <Text style={s.cardTitle}>{c.title}</Text>
               <Text style={s.cardText}>{c.text}</Text>

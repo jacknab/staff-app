@@ -16,7 +16,7 @@ import { SelectField } from '@/components/SelectField';
 import { HelpTitle } from '@/components/HelpTitle';
 import { EmptyHero } from '@/components/EmptyHero';
 import { PageIntro } from '@/components/PageIntro';
-import { HELP_PANEL_MIN_WIDTH } from '@/components/TabletFrame';
+import { useIntroBeside } from '@/components/TabletFrame';
 import { TABLET_INTRO } from '@/lib/tabletIntro';
 import { api, ApiError } from '@/lib/live-api';
 
@@ -43,8 +43,8 @@ export default function PackagesScreen() {
   const [error, setError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const { width } = useWindowDimensions();
-  // Wide enough for the intro panel beside the page (components/TabletFrame.tsx); otherwise it goes under the empty page.
-  const sidePanel = width >= HELP_PANEL_MIN_WIDTH;
+  // The intro panel beside the page (components/TabletFrame.tsx); otherwise it goes under the empty page.
+  const sidePanel = useIntroBeside();
 
   const load = useCallback(async () => {
     try { setShop(await api.get<Shop>('/api/pro/shop')); } catch { setShop((s) => s ?? { giftCardsOn: false, cardsReady: false, packages: [], sold: [] }); }

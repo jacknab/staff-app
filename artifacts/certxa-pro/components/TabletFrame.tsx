@@ -7,6 +7,7 @@ import { HELP } from '@/lib/help';
 import { HelpContent, helpIdForPath } from '@/components/HelpTitle';
 import { TABLET_INTRO } from '@/lib/tabletIntro';
 import { PageIntro } from '@/components/PageIntro';
+import { useInPane } from '@/components/TabletSplit';
 
 /**
  * Tablets (owner, 2026-11-19: pros use phones and tablets): every screen sits in a centered column no wider than a
@@ -21,6 +22,16 @@ import { PageIntro } from '@/components/PageIntro';
 export const APP_MAX_WIDTH = 720;
 /** The tablet width from which a one-column screen gets its help beside it. */
 export const HELP_PANEL_MIN_WIDTH = 1000;
+
+/**
+ * Is this screen's intro panel showing beside it? Not on a phone or an upright tablet, and not when the screen is open
+ * inside another page's right-hand pane (More, Services…). When it isn't, an empty page shows the intro under its hero.
+ */
+export function useIntroBeside() {
+  const { width } = useWindowDimensions();
+  const inPane = useInPane();
+  return width >= HELP_PANEL_MIN_WIDTH && !inPane;
+}
 
 export function TabletFrame({ children }: { children: ReactNode }) {
   const pathname = usePathname();

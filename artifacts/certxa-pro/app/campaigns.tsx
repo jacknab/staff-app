@@ -18,6 +18,11 @@ import { HelpTitle } from '@/components/HelpTitle';
 import { AppBackground } from '@/components/look/AppBackground';
 import { look, cardShadow } from '@/components/look/tokens';
 import { useInPane } from '@/components/TabletSplit';
+import { useWindowDimensions } from 'react-native';
+import { EmptyHero } from '@/components/EmptyHero';
+import { PageIntro } from '@/components/PageIntro';
+import { useIntroBeside } from '@/components/TabletFrame';
+import { TABLET_INTRO } from '@/lib/tabletIntro';
 type Campaign = { id: number; name: string; status: string; audience: string; messageTemplate: string; sentCount: number | null; failedCount: number | null;
   rejectionReason?: string | null; sentAt: string | null; createdAt: string };
 const AUDIENCE = [
@@ -39,6 +44,8 @@ export default function CampaignsScreen() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const { width } = useWindowDimensions();
+  const introBeside = useIntroBeside();
 
   const load = useCallback(async () => {
     try { setList(await api.get<Campaign[]>('/api/campaigns')); } catch { setList([]); }
@@ -98,7 +105,16 @@ export default function CampaignsScreen() {
             </TouchableOpacity>
           </>
         ) : list == null ? <ActivityIndicator style={{ marginTop: 60 }} color={colors.mutedForeground} />
-          : list.length === 0 ? <Text style={[styles.muted, { color: colors.mutedForeground, textAlign: 'center', marginTop: 40 }]}>Send one text to many clients: a special, an opening, a reminder to book.</Text>
+          : list.length === 0 ? (
+            // Nothing sent yet (owner's mock-up, 2026-11-20): the big intro with Create a Campaign; the intro panel's rows
+            // go under it on a phone, an upright tablet or in More's pane.
+            <>
+              <EmptyHero testID="campaigns-empty" compact={width < 600} icons={['mail', { mci: 'bullhorn-outline' }, 'message-circle']} badge="percent" title="Create Marketing Campaigns"
+                text="Promote your services, special offers, and events to keep clients engaged and coming back."
+                button="Create a Campaign" onPress={() => setWriting(true)} note="No campaigns yet. Tap + to make one." />
+              {!introBeside ? <PageIntro compact={width < 600} intro={TABLET_INTRO.campaigns} /> : null}
+            </>
+          )
           : (
             <View style={[styles.list, { borderColor: colors.border, backgroundColor: colors.card }]}>
               {list.map((c, i) => (

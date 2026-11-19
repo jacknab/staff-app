@@ -7,8 +7,8 @@ import { Feather } from '@expo/vector-icons';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text } from '@/components/AppText';
 import { look } from '@/components/look/tokens';
-
-type Icon = keyof typeof Feather.glyphMap;
+import { IntroIcon } from '@/components/IntroIcon';
+import type { IntroIcon as Icon } from '@/lib/tabletIntro';
 
 export function EmptyHero({ icons, badge, title, text, button, onPress, note, testID, compact = false }: {
   /** Left, middle and right cards. */
@@ -33,12 +33,12 @@ export function EmptyHero({ icons, badge, title, text, button, onPress, note, te
           <View style={[styles.spark, { transform: [{ rotate: '55deg' }], marginTop: 14 }]} />
         </View>
         <View style={styles.cards}>
-          <View style={[styles.side, { transform: [{ rotate: '-10deg' }], marginRight: compact ? -18 : -26 }]}><Feather name={icons[0]} size={compact ? 32 : 44} color="#B9A2F2" /></View>
+          <View style={[styles.side, { transform: [{ rotate: '-10deg' }], marginRight: compact ? -18 : -26 }]}><IntroIcon icon={icons[0]} size={compact ? 32 : 44} color="#B9A2F2" /></View>
           <View style={styles.middle}>
-            <Feather name={icons[1]} size={compact ? 58 : 84} color={look.violet} />
-            {badge ? <View style={styles.badge}><Feather name={badge} size={compact ? 16 : 24} color="#FFFFFF" /></View> : null}
+            <IntroIcon icon={icons[1]} size={compact ? 58 : 84} color={look.violet} />
+            {badge ? <View style={styles.badge}><IntroIcon icon={badge} size={compact ? 16 : 24} color="#FFFFFF" /></View> : null}
           </View>
-          <View style={[styles.side, { transform: [{ rotate: '10deg' }], marginLeft: compact ? -18 : -26 }]}><Feather name={icons[2]} size={compact ? 32 : 44} color="#B9A2F2" /></View>
+          <View style={[styles.side, { transform: [{ rotate: '10deg' }], marginLeft: compact ? -18 : -26 }]}><IntroIcon icon={icons[2]} size={compact ? 32 : 44} color="#B9A2F2" /></View>
         </View>
       </View>
       <Text style={styles.title}>{title}</Text>
