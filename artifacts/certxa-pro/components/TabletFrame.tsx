@@ -53,7 +53,7 @@ const styles = StyleSheet.create({
   full: { maxWidth: '100%' },
   split: { flexDirection: 'row', alignItems: 'stretch' },
   page: { flex: 1, maxWidth: APP_MAX_WIDTH, overflow: 'hidden' },
-  helpPanel: { flex: 1, minWidth: 340, maxWidth: 560, margin: 16, marginLeft: 0, borderRadius: 22, backgroundColor: look.card, borderWidth: 1, borderColor: look.cardBorder, overflow: 'hidden' },
+  helpPanel: { flex: 1, minWidth: 340, margin: 16, marginLeft: 0, borderRadius: 22, backgroundColor: look.card, borderWidth: 1, borderColor: look.cardBorder, overflow: 'hidden' },
   helpLabel: { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: look.subtle, paddingHorizontal: 22, paddingTop: 18 },
   helpContent: { paddingHorizontal: 22, paddingTop: 6, paddingBottom: 40 },
 });
