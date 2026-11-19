@@ -6,8 +6,9 @@
  *  - A fixed grid of 2 across × 6 rows (or 3 × 6), never scrolling.
  *  - Without a saved layout it fills itself: a key per catalog category, then Packages and Add-ons; a category opens its
  *    own grid of services whose last key is Back; what doesn't fit goes to pages behind a More key.
- *  - A manager can arrange the main grid and up to 19 grids of their own: categories, single services, add-ons, other
- *    grids, functions and Back, each with an optional name and band colour, and where to go after a pick.
+ *  - A manager can arrange the main grid and up to 19 grids of their own: categories, single services, add-ons, add-on
+ *    groups (a grid of the group's add-ons, like a category; the app's own), other grids, functions and Back, each with
+ *    an optional name and band colour, and where to go after a pick.
  */
 
 export const POS_GRID_COLUMNS = 2;
@@ -26,7 +27,8 @@ export type PosKey =
   | ({ type: 'grid'; gridId: string } & KeyLook)
   | ({ type: 'back' } & KeyLook)
   | ({ type: 'addon'; addonId: number } & KeyLook)
-  | ({ type: 'fn'; fn: PosFn } & KeyLook);
+  | ({ type: 'fn'; fn: PosFn } & KeyLook)
+  | ({ type: 'addonGroup'; groupId: number } & KeyLook);
 
 /** The functions /nail's keys can run. The app has Discount and Gift Card; No Sale and Reprint (saved by /nail) show blank. */
 export type PosFn = 'discount' | 'giftcard' | 'nosale' | 'reprint';
@@ -76,8 +78,11 @@ export function gridKeys(groups: CatalogGroup[], openKey: string | null, page: n
   return keys;
 }
 
+/** An add-on group as a grid category: its key is `addongroup:<id>` and its keys are its add-ons. */
+export const addonGroupKey = (id: number) => `addongroup:${id}`;
+
 /** One arranged grid as keys; on the main grid a category on no grid yet takes the next empty position. */
-export function arrangedKeys(grid: PosGrid, layout: PosGridConfig, groups: CatalogGroup[], addons: CatalogAddon[] = []): GridKey[] {
+export function arrangedKeys(grid: PosGrid, layout: PosGridConfig, groups: CatalogGroup[], addons: CatalogAddon[] = [], addonGroups: CatalogGroup[] = []): GridKey[] {
   const slots = posGridSlots(layout);
   const services = new Map<number, CatalogService>();
   for (const g of groups) for (const svc of g.services) services.set(svc.id, svc);
@@ -90,6 +95,7 @@ export function arrangedKeys(grid: PosGrid, layout: PosGridConfig, groups: Catal
     if (k.type === 'grid') { const target = layout.grids.find((g) => g.id === k.gridId); return target ? { kind: 'grid', grid: target, ...look } : { kind: 'empty' }; }
     if (k.type === 'addon') { const addon = addons.find((a) => a.id === k.addonId); return addon ? { kind: 'addon', addon, ...look } : { kind: 'empty' }; }
     if (k.type === 'fn') return APP_POS_FNS.includes(k.fn) ? { kind: 'fn', fn: k.fn, ...look } : { kind: 'empty' };
+    if (k.type === 'addonGroup') { const group = addonGroups.find((g) => g.key === addonGroupKey(k.groupId)); return group ? { kind: 'category', group, ...look } : { kind: 'empty' }; }
     return { kind: 'back', ...look };
   });
   if (grid.id === POS_GRID_MAIN) {
@@ -111,13 +117,14 @@ export function autoPlacedSlots(layout: PosGridConfig, groups: CatalogGroup[], a
 }
 
 /** The keys for wherever the grid is. A manager's grid with no Back key gets one in its last position. */
-export function placeKeys(layout: PosGridConfig | null | undefined, groups: CatalogGroup[], place: GridPlace, page: number, addons: CatalogAddon[] = []): GridKey[] {
+export function placeKeys(layout: PosGridConfig | null | undefined, groups: CatalogGroup[], place: GridPlace, page: number, addons: CatalogAddon[] = [], addonGroups: CatalogGroup[] = []): GridKey[] {
   const columns = posGridColumns(layout);
   const slots = columns * POS_GRID_ROWS;
-  if (place.at === 'category' && groups.some((g) => g.key === place.key)) return gridKeys(groups, place.key, page, columns);
+  const openable = [...groups, ...addonGroups];
+  if (place.at === 'category' && openable.some((g) => g.key === place.key)) return gridKeys(openable, place.key, page, columns);
   const grid = layout?.grids.find((g) => g.id === (place.at === 'grid' ? place.id : POS_GRID_MAIN));
   if (!layout || !grid) return gridKeys(groups, null, page, columns);
-  const keys = arrangedKeys(grid, layout, groups, addons);
+  const keys = arrangedKeys(grid, layout, groups, addons, addonGroups);
   if (grid.id !== POS_GRID_MAIN && !keys.some((k) => k.kind === 'back')) keys[slots - 1] = { kind: 'back' };
   return keys;
 }

@@ -27,7 +27,7 @@ import { CertxaApiError } from '@/lib/certxa-api';
 import { PosGrid } from '@/components/pos/PosGrid';
 import { ClientLookup } from '@/components/pos/ClientLookup';
 import { PosGridEditor } from '@/components/pos/PosGridEditor';
-import type { CatalogAddon, CatalogGroup, CatalogService, PosFn, PosGridConfig } from '@/lib/posGrid';
+import { addonGroupKey, type CatalogAddon, type CatalogGroup, type CatalogService, type PosFn, type PosGridConfig } from '@/lib/posGrid';
 import { AppBackground } from '@/components/look/AppBackground';
 import { look, cardShadow } from '@/components/look/tokens';
 
@@ -55,6 +55,7 @@ export function TabletPos() {
   const [categories, setCategories] = useState<{ id: number; name: string; sortOrder: number }[]>([]);
   const [addons, setAddons] = useState<CatalogAddon[]>([]);
   const [packages, setPackages] = useState<any[]>([]);
+  const [addonGroupRows, setAddonGroupRows] = useState<{ id: number; name: string; addonIds: number[] }[]>([]);
   const [gridConfig, setGridConfig] = useState<PosGridConfig | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,7 +67,8 @@ export function TabletPos() {
       api.get<any[]>('/api/addons').catch(() => []),
       api.get<any[]>('/api/packages').catch(() => []),
       api.get<{ config: PosGridConfig | null }>('/api/pro/pos-grid').catch(() => ({ config: null })),
-    ]).then(([rows, cats, prods, adds, packs, grid]) => {
+      api.get<any[]>('/api/addon-groups').catch(() => []),
+    ]).then(([rows, cats, prods, adds, packs, grid, addonGroupList]) => {
       const list = Array.isArray(rows) ? rows : [];
       // A service with options is sold by its options ("Haircut · Long"), not by itself.
       const parents = new Set(list.filter((s) => s.parentServiceId).map((s) => Number(s.parentServiceId)));
@@ -83,6 +85,7 @@ export function TabletPos() {
       setAddons((Array.isArray(adds) ? adds : []).filter((a) => a.isActive !== false && !a.kioskExtra)
         .map((a) => ({ id: Number(a.id), name: String(a.name), price: Number(a.price) || 0, duration: a.duration ?? null })));
       setPackages(Array.isArray(packs) ? packs : []);
+      setAddonGroupRows((Array.isArray(addonGroupList) ? addonGroupList : []).map((g) => ({ id: Number(g.id), name: String(g.name), addonIds: (g.addonIds ?? []).map(Number) })));
       setGridConfig(grid?.config ?? null);
       setProducts((Array.isArray(prods) ? prods : []).map((p) => ({ id: Number(p.id), name: String(p.name ?? ''), priceCents: Math.round(Number(p.price) * 100) || 0, stock: p.stock == null ? null : Number(p.stock) })));
     }).finally(() => setLoading(false));
@@ -109,6 +112,12 @@ export function TabletPos() {
     if (addons.length && !gridConfig?.hideAddonsKey) out.push({ key: 'addons', name: 'Add-ons', services: [], addons });
     return out;
   }, [services, categories, packages, products, addons, gridConfig?.hideAddonsKey]);
+
+  // Add-on groups for Add-on Group keys: each opens a grid of its add-ons, in the group's order.
+  const addonGroups = useMemo(() => addonGroupRows.map((g) => ({
+    id: g.id, name: g.name,
+    group: { key: addonGroupKey(g.id), name: g.name, services: [], addons: g.addonIds.flatMap((id) => addons.filter((a) => a.id === id)) } as CatalogGroup,
+  })), [addonGroupRows, addons]);
 
   // ── The ticket ──
   const [lines, setLines] = useState<Line[]>([]);
@@ -187,7 +196,8 @@ export function TabletPos() {
         return;
       }
       if (cents <= 0) return needAmount();
-      add({ label: 'Amount', priceCents: cents, kind: 'amount' }); setCents(0);
+      // A typed amount and ENTER is a "+Misc Item" line (owner, 2026-11-19).
+      add({ label: '+Misc Item', priceCents: cents, kind: 'amount' }); setCents(0);
       return;
     }
     setCents((c) => { const next = key === '00' ? c * 100 : c * 10 + Number(key); return next > MAX_CENTS ? c : next; });
@@ -371,7 +381,7 @@ export function TabletPos() {
       <View style={[styles.panel, styles.catalog]} testID="tablet-pos-catalog">
         {loading ? <ActivityIndicator color={look.violet} style={{ marginTop: 30 }} />
           : groups.length === 0 ? <Text style={[styles.subtle, styles.empty]}>No services yet. Add them in Services.</Text>
-          : <PosGrid key={JSON.stringify(gridConfig)} layout={gridConfig} groups={groups} addons={addons} onService={pickKey} onAddon={pickAddon} onFn={gridFn} />}
+          : <PosGrid key={JSON.stringify(gridConfig)} layout={gridConfig} groups={groups} addons={addons} addonGroups={addonGroups.map((g) => g.group)} onService={pickKey} onAddon={pickAddon} onFn={gridFn} />}
       </View>
       {/* The key grid editor: under the grid on the left, in the app-icons button's style (the app-icons button is on the right). */}
       <TouchableOpacity testID="tablet-pos-grid-settings" accessibilityLabel="Key grid" onPress={() => setEditingGrid(true)} activeOpacity={0.85} style={styles.gearShadow}>
@@ -394,7 +404,7 @@ export function TabletPos() {
         </View>
       )}
 
-      {editingGrid ? <PosGridEditor visible groups={groups} addons={addons} config={gridConfig} saving={savingGrid} onSave={(c) => void saveGrid(c)} onClose={() => setEditingGrid(false)} /> : null}
+      {editingGrid ? <PosGridEditor visible groups={groups} addons={addons} addonGroups={addonGroups} config={gridConfig} saving={savingGrid} onSave={(c) => void saveGrid(c)} onClose={() => setEditingGrid(false)} /> : null}
       <ClientLookup visible={picking} clients={clients} busy={busy} error={error} onPick={pickExisting}
         onAdd={(n, ph) => void addNewClient(n, ph)} onClose={() => { setPicking(false); setError(''); }} />
     </View>
@@ -437,14 +447,15 @@ const styles = StyleSheet.create({
   secondaryText: { fontSize: 17, fontFamily: 'Inter_700Bold', color: look.violetDeep },
   chargeButton: { flex: 1, height: 58, borderRadius: 16, backgroundColor: look.violet, alignItems: 'center', justifyContent: 'center' },
   chargeText: { fontSize: 18, fontFamily: 'Inter_700Bold', color: '#FFFFFF', letterSpacing: 0.4 },
-  status: { minHeight: 46, borderRadius: 12, backgroundColor: look.tile, justifyContent: 'center', paddingHorizontal: 12, marginBottom: 10 },
+  // The message bar and the amount box grow to fill the keypad's panel, pushing the keys down to its bottom.
+  status: { minHeight: 46, flexGrow: 1, maxHeight: 110, borderRadius: 12, backgroundColor: look.tile, justifyContent: 'center', paddingHorizontal: 12, marginBottom: 10 },
   statusOk: { backgroundColor: '#E7F6EC' },
   statusError: { backgroundColor: '#FDECEC' },
   statusPrompt: { backgroundColor: look.violet },
   statusText: { fontSize: 14, fontFamily: 'Inter_700Bold', color: look.heading, letterSpacing: 0.3 },
-  display: { height: 68, borderRadius: 16, backgroundColor: look.pageBottom, borderWidth: 1, borderColor: look.cardBorder, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, marginBottom: 12, gap: 10 },
+  display: { minHeight: 68, flexGrow: 1.4, maxHeight: 150, borderRadius: 16, backgroundColor: look.pageBottom, borderWidth: 1, borderColor: look.cardBorder, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, marginBottom: 12, gap: 10 },
   displayQty: { fontSize: 18, fontFamily: 'Inter_700Bold', color: look.violetDeep },
-  displayText: { flex: 1, fontSize: 40, fontFamily: 'Inter_700Bold', textAlign: 'right', color: look.heading },
+  displayText: { flex: 1, fontSize: 46, fontFamily: 'Inter_700Bold', textAlign: 'right', color: look.heading },
   keys: { flexDirection: 'row', flexWrap: 'wrap', gap: KEY_GAP },
   // Raised keys (owner, 2026-11-19): a darker bottom edge and a shadow give them depth.
   key: { width: '22.6%', aspectRatio: 1, borderRadius: 16, backgroundColor: look.card, borderWidth: 1, borderColor: look.cardBorder, borderBottomWidth: 5, borderBottomColor: '#D8CEF6',

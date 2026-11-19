@@ -19,11 +19,13 @@ import {
 type KeyType = 'empty' | PosKey['type'];
 const KEY_TYPES: { value: KeyType; label: string }[] = [
   { value: 'empty', label: 'Empty' }, { value: 'category', label: 'Category' }, { value: 'service', label: 'Service' }, { value: 'addon', label: 'Add-on' },
+  // Opens a grid of the group's add-ons, the way a Category key opens its services (owner, 2026-11-19).
+  { value: 'addonGroup', label: 'Add-on Group' },
   { value: 'grid', label: 'Grid' }, { value: 'fn', label: 'Function' }, { value: 'back', label: 'Back' },
 ];
 
-export function PosGridEditor({ visible, groups: allGroups, addons, config, saving, onSave, onClose }: {
-  visible: boolean; groups: CatalogGroup[]; addons: CatalogAddon[];
+export function PosGridEditor({ visible, groups: allGroups, addons, addonGroups, config, saving, onSave, onClose }: {
+  visible: boolean; groups: CatalogGroup[]; addons: CatalogAddon[]; addonGroups: { id: number; name: string; group: CatalogGroup }[];
   /** The saved layout, or null while the POS is on the automatic one. */
   config: PosGridConfig | null; saving: boolean;
   /** null = go back to the automatic layout. */
@@ -36,7 +38,7 @@ export function PosGridEditor({ visible, groups: allGroups, addons, config, savi
   const [slot, setSlot] = useState<number | null>(null);
   const grid = draft.grids.find((g) => g.id === gridId) ?? draft.grids[0];
   const isMain = grid.id === POS_GRID_MAIN;
-  const keys = useMemo(() => arrangedKeys(grid, draft, groups, addons), [grid, draft, groups, addons]);
+  const keys = useMemo(() => arrangedKeys(grid, draft, groups, addons, addonGroups.map((g) => g.group)), [grid, draft, groups, addons, addonGroups]);
   const autoSlots = useMemo(() => (isMain ? autoPlacedSlots(draft, groups, addons) : new Set<number>()), [isMain, draft, groups, addons]);
   const current = slot != null ? grid.keys[slot] ?? null : null;
   const otherGrids = draft.grids.filter((g) => g.id !== POS_GRID_MAIN && g.id !== grid.id);
@@ -53,6 +55,7 @@ export function PosGridEditor({ visible, groups: allGroups, addons, config, savi
     if (type === 'service') return services[0] ? setKey({ type, serviceId: services[0].id, ...lookOf }) : undefined;
     if (type === 'grid') return otherGrids[0] ? setKey({ type, gridId: otherGrids[0].id, ...lookOf }) : undefined;
     if (type === 'addon') return addons[0] ? setKey({ type, addonId: addons[0].id, ...lookOf }) : undefined;
+    if (type === 'addonGroup') return addonGroups[0] ? setKey({ type, groupId: addonGroups[0].id, ...lookOf }) : undefined;
     if (type === 'fn') return setKey({ type, fn: APP_POS_FNS[0], ...lookOf });
     return setKey({ type: 'back', ...lookOf });
   };
@@ -110,6 +113,7 @@ export function PosGridEditor({ visible, groups: allGroups, addons, config, savi
     : current.type === 'service' ? services.find((s) => s.id === current.serviceId)?.name ?? 'Service'
     : current.type === 'grid' ? draft.grids.find((g) => g.id === current.gridId)?.name ?? 'Grid'
     : current.type === 'addon' ? addons.find((a) => a.id === current.addonId)?.name ?? 'Add-on'
+    : current.type === 'addonGroup' ? addonGroups.find((g) => g.id === current.groupId)?.name ?? 'Add-on Group'
     : current.type === 'fn' ? POS_FN_LABELS[current.fn] : 'Back';
 
   return (
@@ -169,10 +173,11 @@ export function PosGridEditor({ visible, groups: allGroups, addons, config, savi
                 <TouchableOpacity accessibilityLabel="Close" onPress={() => setSlot(null)}><Feather name="x" size={20} color={look.subtle} /></TouchableOpacity>
               </View>
               <SelectField testID="pos-grid-type" title="Key" value={current?.type ?? 'empty'}
-                options={KEY_TYPES.filter((t) => (t.value !== 'back' || !isMain) && (t.value !== 'grid' || otherGrids.length > 0) && (t.value !== 'category' || groups.length > 0) && (t.value !== 'addon' || addons.length > 0) && (t.value !== 'service' || services.length > 0))}
+                options={KEY_TYPES.filter((t) => (t.value !== 'back' || !isMain) && (t.value !== 'grid' || otherGrids.length > 0) && (t.value !== 'category' || groups.length > 0) && (t.value !== 'addon' || addons.length > 0) && (t.value !== 'addonGroup' || addonGroups.length > 0) && (t.value !== 'service' || services.length > 0))}
                 onChange={(v) => setType(v as KeyType)} />
               {current?.type === 'category' ? <SelectField testID="pos-grid-target" title="Category" value={current.groupKey} options={groups.map((g) => ({ value: g.key, label: g.name }))} onChange={(v) => patch({ groupKey: String(v) } as Partial<PosKey>)} /> : null}
               {current?.type === 'service' ? <SelectField testID="pos-grid-target" title="Service" value={current.serviceId} options={services.map((s) => ({ value: s.id, label: `${s.name} · $${Number(s.price).toFixed(2)} · ${s.group}` }))} onChange={(v) => patch({ serviceId: Number(v) } as Partial<PosKey>)} /> : null}
+              {current?.type === 'addonGroup' ? <SelectField testID="pos-grid-target" title="Add-on Group" value={current.groupId} options={addonGroups.map((g) => ({ value: g.id, label: `${g.name} · ${g.group.addons?.length ?? 0} add-ons` }))} onChange={(v) => patch({ groupId: Number(v) } as Partial<PosKey>)} /> : null}
               {current?.type === 'grid' ? <SelectField testID="pos-grid-target" title="Opens" value={current.gridId} options={otherGrids.map((g) => ({ value: g.id, label: g.name }))} onChange={(v) => patch({ gridId: String(v) } as Partial<PosKey>)} /> : null}
               {current?.type === 'addon' ? <SelectField testID="pos-grid-target" title="Add-on" value={current.addonId} options={addons.map((a) => ({ value: a.id, label: `${a.name} · +$${Number(a.price).toFixed(2)}` }))} onChange={(v) => patch({ addonId: Number(v) } as Partial<PosKey>)} /> : null}
               {current?.type === 'fn' ? <SelectField testID="pos-grid-target" title="Function" value={current.fn} options={APP_POS_FNS.map((f) => ({ value: f, label: POS_FN_LABELS[f] }))} onChange={(v) => patch({ fn: v as PosFn } as Partial<PosKey>)} /> : null}

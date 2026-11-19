@@ -71,8 +71,8 @@ export function KeyRows({ keys, columns, render }: { keys: GridKey[]; columns: n
   );
 }
 
-export function PosGrid({ layout, groups, addons, onService, onAddon, onFn }: {
-  layout: PosGridConfig | null; groups: CatalogGroup[]; addons: CatalogAddon[];
+export function PosGrid({ layout, groups, addons, addonGroups, onService, onAddon, onFn }: {
+  layout: PosGridConfig | null; groups: CatalogGroup[]; addons: CatalogAddon[]; addonGroups: CatalogGroup[];
   onService: (svc: CatalogService) => void; onAddon: (addon: CatalogAddon) => void; onFn: (fn: PosFn) => void;
 }) {
   // The way here: the main grid first, then whatever was opened from it. Back takes one step off.
@@ -80,7 +80,7 @@ export function PosGrid({ layout, groups, addons, onService, onAddon, onFn }: {
   const [page, setPage] = useState(0);
   const place = trail[trail.length - 1];
   const columns = posGridColumns(layout);
-  const keys = placeKeys(layout, groups, place, page, addons);
+  const keys = placeKeys(layout, groups, place, page, addons, addonGroups);
   const open = (next: GridPlace) => { setTrail((t) => [...t, next]); setPage(0); };
   const back = () => { setTrail((t) => (t.length > 1 ? t.slice(0, -1) : t)); setPage(0); };
   // After a service or add-on is picked: what the grid it was on says — stay, back to main, or open a grid.
