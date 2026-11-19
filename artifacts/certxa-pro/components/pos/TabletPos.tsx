@@ -1,7 +1,11 @@
 /**
  * The tablet POS (owner, 2026-11-19), laid out like the POS tab of the website's /barber screen (pages/barber/
  * CheckoutMode.tsx, used as a reference only) in the app's own light look: the ticket on the left, a keypad in the
- * middle, the services and products to tap on the right. Turned upright, the keypad sits under the ticket.
+ * middle, the key grid on the right. Turned upright, the keypad sits under the ticket.
+ *
+ * The key grid is /nail's (components/pos/PosGrid.tsx, lib/posGrid.ts): a fixed 2 × 6 (or 3 × 6) of keys — the catalog's
+ * categories, then Packages, Products and Add-ons, each opening its own grid with Back — or the manager's own
+ * arrangement from the key grid editor (the gear on the ticket; GET · PUT /api/pro/pos-grid).
  *
  * The keypad is /barber's: 7 8 9 ⌫ · 4 5 6 ↶ · 1 2 3 X (quantity) · 00 0 ENTER, then Quick Ticket, Retail, Gift Card,
  * Tip Adjust and Discount (/barber's Combine, No Sale and Split Ticket need things the app doesn't have; owner's choice
@@ -13,27 +17,30 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { Feather } from '@expo/vector-icons';
-import { ActivityIndicator, FlatList, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { router, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBookingData } from '@/contexts/BookingContext';
 import { api } from '@/lib/live-api';
 import { CertxaApiError } from '@/lib/certxa-api';
-import { SelectField } from '@/components/SelectField';
+import { PosGrid } from '@/components/pos/PosGrid';
+import { PosGridEditor } from '@/components/pos/PosGridEditor';
+import type { CatalogAddon, CatalogGroup, CatalogService, PosFn, PosGridConfig } from '@/lib/posGrid';
 import { AppBackground } from '@/components/look/AppBackground';
 import { look, cardShadow } from '@/components/look/tokens';
 
-type Service = { id: number; name: string; priceCents: number; duration: number; categoryId: number | null };
+type Service = { id: number; name: string; priceCents: number; duration: number; categoryId: number | null; category: string };
 type Product = { id: number; name: string; priceCents: number; stock: number | null };
-type Line = { key: string; label: string; priceCents: number; kind: 'service' | 'amount' | 'product'; serviceId?: number; productId?: number };
+type Line = { key: string; label: string; priceCents: number; kind: 'service' | 'amount' | 'product' | 'addon' | 'package'; serviceId?: number; productId?: number };
 type Client = { customerId: number; name: string; phone: string; email: string };
 
 const MAX_CENTS = 10_000_000;
 const KEYS = ['7', '8', '9', '⌫', '4', '5', '6', '↶', '1', '2', '3', 'X', '00', '0', 'ENTER'];
 const money = (cents: number) => `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const digitsOnly = (value: string) => value.replace(/\D/g, '');
-const ALL = 'all';
-const PRODUCTS = 'products';
+/** Products and packages ride on the grid as service keys with ids no service has: a package is its id negated (as on
+ *  /nail); a product is PRODUCT_KEY minus its id. */
+const PRODUCT_KEY = -1_000_000_000;
 
 export function TabletPos() {
   const insets = useSafeAreaInsets();
@@ -42,7 +49,10 @@ export function TabletPos() {
   const { clients, addQuickClient } = useBookingData();
 
   const [services, setServices] = useState<Service[]>([]);
-  const [categories, setCategories] = useState<{ id: number; name: string }[]>([]);
+  const [categories, setCategories] = useState<{ id: number; name: string; sortOrder: number }[]>([]);
+  const [addons, setAddons] = useState<CatalogAddon[]>([]);
+  const [packages, setPackages] = useState<any[]>([]);
+  const [gridConfig, setGridConfig] = useState<PosGridConfig | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
@@ -50,7 +60,10 @@ export function TabletPos() {
       api.get<any[]>('/api/services').catch(() => []),
       api.get<any[]>('/api/service-categories').catch(() => []),
       api.get<any[]>('/api/products').catch(() => []),
-    ]).then(([rows, cats, prods]) => {
+      api.get<any[]>('/api/addons').catch(() => []),
+      api.get<any[]>('/api/packages').catch(() => []),
+      api.get<{ config: PosGridConfig | null }>('/api/pro/pos-grid').catch(() => ({ config: null })),
+    ]).then(([rows, cats, prods, adds, packs, grid]) => {
       const list = Array.isArray(rows) ? rows : [];
       // A service with options is sold by its options ("Haircut · Long"), not by itself.
       const parents = new Set(list.filter((s) => s.parentServiceId).map((s) => Number(s.parentServiceId)));
@@ -60,13 +73,39 @@ export function TabletPos() {
         return {
           id: Number(s.id), name: parent ? `${parent.name} · ${s.optionLabel || s.name}` : String(s.name),
           priceCents: Math.round(Number(s.price) * 100) || 0, duration: Number(s.duration) || 0,
-          categoryId: s.categoryId ?? parent?.categoryId ?? null,
+          categoryId: s.categoryId ?? parent?.categoryId ?? null, category: String(s.category ?? parent?.category ?? 'Services'),
         };
       }).sort((a, b) => a.name.localeCompare(b.name)));
-      setCategories((Array.isArray(cats) ? cats : []).map((c) => ({ id: Number(c.id), name: String(c.name) })));
+      setCategories((Array.isArray(cats) ? cats : []).map((c) => ({ id: Number(c.id), name: String(c.name), sortOrder: Number(c.sortOrder ?? 9999) })));
+      setAddons((Array.isArray(adds) ? adds : []).filter((a) => a.isActive !== false && !a.kioskExtra)
+        .map((a) => ({ id: Number(a.id), name: String(a.name), price: Number(a.price) || 0, duration: a.duration ?? null })));
+      setPackages(Array.isArray(packs) ? packs : []);
+      setGridConfig(grid?.config ?? null);
       setProducts((Array.isArray(prods) ? prods : []).map((p) => ({ id: Number(p.id), name: String(p.name ?? ''), priceCents: Math.round(Number(p.price) * 100) || 0, stock: p.stock == null ? null : Number(p.stock) })));
     }).finally(() => setLoading(false));
   }, []);
+
+  // The grid's categories, as /nail builds them: the catalog's (in their order), then Packages, Products and Add-ons.
+  const groups = useMemo<CatalogGroup[]>(() => {
+    const byId = new Map(categories.map((c) => [c.id, c]));
+    const map = new Map<string, CatalogGroup & { sortOrder: number }>();
+    for (const sv of services) {
+      const cat = sv.categoryId != null ? byId.get(sv.categoryId) : undefined;
+      const key = cat ? `cat:${sv.categoryId}` : `legacy:${sv.category}`;
+      const g = map.get(key) ?? { key, name: cat?.name ?? sv.category, sortOrder: cat?.sortOrder ?? 99999, services: [] };
+      g.services.push({ id: sv.id, name: sv.name, duration: sv.duration, price: sv.priceCents / 100 });
+      map.set(key, g);
+    }
+    const out: CatalogGroup[] = [...map.values()].sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
+    const known = new Set(services.map((sv) => sv.id));
+    const packageKeys = packages.filter((p) => p.isActive !== false && (p.items ?? []).some((i: any) => i.itemType === 'service')
+      && (p.items ?? []).every((i: any) => i.itemType !== 'service' || known.has(Number(i.serviceId))))
+      .map((p) => ({ id: -Number(p.id), name: String(p.name), duration: Number(p.duration) || 0, price: Number(p.price) || 0 }));
+    if (packageKeys.length) out.push({ key: 'packages', name: 'Packages', services: packageKeys });
+    if (products.length) out.push({ key: 'products', name: 'Products', services: products.map((p) => ({ id: PRODUCT_KEY - p.id, name: p.name, duration: 0, price: p.priceCents / 100 })) });
+    if (addons.length && !gridConfig?.hideAddonsKey) out.push({ key: 'addons', name: 'Add-ons', services: [], addons });
+    return out;
+  }, [services, categories, packages, products, addons, gridConfig?.hideAddonsKey]);
 
   // ── The ticket ──
   const [lines, setLines] = useState<Line[]>([]);
@@ -93,7 +132,7 @@ export function TabletPos() {
   const grouped = useMemo(() => {
     const groups: { id: string; line: Line; count: number; lastKey: string }[] = [];
     for (const l of lines) {
-      const id = l.kind === 'amount' ? l.key : `${l.kind}-${l.serviceId ?? l.productId}`;
+      const id = l.kind === 'amount' ? l.key : `${l.kind}-${l.serviceId ?? l.productId ?? l.label}`;
       const g = groups.find((x) => x.id === id);
       if (g) { g.count += 1; g.lastKey = l.key; } else groups.push({ id, line: l, count: 1, lastKey: l.key });
     }
@@ -155,7 +194,7 @@ export function TabletPos() {
     if (fn === 'quick') { setCents(0); if (guided !== null) { setGuided(null); say('QUICK TICKET CANCELLED'); } else setGuided(0); return; }
     if (fn === 'retail') {
       // A typed amount is a retail item; with nothing typed, the products are shown to tap.
-      if (cents <= 0) { if (products.length) { setSection(PRODUCTS); say('TAP A PRODUCT, OR TYPE AN AMOUNT AND TAP RETAIL'); } else needAmount(); return; }
+      if (cents <= 0) { if (products.length) say('TYPE AN AMOUNT AND TAP RETAIL, OR TAP PRODUCTS ON THE GRID'); else needAmount(); return; }
       add({ label: 'Retail Item', priceCents: cents, kind: 'amount' }); setCents(0); return;
     }
     if (fn === 'gift') { router.push('/gift-cards' as Href); return; }
@@ -165,18 +204,6 @@ export function TabletPos() {
     setDiscountCents(cents); setCents(0); say(`DISCOUNT · ${money(cents)}`, 'ok');
   };
   const prompt = guided !== null ? `${steps[guided].toUpperCase()} AMOUNT · THEN ENTER` : qtyDigits !== null ? 'QTY: TYPE HOW MANY, THEN TAP THE ITEM' : null;
-
-  // ── The catalog ──
-  const [section, setSection] = useState<string>(ALL);
-  const sectionOptions = [
-    { value: ALL, label: 'All services' },
-    ...categories.filter((c) => services.some((s) => s.categoryId === c.id)).map((c) => ({ value: String(c.id), label: c.name })),
-    ...(products.length ? [{ value: PRODUCTS, label: 'Products' }] : []),
-  ];
-  const tiles = section === PRODUCTS
-    ? products.map((p) => ({ key: `p${p.id}`, title: p.name, price: p.priceCents, hint: p.stock != null ? `${p.stock} in stock` : 'Product', onPress: () => add({ label: p.name, priceCents: p.priceCents, kind: 'product', productId: p.id }) }))
-    : services.filter((s) => section === ALL || String(s.categoryId) === section)
-      .map((s) => ({ key: `s${s.id}`, title: s.name, price: s.priceCents, hint: s.duration ? `${s.duration} min` : 'Service', onPress: () => add({ label: s.name, priceCents: s.priceCents, kind: 'service', serviceId: s.id }) }));
 
   // ── Choosing the client ──
   const [picking, setPicking] = useState(false);
@@ -239,21 +266,27 @@ export function TabletPos() {
 
   const ticket = (
     <View style={[styles.panel, styles.ticket]} testID="tablet-pos-ticket">
-      <TouchableOpacity testID="tablet-pos-client" onPress={() => setPicking(true)} style={styles.clientRow}>
-        <View style={styles.clientIcon}><Feather name="user" size={22} color={look.violetDeep} /></View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.clientName} numberOfLines={1}>{client ? client.name : 'Choose a client'}</Text>
-          <Text style={styles.subtle} numberOfLines={1}>{client ? client.phone || client.email || 'Client' : 'Tap to pick or add one'}</Text>
-        </View>
-        <Feather name="chevron-right" size={22} color={look.subtle} />
-      </TouchableOpacity>
+      <View style={styles.clientRow}>
+        <TouchableOpacity testID="tablet-pos-client" onPress={() => setPicking(true)} style={styles.clientPickRow}>
+          <View style={styles.clientIcon}><Feather name="user" size={22} color={look.violetDeep} /></View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.clientName} numberOfLines={1}>{client ? client.name : 'Choose a client'}</Text>
+            <Text style={styles.subtle} numberOfLines={1}>{client ? client.phone || client.email || 'Client' : 'Tap to pick or add one'}</Text>
+          </View>
+          <Feather name="chevron-right" size={22} color={look.subtle} />
+        </TouchableOpacity>
+        {/* The key grid editor (as /nail's POS settings gear on the ticket). */}
+        <TouchableOpacity testID="tablet-pos-grid-settings" accessibilityLabel="Key grid" onPress={() => setEditingGrid(true)} style={styles.gear}>
+          <Feather name="settings" size={21} color={look.subtle} />
+        </TouchableOpacity>
+      </View>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingVertical: 6 }}>
         {grouped.length === 0 ? <Text style={[styles.subtle, styles.empty]}>Tap a service or product, or key in an amount.</Text> : null}
         {grouped.map((g) => (
           <View key={g.id} style={styles.line} testID={`tablet-pos-line-${g.id}`}>
             <View style={{ flex: 1 }}>
               <Text style={styles.lineTitle} numberOfLines={2}>{g.count > 1 ? `${g.count} × ` : ''}{g.line.label}</Text>
-              <Text style={styles.subtle}>{g.line.kind === 'product' ? 'Product' : g.line.kind === 'amount' ? 'Keyed in' : 'Service'}</Text>
+              <Text style={styles.subtle}>{g.line.kind === 'product' ? 'Product' : g.line.kind === 'amount' ? 'Keyed in' : g.line.kind === 'addon' ? 'Add-on' : g.line.kind === 'package' ? 'Package' : 'Service'}</Text>
             </View>
             <Text style={styles.linePrice}>{money(g.line.priceCents * g.count)}</Text>
             <TouchableOpacity accessibilityLabel={g.count > 1 ? `Remove one ${g.line.label}` : `Remove ${g.line.label}`} onPress={() => removeOne(g.lastKey)} style={styles.remove}>
@@ -321,30 +354,37 @@ export function TabletPos() {
     </View>
   );
 
+  // A key on the grid: a service, a package, a product or an add-on goes on the ticket (X first for that many).
+  const pickKey = (svc: CatalogService) => {
+    const cents = Math.round(svc.price * 100);
+    if (svc.id <= PRODUCT_KEY) add({ label: svc.name, priceCents: cents, kind: 'product', productId: PRODUCT_KEY - svc.id });
+    else if (svc.id < 0) add({ label: svc.name, priceCents: cents, kind: 'package' });
+    else add({ label: svc.name, priceCents: cents, kind: 'service', serviceId: svc.id });
+  };
+  const pickAddon = (a: CatalogAddon) => add({ label: a.name, priceCents: Math.round(a.price * 100), kind: 'addon' });
+  const gridFn = (fn: PosFn) => { if (fn === 'discount') runFn('discount'); else if (fn === 'giftcard') runFn('gift'); };
+  const [editingGrid, setEditingGrid] = useState(false);
+  const [savingGrid, setSavingGrid] = useState(false);
+  const saveGrid = async (config: PosGridConfig | null) => {
+    setSavingGrid(true);
+    try {
+      const r = await api.put<{ config: PosGridConfig | null }>('/api/pro/pos-grid', { config });
+      setGridConfig(r?.config ?? null); setEditingGrid(false);
+      say(r?.config ? 'KEY GRID SAVED' : 'KEY GRID IS AUTOMATIC AGAIN', 'ok');
+    } catch (cause) { Alert.alert('Key grid', cause instanceof Error ? cause.message : 'Could not save the key grid.'); }
+    finally { setSavingGrid(false); }
+  };
+
   const catalog = (
     <View style={[styles.panel, styles.catalog]} testID="tablet-pos-catalog">
-      <View style={{ marginBottom: 12 }}>
-        <SelectField testID="tablet-pos-section" title="Show" value={section} options={sectionOptions} onChange={(v) => setSection(String(v))} />
-      </View>
-      {loading ? <ActivityIndicator color={look.violet} style={{ marginTop: 30 }} /> : (
-        <FlatList data={tiles} key={wide ? 'w' : 'n'} numColumns={wide ? 2 : 1} keyExtractor={(t) => t.key} contentContainerStyle={{ paddingBottom: 110 }}
-          columnWrapperStyle={wide ? { gap: 12 } : undefined} ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
-          ListEmptyComponent={<Text style={[styles.subtle, styles.empty]}>{section === PRODUCTS ? 'No products yet.' : 'No services yet. Add them in Services.'}</Text>}
-          renderItem={({ item }) => (
-            <TouchableOpacity testID={`tablet-pos-tile-${item.key}`} onPress={item.onPress} activeOpacity={0.75} style={styles.tile}>
-              <Text style={styles.tileTitle} numberOfLines={2}>{item.title}</Text>
-              <View style={styles.tileFoot}>
-                <Text style={styles.tilePrice}>{money(item.price)}</Text>
-                <Text style={styles.subtle} numberOfLines={1}>{item.hint}</Text>
-              </View>
-            </TouchableOpacity>
-          )} />
-      )}
+      {loading ? <ActivityIndicator color={look.violet} style={{ marginTop: 30 }} />
+        : groups.length === 0 ? <Text style={[styles.subtle, styles.empty]}>No services yet. Add them in Services.</Text>
+        : <PosGrid key={JSON.stringify(gridConfig)} layout={gridConfig} groups={groups} addons={addons} onService={pickKey} onAddon={pickAddon} onFn={gridFn} />}
     </View>
   );
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top + 18 }]}>
+    <View style={[styles.root, { paddingTop: insets.top + 18, paddingBottom: insets.bottom }]}>
       <AppBackground />
       {wide ? (
         <View style={styles.columns}>{ticket}{keypad}{catalog}</View>
@@ -355,6 +395,7 @@ export function TabletPos() {
         </View>
       )}
 
+      {editingGrid ? <PosGridEditor visible groups={groups} addons={addons} config={gridConfig} saving={savingGrid} onSave={(c) => void saveGrid(c)} onClose={() => setEditingGrid(false)} /> : null}
       <Modal visible={picking} transparent animationType="fade" onRequestClose={() => setPicking(false)} supportedOrientations={['portrait', 'landscape']}>
         <TouchableOpacity activeOpacity={1} onPress={() => setPicking(false)} style={styles.backdrop}>
           <TouchableOpacity activeOpacity={1} onPress={() => undefined} style={styles.sheet} testID="tablet-pos-client-sheet">
@@ -393,8 +434,11 @@ const styles = StyleSheet.create({
   ticket: { flex: 1, minHeight: 0 },
   keypad: { width: 390 },
   keypadUnder: { width: 'auto' },
-  catalog: { flex: 1, minHeight: 0 },
-  clientRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: look.cardBorder },
+  // Ends above the app-icons button (bottom right, components/TabletLauncher.tsx), so the grid's last key — Back — is never under it.
+  catalog: { flex: 1, minHeight: 0, marginBottom: 74 },
+  clientRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: look.cardBorder },
+  clientPickRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  gear: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: look.pageBottom },
   clientIcon: { width: 48, height: 48, borderRadius: 14, backgroundColor: look.tile, alignItems: 'center', justifyContent: 'center' },
   clientName: { fontSize: 20, fontFamily: 'Inter_700Bold', color: look.heading },
   subtle: { fontSize: 15, fontFamily: 'Inter_400Regular', color: look.subtle },
@@ -435,10 +479,6 @@ const styles = StyleSheet.create({
   fnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: look.violetDeep },
   adjust: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   removeSmall: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
-  tile: { flex: 1, minHeight: 112, borderRadius: 18, backgroundColor: look.pageBottom, borderWidth: 1, borderColor: look.cardBorder, padding: 14, justifyContent: 'space-between' },
-  tileTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold', color: look.heading },
-  tileFoot: { marginTop: 10, gap: 2 },
-  tilePrice: { fontSize: 19, fontFamily: 'Inter_700Bold', color: look.violetDeep },
   backdrop: { flex: 1, backgroundColor: 'rgba(17, 12, 34, 0.35)', alignItems: 'center', justifyContent: 'center' },
   sheet: { width: 560, maxWidth: '92%', backgroundColor: look.pageTop, borderRadius: 26, padding: 20 },
   sheetHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
