@@ -131,6 +131,8 @@ export type RegisterRequest = {
   /** Where they see clients: their own place (salon/suite or a private home studio, or none) and house calls. */
   ownPlace?: 'salon' | 'home' | 'none';
   houseCalls?: boolean;
+  /** The services priced in the sign-up's catalog builder; with any, they are the menu instead of the starter list. */
+  catalog?: { category: string; services: { name: string; price: number; duration: number }[] }[];
 };
 
 /** Texts a sign-up code to a mobile number no Certxa account has had (landline and VoIP numbers are refused). */

@@ -360,4 +360,12 @@ export const VI_3: Record<string, string> = {
   "UPDATING…": "ĐANG CẬP NHẬT…",
   "Numeric keyboard": "Bàn phím số",
   "Letter keyboard": "Bàn phím chữ",
+  "What do you offer?": "Bạn cung cấp dịch vụ gì?",
+  "Tap every kind of service you do. Next, you'll price each one.": "Chạm vào mọi loại dịch vụ bạn làm. Tiếp theo, bạn sẽ đặt giá cho từng dịch vụ.",
+  "I'll add my services later": "Tôi sẽ thêm dịch vụ sau",
+  "Don't offer it? Tap ENTER to skip.": "Không làm dịch vụ này? Chạm NHẬP để bỏ qua.",
+  "Usual length. Tap ENTER to keep it.": "Thời gian thường lệ. Chạm NHẬP để giữ.",
+  "Minutes must be between 5 and 600.": "Số phút phải từ 5 đến 600.",
+  "NEXT CATEGORY": "LOẠI TIẾP THEO",
+  "PREV": "TRƯỚC",
 };

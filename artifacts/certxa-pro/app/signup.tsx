@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,7 +8,8 @@ import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollV
 import { useColors } from '@/hooks/useColors';
 import { SelectField } from '@/components/SelectField';
 import { useAuth } from '@/contexts/AuthContext';
-import { CertxaApiError, sendSignupPhoneCode, verifySignupPhoneCode } from '@/lib/certxa-api';
+import { CertxaApiError, certxaRequest, sendSignupPhoneCode, verifySignupPhoneCode } from '@/lib/certxa-api';
+import { CatalogBuilder, entryKey, type CatalogCategory, type CatalogEntries } from '@/components/signup/CatalogBuilder';
 import { api } from '@/lib/live-api';
 import { BusinessHoursEditor, DAY_NAMES, type DayHours } from '@/components/BusinessHoursEditor';
 
@@ -19,14 +20,24 @@ import { WhyWeAsk } from '@/components/WhyWeAsk';
 import { BUSINESS_STRUCTURES, WHY, dateOfBirthIso, isCompany } from '@/lib/stripe-details';
 // The same list as Settings > Business details. Certxa loads a starter list of services for the types it has one for.
 const BUSINESS_TYPES = ['Nail Salon', 'Hair Salon', 'Barbershop', 'Lash and Brows', 'Esthetician', 'Makeup', 'Massage', 'Wax', 'Tattoo and Piercing', 'Pet Grooming', 'Other'];
-const STEPS = 6;
+// Each business type's list in the service catalog (GET /api/public/service-catalog/:type); Makeup is the Esthetics
+// list's Makeup category. Types without one skip the two catalog steps.
+const CATALOG_TYPE: Record<string, { type: string; only?: string }> = {
+  'Nail Salon': { type: 'Nails' }, 'Hair Salon': { type: 'Hair' }, Barbershop: { type: 'Barber' }, 'Lash and Brows': { type: 'Lash & Brow' },
+  Esthetician: { type: 'Esthetics' }, Makeup: { type: 'Esthetics', only: 'Makeup' }, Massage: { type: 'Massage' }, Wax: { type: 'Waxing' },
+};
+type StepId = 'business' | 'categories' | 'prices' | 'place' | 'hours' | 'stripe' | 'login' | 'phone';
+const ALL_STEPS: StepId[] = ['business', 'categories', 'prices', 'place', 'hours', 'stripe', 'login', 'phone'];
 
 function deviceTimezone() {
   try { return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined; } catch { return undefined; }
 }
 
 /**
- * Sign-up, one question per step (owner, 2026-11-03): 1 you and your business, 2 where you offer your services,
+ * Sign-up, one question per step (owner, 2026-11-03): 1 you and your business, then (owner, 2026-11-20) the services
+ * you offer: the categories you do (tiles), then each category's common services on a keypad, price then minutes
+ * (components/signup/CatalogBuilder.tsx; saved as the account's menu instead of the starter list), then where you
+ * offer your services,
  * 3 your business hours (a day opens a sheet with a time wheel), 4 the details Stripe needs for card payments (date of
  * birth, home address, business structure and EIN, each with "Why we ask"; owner, 2026-11-10: handed to Stripe so its
  * form doesn't ask again), 5 your login, 6 your mobile number, proved by a
@@ -44,6 +55,29 @@ export default function SignupScreen() {
   const [lastName, setLastName] = useState('');
   const [businessName, setBusinessName] = useState('');
   const [businessType, setBusinessType] = useState('');
+  // The catalog steps: the business type's categories, the ones chosen, and the prices and minutes entered.
+  const catalogType = CATALOG_TYPE[businessType];
+  const [catalog, setCatalog] = useState<CatalogCategory[] | null>(null);
+  const [chosenCats, setChosenCats] = useState<string[]>([]);
+  const [entries, setEntries] = useState<CatalogEntries>({});
+  useEffect(() => {
+    setCatalog(null); setChosenCats([]); setEntries({});
+    if (!catalogType) return;
+    let cancelled = false;
+    certxaRequest<{ categories: CatalogCategory[] }>(`/api/public/service-catalog/${encodeURIComponent(catalogType.type)}`)
+      .then((r) => { if (!cancelled) setCatalog((r?.categories ?? []).filter((c) => !catalogType.only || c.name === catalogType.only)); })
+      .catch(() => { if (!cancelled) setCatalog([]); });
+    return () => { cancelled = true; };
+  }, [businessType]); // eslint-disable-line react-hooks/exhaustive-deps
+  // No list for this type (or it couldn't load): the two catalog steps are left out.
+  const flow = ALL_STEPS.filter((id) => (id !== 'categories' && id !== 'prices') || (catalog?.length ?? 0) > 0 || (!!catalogType && catalog === null));
+  const STEPS = flow.length;
+  const stepId: StepId = flow[step - 1] ?? 'business';
+  const chosenCatalog = (catalog ?? []).filter((c) => chosenCats.includes(c.name));
+  const ownCatalog = chosenCatalog
+    .map((c) => ({ category: c.name, services: c.services.flatMap((sv) => { const e = entries[entryKey(c.name, sv.name)]; return e ? [{ name: sv.name, price: e.price, duration: e.duration }] : []; }) }))
+    .filter((c) => c.services.length > 0);
+  const goTo = (id: StepId) => setStep(Math.max(1, flow.indexOf(id) + 1));
   // Where they see clients: their own place (a salon/suite/booth, or a home studio kept private) and/or house calls.
   const [houseCalls, setHouseCalls] = useState(false);
   const [hasPlace, setHasPlace] = useState(true);
@@ -86,11 +120,13 @@ export default function SignupScreen() {
   const homeReady = homeIsBusiness || Boolean(homeStreet.trim() && homeCity.trim() && /^[A-Za-z]{2}$/.test(homeState.trim()) && /^\d{5}$/.test(homeZip.trim()));
   const einDigits = ein.replace(/\D/g, '');
   const ready =
-    step === 1 ? Boolean(firstName.trim() && lastName.trim() && businessName.trim().length >= 2 && businessType)
-    : step === 2 ? (houseCalls || hasPlace) && (!hasPlace || addressReady)
-    : step === 3 ? hours.some((day) => !day.isClosed)
-    : step === 4 ? Boolean(dateOfBirth && homeReady && structure && (!isCompany(structure) || einDigits.length === 0 || einDigits.length === 9))
-    : step === 5 ? Boolean(email.trim().includes('@') && password.length >= 8)
+    stepId === 'business' ? Boolean(firstName.trim() && lastName.trim() && businessName.trim().length >= 2 && businessType && (!catalogType || catalog !== null))
+    : stepId === 'categories' ? chosenCats.length > 0
+    : stepId === 'prices' ? true
+    : stepId === 'place' ? (houseCalls || hasPlace) && (!hasPlace || addressReady)
+    : stepId === 'hours' ? hours.some((day) => !day.isClosed)
+    : stepId === 'stripe' ? Boolean(dateOfBirth && homeReady && structure && (!isCompany(structure) || einDigits.length === 0 || einDigits.length === 9))
+    : stepId === 'login' ? Boolean(email.trim().includes('@') && password.length >= 8)
     : codeSent ? code.length === 6 : phoneDigits.length === 10;
 
   const otherNumber = () => { setCodeSent(false); setCode(''); setPhoneToken(null); setError(''); };
@@ -136,6 +172,7 @@ export default function SignupScreen() {
         firstName: firstName.trim(), lastName: lastName.trim(), businessName: businessName.trim(), businessType,
         email: email.trim(), password, phone: phoneDigits, phoneToken: token, timezone: deviceTimezone(),
         ownPlace: hasPlace ? (placeIsHome ? 'home' : 'salon') : 'none', houseCalls,
+        ...(ownCatalog.length ? { catalog: ownCatalog } : {}),
       });
       // The business address, saved the way Get paid saves it (Certxa also sets the time zone from it). Never blocks
       // the sign-up: Get paid asks again if it is missing.
@@ -180,6 +217,33 @@ export default function SignupScreen() {
       trackColor={{ false: colors.border, true: colors.primary }} thumbColor="#FFFFFF" ios_backgroundColor={colors.border} />
   );
 
+  // The back arrow, progress bar and "n / N", on every step.
+  const header = (
+    <>
+      <TouchableOpacity accessibilityLabel={step > 1 ? 'Back' : 'Back to sign in'} onPress={back} style={styles.back} testID="signup-back">
+        <Feather name="arrow-left" size={24} color={colors.foreground} />
+      </TouchableOpacity>
+      <View style={[styles.progress, { backgroundColor: colors.border }]} accessibilityLabel={`Step ${step} of ${STEPS}`}>
+        <View style={[styles.progressFill, { backgroundColor: colors.foreground, width: `${(step / STEPS) * 100}%` }]} />
+      </View>
+      <Text style={[styles.stepCount, { color: colors.mutedForeground }]}>{step} / {STEPS}</Text>
+    </>
+  );
+
+  // The keypad step fills the screen (no scrolling, no Next button: its own ENTER, PREV, EXIT).
+  if (stepId === 'prices') {
+    return (
+      <View style={[styles.root, { backgroundColor: look.pageTop, paddingTop: topInset + 6, paddingBottom: bottomInset + 12, paddingHorizontal: 18 }]}>
+        <AppBackground />
+        {header}
+        <View style={{ flex: 1, marginTop: 8 }}>
+          <CatalogBuilder key={chosenCats.join('|')} categories={chosenCatalog} entries={entries} onChange={setEntries}
+            onDone={() => goTo('place')} onBack={() => goTo('categories')} />
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.root, { backgroundColor: look.pageTop }]}>
       <AppBackground />
@@ -189,15 +253,9 @@ export default function SignupScreen() {
         keyboardShouldPersistTaps="handled"
         bottomOffset={110}
       >
-        <TouchableOpacity accessibilityLabel={step > 1 ? 'Back' : 'Back to sign in'} onPress={back} style={styles.back} testID="signup-back">
-          <Feather name="arrow-left" size={24} color={colors.foreground} />
-        </TouchableOpacity>
-        <View style={[styles.progress, { backgroundColor: colors.border }]} accessibilityLabel={`Step ${step} of ${STEPS}`}>
-          <View style={[styles.progressFill, { backgroundColor: colors.foreground, width: `${(step / STEPS) * 100}%` }]} />
-        </View>
-        <Text style={[styles.stepCount, { color: colors.mutedForeground }]}>{step} / {STEPS}</Text>
+        {header}
 
-        {step === 1 ? (
+        {stepId === 'business' ? (
           <>
             <HelpTitle help="signup" style={[styles.title, { color: colors.foreground }]}>Tell us about your business</HelpTitle>
             <View style={styles.form}>
@@ -211,7 +269,28 @@ export default function SignupScreen() {
                 options={BUSINESS_TYPES.map((type) => ({ value: type, label: type }))} onChange={setBusinessType} />
             </View>
           </>
-        ) : step === 2 ? (
+        ) : stepId === 'categories' ? (
+          <>
+            <HelpTitle help="signup" style={[styles.title, { color: colors.foreground }]}>What do you offer?</HelpTitle>
+            <Text style={[styles.optionHint, { color: colors.mutedForeground, marginTop: 12 }]}>Tap every kind of service you do. Next, you'll price each one.</Text>
+            <View style={styles.tiles}>
+              {(catalog ?? []).map((c) => {
+                const on = chosenCats.includes(c.name);
+                return (
+                  <TouchableOpacity key={c.name} accessibilityRole="checkbox" accessibilityState={{ checked: on }} testID={`signup-cat-${c.name}`}
+                    onPress={() => setChosenCats((cur) => (on ? cur.filter((n) => n !== c.name) : [...cur, c.name]))}
+                    style={[styles.tile, on && styles.tileOn]}>
+                    <Text style={[styles.tileText, on && styles.tileTextOn]}>{c.name}</Text>
+                    {on ? <Feather name="check" size={20} color="#FFFFFF" /> : null}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <TouchableOpacity onPress={() => { setChosenCats([]); goTo('place'); }} style={{ alignSelf: 'center', minHeight: 44, justifyContent: 'center', marginTop: 18 }} testID="signup-catalog-skip">
+              <Text style={[styles.link, { color: colors.foreground }]}>I'll add my services later</Text>
+            </TouchableOpacity>
+          </>
+        ) : stepId === 'place' ? (
           <>
             <HelpTitle help="signup" style={[styles.title, { color: colors.foreground }]}>Where do you offer your services?</HelpTitle>
             <View style={styles.optionRow}>
@@ -248,7 +327,7 @@ export default function SignupScreen() {
             ) : null}
             {!houseCalls && !hasPlace ? <Text style={[styles.optionHint, { color: colors.mutedForeground, marginTop: 18 }]}>Turn on at least one.</Text> : null}
           </>
-        ) : step === 3 ? (
+        ) : stepId === 'hours' ? (
           <>
             <HelpTitle help="signup" style={[styles.title, { color: colors.foreground }]}>What are your business hours?</HelpTitle>
             <Text style={[styles.optionHint, { color: colors.mutedForeground, marginTop: 12 }]}>Clients will only be able to book within these hours. You can edit these later in Settings.</Text>
@@ -256,7 +335,7 @@ export default function SignupScreen() {
               <BusinessHoursEditor hours={hours} onChange={setHours} />
             </View>
           </>
-        ) : step === 4 ? (
+        ) : stepId === 'stripe' ? (
           <>
             <HelpTitle help="signup" style={[styles.title, { color: colors.foreground }]}>A few details for card payments</HelpTitle>
             <Text style={[styles.optionHint, { color: colors.mutedForeground, marginTop: 12 }]}>Stripe processes your card payments. We pass these to Stripe so you only enter them once.</Text>
@@ -311,7 +390,7 @@ export default function SignupScreen() {
               ) : null}
             </View>
           </>
-        ) : step === 5 ? (
+        ) : stepId === 'login' ? (
           <>
             <HelpTitle help="signup" style={[styles.title, { color: colors.foreground }]}>Create your login</HelpTitle>
             <View style={styles.form}>
@@ -347,7 +426,7 @@ export default function SignupScreen() {
           </>
         )}
         {error ? <Text style={[styles.error, { color: colors.destructive }]}>{error}</Text> : null}
-        {step === 1 ? (
+        {stepId === 'business' ? (
           <TouchableOpacity onPress={() => router.replace('/login')} style={{ alignSelf: 'center', minHeight: 44, justifyContent: 'center', marginTop: 18 }} testID="signup-sign-in">
             <Text style={[styles.link, { color: colors.foreground }]}>I already have an account</Text>
           </TouchableOpacity>
@@ -379,6 +458,12 @@ const styles = StyleSheet.create({
   sectionLabel: { fontSize: 17, fontFamily: 'Inter_600SemiBold', marginTop: 12 },
   input: { borderWidth: 1, borderRadius: 14, height: 56, paddingHorizontal: 16, fontSize: 18, fontFamily: 'Inter_400Regular' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 24 },
+  tile: { flexGrow: 1, flexBasis: '45%', minHeight: 72, borderRadius: 16, borderWidth: 1, borderColor: look.cardBorder, backgroundColor: look.card,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingHorizontal: 16, ...cardShadow },
+  tileOn: { backgroundColor: look.violet, borderColor: look.violet },
+  tileText: { flex: 1, fontSize: 18, fontFamily: 'Inter_600SemiBold', color: look.heading },
+  tileTextOn: { color: '#FFFFFF' },
   chip: { borderWidth: 1, borderRadius: 22, paddingHorizontal: 16, minHeight: 42, justifyContent: 'center' },
   chipText: { fontSize: 17, fontFamily: 'Inter_500Medium' },
   optionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 64, marginTop: 22 },
