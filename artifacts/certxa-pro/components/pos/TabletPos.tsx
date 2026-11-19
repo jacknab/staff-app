@@ -18,13 +18,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ActivityIndicator, Alert, FlatList, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { router, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBookingData } from '@/contexts/BookingContext';
 import { api } from '@/lib/live-api';
 import { CertxaApiError } from '@/lib/certxa-api';
 import { PosGrid } from '@/components/pos/PosGrid';
+import { ClientLookup } from '@/components/pos/ClientLookup';
 import { PosGridEditor } from '@/components/pos/PosGridEditor';
 import type { CatalogAddon, CatalogGroup, CatalogService, PosFn, PosGridConfig } from '@/lib/posGrid';
 import { AppBackground } from '@/components/look/AppBackground';
@@ -37,6 +38,7 @@ type Client = { customerId: number; name: string; phone: string; email: string }
 
 const MAX_CENTS = 10_000_000;
 const KEYS = ['7', '8', '9', '⌫', '4', '5', '6', '↶', '1', '2', '3', 'X', '00', '0', 'ENTER'];
+const KEY_GAP = 10;
 const money = (cents: number) => `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const digitsOnly = (value: string) => value.replace(/\D/g, '');
 /** Products and packages ride on the grid as service keys with ids no service has: a package is its id negated (as on
@@ -208,16 +210,8 @@ export function TabletPos() {
 
   // ── Choosing the client ──
   const [picking, setPicking] = useState(false);
-  const [search, setSearch] = useState('');
-  const [newName, setNewName] = useState('');
-  const [newPhone, setNewPhone] = useState('');
-  const results = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    const qDigits = digitsOnly(q);
-    return (q ? clients.filter((c) => c.name.toLowerCase().includes(q) || (c.email ?? '').toLowerCase().includes(q) || (qDigits.length >= 3 && digitsOnly(c.phone).includes(qDigits))) : clients).slice(0, 60);
-  }, [clients, search]);
-  const pickExisting = (c: (typeof clients)[number]) => { setClient({ customerId: c.customerId, name: c.name, phone: c.phone, email: c.email ?? '' }); setPicking(false); setSearch(''); };
-  const addNewClient = async () => {
+  const pickExisting = (c: (typeof clients)[number]) => { setClient({ customerId: c.customerId, name: c.name, phone: c.phone, email: c.email ?? '' }); setPicking(false); };
+  const addNewClient = async (newName: string, newPhone: string) => {
     if (!newName.trim() && !newPhone.trim()) return;
     setBusy(true); setError('');
     try {
@@ -230,7 +224,7 @@ export function TabletPos() {
         if (!existing) throw cause;
         pickExisting(existing);
       }
-      setNewName(''); setNewPhone(''); setPicking(false);
+      setPicking(false);
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not add the client.'); }
     finally { setBusy(false); }
   };
@@ -266,7 +260,7 @@ export function TabletPos() {
   };
 
   const ticket = (
-    <View style={[styles.panel, styles.ticket]} testID="tablet-pos-ticket">
+    <View style={[styles.panel, styles.ticket, wide && styles.ticketWide]} testID="tablet-pos-ticket">
       <TouchableOpacity testID="tablet-pos-client" onPress={() => setPicking(true)} style={styles.clientRow}>
         <View style={styles.clientIcon}><Feather name="user" size={22} color={look.violetDeep} /></View>
         <View style={{ flex: 1 }}>
@@ -316,6 +310,8 @@ export function TabletPos() {
     [{ id: 'quick', label: 'Quick Ticket', icon: 'zap' }, { id: 'retail', label: 'Retail', icon: 'shopping-bag' }, { id: 'gift', label: 'Gift Card', icon: 'gift' }],
     [{ id: 'tip', label: 'Tip Adjust', icon: 'dollar-sign' }, { id: 'discount', label: 'Discount', icon: 'percent' }],
   ];
+  // Square keys (owner, 2026-11-19), as big as the keypad's width allows.
+  const [keySize, setKeySize] = useState(0);
   const keypad = (
     <View style={[styles.panel, styles.keypad, !wide && styles.keypadUnder]} testID="tablet-pos-keypad">
       <View style={[styles.status, status?.tone === 'error' && styles.statusError, status?.tone === 'ok' && styles.statusOk, prompt != null && styles.statusPrompt]} testID="tablet-pos-status">
@@ -326,10 +322,10 @@ export function TabletPos() {
         {/* Just the number, no $ (as /barber). */}
         <Text testID="tablet-pos-display" style={styles.displayText} numberOfLines={1} adjustsFontSizeToFit>{cents ? (cents / 100).toFixed(2) : ''}</Text>
       </View>
-      <View style={styles.keys}>
+      <View style={styles.keys} onLayout={(e) => setKeySize(Math.floor((e.nativeEvent.layout.width - 3 * KEY_GAP) / 4))}>
         {KEYS.map((k) => (
-          <TouchableOpacity key={k} testID={`tablet-pos-key-${k === '⌫' ? 'back' : k === '↶' ? 'undo' : k}`} onPress={() => press(k)} accessibilityLabel={k === '⌫' ? 'Delete' : k === '↶' ? 'Undo' : k === 'X' ? 'Quantity' : k}
-            style={[styles.key, k === 'ENTER' && styles.enterKey, k === '↶' && styles.undoKey]}>
+          <TouchableOpacity key={k} testID={`tablet-pos-key-${k === '⌫' ? 'back' : k === '↶' ? 'undo' : k}`} onPress={() => press(k)} accessibilityLabel={k === '⌫' ? 'Delete' : k === '↶' ? 'Undo' : k === 'X' ? 'Quantity' : k} activeOpacity={0.7}
+            style={[styles.key, keySize > 0 && { width: k === 'ENTER' ? keySize * 2 + KEY_GAP : keySize, height: keySize }, k === 'ENTER' && styles.enterKey, k === '↶' && styles.undoKey]}>
             {k === '⌫' ? <Feather name="delete" size={28} color={look.heading} />
               : <Text style={[styles.keyText, k === 'ENTER' && styles.enterText, k === '↶' && guided !== null && styles.exitText]}>{k === '↶' && guided !== null ? 'EXIT' : k}</Text>}
             {k === 'X' ? <Text style={styles.keySmall}>Qty</Text> : null}
@@ -399,31 +395,8 @@ export function TabletPos() {
       )}
 
       {editingGrid ? <PosGridEditor visible groups={groups} addons={addons} config={gridConfig} saving={savingGrid} onSave={(c) => void saveGrid(c)} onClose={() => setEditingGrid(false)} /> : null}
-      <Modal visible={picking} transparent animationType="fade" onRequestClose={() => setPicking(false)} supportedOrientations={['portrait', 'landscape']}>
-        <TouchableOpacity activeOpacity={1} onPress={() => setPicking(false)} style={styles.backdrop}>
-          <TouchableOpacity activeOpacity={1} onPress={() => undefined} style={styles.sheet} testID="tablet-pos-client-sheet">
-            <View style={styles.sheetHead}>
-              <Text style={styles.sheetTitle}>Client</Text>
-              <TouchableOpacity accessibilityLabel="Close" onPress={() => setPicking(false)} style={styles.remove}><Feather name="x" size={24} color={look.heading} /></TouchableOpacity>
-            </View>
-            <TextInput testID="tablet-pos-client-search" value={search} onChangeText={setSearch} placeholder="Search name, phone or e-mail" placeholderTextColor={look.subtle} style={styles.input} />
-            <FlatList data={results} keyExtractor={(c) => String(c.customerId)} style={{ maxHeight: 300 }} keyboardShouldPersistTaps="handled"
-              renderItem={({ item }) => (
-                <TouchableOpacity testID={`tablet-pos-client-${item.customerId}`} onPress={() => pickExisting(item)} style={styles.clientPick}>
-                  <Text style={styles.lineTitle}>{item.name}</Text><Text style={styles.subtle}>{item.phone || item.email}</Text>
-                </TouchableOpacity>
-              )} />
-            <Text style={[styles.lineTitle, { marginTop: 16 }]}>New client</Text>
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
-              <TextInput testID="tablet-pos-new-name" value={newName} onChangeText={setNewName} placeholder="Name" placeholderTextColor={look.subtle} style={[styles.input, styles.half]} autoCapitalize="words" />
-              <TextInput testID="tablet-pos-new-phone" value={newPhone} onChangeText={setNewPhone} placeholder="Mobile" placeholderTextColor={look.subtle} style={[styles.input, styles.half]} keyboardType="phone-pad" />
-            </View>
-            <TouchableOpacity testID="tablet-pos-new-add" disabled={busy || (!newName.trim() && !newPhone.trim())} onPress={() => void addNewClient()} style={[styles.newClientButton, (!newName.trim() && !newPhone.trim()) && { opacity: 0.5 }]}>
-              <Text style={styles.chargeText}>ADD CLIENT</Text>
-            </TouchableOpacity>
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
+      <ClientLookup visible={picking} clients={clients} busy={busy} error={error} onPick={pickExisting}
+        onAdd={(n, ph) => void addNewClient(n, ph)} onClose={() => { setPicking(false); setError(''); }} />
     </View>
   );
 }
@@ -435,7 +408,9 @@ const styles = StyleSheet.create({
   leftColumn: { flex: 1.1, minHeight: 0, gap: 14 },
   panel: { backgroundColor: look.card, borderRadius: 22, borderWidth: 1, borderColor: look.cardBorder, padding: 16, ...cardShadow },
   ticket: { flex: 1, minHeight: 0 },
-  keypad: { width: 390 },
+  // Side by side: a narrower ticket, so the keypad's keys can be bigger.
+  ticketWide: { flexGrow: 0, flexShrink: 0, flexBasis: 320, width: 320 },
+  keypad: { width: 450 },
   keypadUnder: { width: 'auto' },
   // The grid ends above the app-icons button (bottom right, components/TabletLauncher.tsx), so its last key — Back — is
   // never under it; the gear sits in that row on the left.
@@ -467,29 +442,24 @@ const styles = StyleSheet.create({
   statusError: { backgroundColor: '#FDECEC' },
   statusPrompt: { backgroundColor: look.violet },
   statusText: { fontSize: 14, fontFamily: 'Inter_700Bold', color: look.heading, letterSpacing: 0.3 },
-  display: { height: 76, borderRadius: 16, backgroundColor: look.pageBottom, borderWidth: 1, borderColor: look.cardBorder, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, marginBottom: 12, gap: 10 },
+  display: { height: 68, borderRadius: 16, backgroundColor: look.pageBottom, borderWidth: 1, borderColor: look.cardBorder, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, marginBottom: 12, gap: 10 },
   displayQty: { fontSize: 18, fontFamily: 'Inter_700Bold', color: look.violetDeep },
   displayText: { flex: 1, fontSize: 40, fontFamily: 'Inter_700Bold', textAlign: 'right', color: look.heading },
-  keys: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  key: { width: '22.6%', height: 74, borderRadius: 16, backgroundColor: look.pageBottom, borderWidth: 1, borderColor: look.cardBorder, alignItems: 'center', justifyContent: 'center' },
-  enterKey: { width: '48.4%', backgroundColor: look.violet, borderColor: look.violet },
+  keys: { flexDirection: 'row', flexWrap: 'wrap', gap: KEY_GAP },
+  // Raised keys (owner, 2026-11-19): a darker bottom edge and a shadow give them depth.
+  key: { width: '22.6%', aspectRatio: 1, borderRadius: 16, backgroundColor: look.card, borderWidth: 1, borderColor: look.cardBorder, borderBottomWidth: 5, borderBottomColor: '#D8CEF6',
+    alignItems: 'center', justifyContent: 'center', shadowColor: '#2E1065', shadowOpacity: 0.18, shadowRadius: 5, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
+  enterKey: { aspectRatio: undefined, backgroundColor: look.violet, borderColor: look.violet, borderBottomColor: look.violetDeep },
   undoKey: { backgroundColor: look.tile },
-  keyText: { fontSize: 28, fontFamily: 'Inter_600SemiBold', color: look.heading },
+  keyText: { fontSize: 32, fontFamily: 'Inter_600SemiBold', color: look.heading },
   enterText: { fontSize: 22, fontFamily: 'Inter_700Bold', color: '#FFFFFF', letterSpacing: 0.6 },
   exitText: { fontSize: 18, fontFamily: 'Inter_700Bold', color: look.violetDeep },
   keySmall: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: look.subtle, marginTop: -2 },
   fnRow: { flexDirection: 'row', gap: 10, marginTop: 10 },
-  fnButton: { flex: 1, height: 66, borderRadius: 16, backgroundColor: look.tile, borderWidth: 1, borderColor: look.cardBorder, alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 6 },
+  fnButton: { flex: 1, height: 66, borderRadius: 16, backgroundColor: look.tile, borderWidth: 1, borderColor: look.cardBorder, borderBottomWidth: 4, borderBottomColor: '#D8CEF6',
+    alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 6, shadowColor: '#2E1065', shadowOpacity: 0.14, shadowRadius: 4, shadowOffset: { width: 0, height: 3 }, elevation: 3 },
   fnActive: { borderColor: look.violet, borderWidth: 2 },
   fnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: look.violetDeep },
   adjust: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   removeSmall: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
-  backdrop: { flex: 1, backgroundColor: 'rgba(17, 12, 34, 0.35)', alignItems: 'center', justifyContent: 'center' },
-  sheet: { width: 560, maxWidth: '92%', backgroundColor: look.pageTop, borderRadius: 26, padding: 20 },
-  sheetHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  sheetTitle: { fontSize: 24, fontFamily: 'Inter_700Bold', color: look.heading },
-  input: { height: 52, borderRadius: 14, borderWidth: 1, borderColor: look.cardBorder, backgroundColor: look.card, paddingHorizontal: 14, fontSize: 17, color: look.heading, fontFamily: 'Inter_400Regular' },
-  half: { flex: 1, minWidth: 0 },
-  newClientButton: { height: 58, borderRadius: 16, backgroundColor: look.violetDeep, alignItems: 'center', justifyContent: 'center', marginTop: 12 },
-  clientPick: { paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: look.cardBorder },
 });
