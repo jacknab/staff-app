@@ -353,4 +353,9 @@ export const VI_3: Record<string, string> = {
   "TAP CREATE APPOINTMENT TO PICK THE DAY AND TIME": "NHẤN TẠO LỊCH HẸN ĐỂ CHỌN NGÀY VÀ GIỜ",
   "TAP THE SERVICES, THEN CREATE APPOINTMENT": "NHẤN DỊCH VỤ, RỒI TẠO LỊCH HẸN",
   "TAP THE SERVICES TO BOOK, THEN CREATE APPOINTMENT": "NHẤN DỊCH VỤ CẦN ĐẶT, RỒI TẠO LỊCH HẸN",
+  // Booking details buttons
+  "CANCEL APPOINTMENT": "HỦY LỊCH HẸN",
+  "MARK AS COMPLETED": "ĐÁNH DẤU ĐÃ XONG",
+  "MARK AS DONE": "ĐÁNH DẤU ĐÃ XONG",
+  "UPDATING…": "ĐANG CẬP NHẬT…",
 };

@@ -22,7 +22,9 @@ import { AppBackground } from '@/components/look/AppBackground';
 import { APP_MAX_WIDTH } from '@/components/TabletFrame';
 import { look, cardShadow } from '@/components/look/tokens';
 import { usePaymentsReady } from '@/lib/usePaymentsReady';
-import { useInPane, usePaneClose, usePaneSetParams, useScreenParams } from '@/components/TabletSplit';
+import { PaneHost, useInPane, usePaneClose, usePaneSetParams, useScreenParams } from '@/components/TabletSplit';
+import { useIsTablet } from '@/components/TabletLauncher';
+import ClientProfileScreen from '../client/[id]';
 import { useOpenBooking } from '@/lib/openBooking';
 /** Every quarter hour of the working day, and the booking's own time when it is between them. */
 function timeChoices(current: string): string[] {
@@ -116,6 +118,8 @@ export default function AppointmentDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const params = useScreenParams<AppointmentRouteParams>();
+  const isTablet = useIsTablet();
+  const inPane = useInPane();
   const { timeZone } = useBookingData();
   // Fixed when the screen opens: saving an edit puts a few details in the address, not all of them.
   const [complete] = useState(!!params.dateIso || params.preview === '1');
@@ -128,8 +132,22 @@ export default function AppointmentDetailScreen() {
       .catch(() => setFailed(true));
   }, [complete, params.id, timeZone]);
 
-  if (complete) return <AppointmentDetail params={params} />;
-  if (loaded) return <AppointmentDetail params={{ ...loaded, ...params }} />;
+  const shown = complete ? params : loaded ? { ...loaded, ...params } : null;
+  // Tablets (owner, 2026-11-20): the booking on the left and the client's profile on the right (app/client/[id].tsx),
+  // when the booking has a client and isn't already in another screen's right side.
+  if (shown && isTablet && !inPane && Number(shown.customerId) > 0) {
+    return (
+      <View style={styles.split}>
+        <View style={styles.splitMain}><AppointmentDetail params={shown} /></View>
+        <View style={styles.splitLine} />
+        <View style={styles.splitSide}>
+          <PaneHost pane={{ key: `client-${shown.customerId}`, Screen: ClientProfileScreen, params: { id: String(shown.customerId) } }}
+            onClose={() => undefined} />
+        </View>
+      </View>
+    );
+  }
+  if (shown) return <AppointmentDetail params={shown} />;
   return (
     <View testID="appointment-loading" style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.background, paddingTop: insets.top }}>
       {failed ? (
@@ -880,19 +898,28 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
             </>
           ) : (
             <>
-              {!prepaid ? (
+              {/* One button (owner, 2026-11-20): MARK AS COMPLETED until the visit is completed, then CHECKOUT. */}
+              {status !== 'completed' || !prepaid ? (
                 <LinearGradient colors={[colors.primary, '#A855F7']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.checkoutGradient}>
-                  <TouchableOpacity testID="appointment-checkout" disabled={saving} onPress={checkout} style={styles.actionButton}>
-                    <Feather name="credit-card" size={19} color={colors.primaryForeground} />
-                    <Text style={[styles.actionText, { color: colors.primaryForeground }]}>CHECKOUT</Text>
-                  </TouchableOpacity>
+                  {status === 'completed' ? (
+                    <TouchableOpacity testID="appointment-checkout" disabled={saving} onPress={checkout} style={styles.actionButton}>
+                      <Feather name="credit-card" size={19} color={colors.primaryForeground} />
+                      <Text style={[styles.actionText, { color: colors.primaryForeground }]}>CHECKOUT</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity testID="appointment-mark-completed" disabled={saving} onPress={() => void markCompleted()} style={styles.actionButton}>
+                      <Feather name="check" size={19} color={colors.primaryForeground} />
+                      <Text style={[styles.actionText, { color: colors.primaryForeground }]}>{saving ? 'UPDATING…' : prepaid ? 'MARK AS DONE' : 'MARK AS COMPLETED'}</Text>
+                    </TouchableOpacity>
+                  )}
                 </LinearGradient>
               ) : null}
-              {status !== 'completed' ? (
-              <TouchableOpacity testID="appointment-mark-completed" disabled={saving} onPress={() => void markCompleted()} style={[styles.secondaryAction, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <Feather name="check" size={20} color={colors.primary} />
-                <Text style={[styles.secondaryActionText, { color: colors.foreground }]}>{saving ? 'UPDATING…' : prepaid ? 'MARK AS DONE' : 'MARK AS COMPLETED'}</Text>
-              </TouchableOpacity>
+              {/* Space first, so it isn't tapped by accident; only while the booking can still be cancelled (as the ⋮ menu). */}
+              {isOpenBooking && status !== 'started' ? (
+                <TouchableOpacity testID="appointment-cancel" disabled={saving} onPress={cancelBooking} style={[styles.secondaryAction, styles.cancelAction, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <Feather name="x-circle" size={20} color={colors.destructive} />
+                  <Text style={[styles.secondaryActionText, { color: colors.destructive }]}>CANCEL APPOINTMENT</Text>
+                </TouchableOpacity>
               ) : null}
               {packageForVisit ? (
                 <TouchableOpacity testID="appointment-use-package" disabled={saving} onPress={() => void spendPackageVisit()} style={[styles.secondaryAction, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -1200,6 +1227,11 @@ const styles = StyleSheet.create({
   checkoutGradient: { borderRadius: 14, marginTop: 18, overflow: 'hidden' },
   actionButton: { height: 53, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 9 },
   actionText: { fontSize: 17, letterSpacing: 0.5, fontFamily: 'Inter_700Bold' },
+  cancelAction: { marginTop: 28 },
+  split: { flex: 1, flexDirection: 'row', backgroundColor: look.pageTop },
+  splitMain: { flex: 1, minWidth: 0 },
+  splitLine: { width: StyleSheet.hairlineWidth, backgroundColor: 'rgba(28, 22, 80, 0.14)' },
+  splitSide: { width: '42%', maxWidth: 520, minWidth: 0, overflow: 'hidden' },
   secondaryAction: { height: 52, borderWidth: 1, borderRadius: 14, marginTop: 9, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
   secondaryActionText: { fontSize: 16, fontFamily: 'Inter_600SemiBold', letterSpacing: 0.2 },
   deleteAction: { height: 51, borderWidth: 1, borderRadius: 14, marginTop: 9, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },

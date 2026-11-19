@@ -14,7 +14,8 @@ export const APP_MAX_WIDTH = 720;
 
 export function TabletFrame({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const fullWidth = ['/', '/index', '/settings', '/clients', '/more', '/catalog', '/past-bookings', '/pos'].includes(pathname);
+  const fullWidth = ['/', '/index', '/settings', '/clients', '/more', '/catalog', '/past-bookings', '/pos'].includes(pathname)
+    || pathname.startsWith('/appointment/');
   return (
     <View style={styles.outer}>
       <View style={[styles.inner, fullWidth && styles.full]}>{children}</View>

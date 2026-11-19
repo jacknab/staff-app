@@ -8,7 +8,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { Feather } from '@expo/vector-icons';
 import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, StatusBar, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text, TextInput } from '@/components/AppText';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router } from 'expo-router';
+import { useInPane, useScreenParams } from '@/components/TabletSplit';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { useBookingData } from '@/contexts/BookingContext';
@@ -25,7 +26,9 @@ export default function NotesScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { timeZone } = useBookingData();
-  const params = useLocalSearchParams<{ customerId?: string; clientName?: string; appointmentId?: string }>();
+  // On a tablet the booking details show these notes beside them (app/appointment/[id].tsx): the details come from there.
+  const params = useScreenParams<{ customerId?: string; clientName?: string; appointmentId?: string }>();
+  const inPane = useInPane();
   const customerId = Number(params.customerId);
   const appointmentId = Number(params.appointmentId);
   const hasClient = Number.isInteger(customerId) && customerId > 0;
@@ -80,9 +83,9 @@ export default function NotesScreen() {
       <AppBackground />
       <StatusBar barStyle="dark-content" />
       <View style={styles.header}>
-        <TouchableOpacity testID="notes-back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} style={styles.back} accessibilityLabel="Back">
+        {inPane ? <View style={styles.back} /> : <TouchableOpacity testID="notes-back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))} style={styles.back} accessibilityLabel="Back">
           <Feather name="chevron-left" size={24} color={colors.foreground} />
-        </TouchableOpacity>
+        </TouchableOpacity>}
         <View style={{ flex: 1 }}>
           <HelpTitle help="notes" style={[styles.title, { color: colors.foreground }]}>Notes</HelpTitle>
           {params.clientName ? <Text numberOfLines={1} style={[styles.subtitle, { color: colors.mutedForeground }]}>{params.clientName}</Text> : null}
