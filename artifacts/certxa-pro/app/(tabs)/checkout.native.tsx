@@ -50,7 +50,7 @@ import { look, cardShadow } from '@/components/look/tokens';
 // Stripe M2 does not require that Apple entitlement.
 const TAP_TO_PAY_ENABLED = true;
 // Shown on the payment screen so a tester can tell which build is installed.
-const BUILD_LABEL = 'Build Nov 20 · B';
+const BUILD_LABEL = 'Build Nov 20 · C';
 const EXPO_GO_PREVIEW = process.env.EXPO_PUBLIC_EXPO_GO_PREVIEW === '1';
 
 type PaymentStep = 'idle' | 'tap_intro' | 'initializing' | 'discovering' | 'connecting' | 'ready' | 'processing' | 'capture_pending' | 'success' | 'error';
@@ -147,6 +147,8 @@ export default function CheckoutScreen() {
   const {
     initialize,
     discoverReaders,
+    cancelDiscovering,
+    cancelCollectPaymentMethod,
     connectReader,
     disconnectReader,
     retrievePaymentIntent,
@@ -653,9 +655,32 @@ export default function CheckoutScreen() {
           // The original payment error is more useful to the user than cleanup details.
         }
       }
+      if (cardCancelled.current) {
+        cardCancelled.current = false;
+        setStep('tap_intro'); setError(''); setStatusText('Card payment cancelled.');
+        return;
+      }
       setStep('error');
       setError(cause instanceof CertxaApiError && cause.status === 401 ? 'Your Certxa session has expired. Please sign in again.' : `${phase}: ${errorMessage(cause)}`);
     }
+  };
+
+  // The tablet POS's card reader screen (owner, 2026-11-19): no way out but Cancel, which first asks the pro to make sure
+  // the client isn't about to pay. Continue stops the reader (a card being read is let go and its unpaid charge
+  // cancelled) and goes back to the ways to pay; the reader stays connected for the next card.
+  const cardCancelled = useRef(false);
+  const cancelCardPayment = () => {
+    const stop = async () => {
+      if (step === 'processing') { cardCancelled.current = true; await cancelCollectPaymentMethod().catch(() => undefined); return; }
+      if (step === 'discovering') await cancelDiscovering().catch(() => undefined);
+      setPaymentIntentId(null); setError(''); setStatusText('Card payment cancelled.');
+      setStep('tap_intro');
+    };
+    if (step === 'error') { void stop(); return; }
+    Alert.alert('Cancel the card payment?', 'Make sure your client is not about to tap, insert or swipe their card.', [
+      { text: 'Keep waiting', style: 'cancel' },
+      { text: 'Continue', style: 'destructive', onPress: () => void stop() },
+    ]);
   };
 
   const processManualPayment = () => {
@@ -993,7 +1018,7 @@ export default function CheckoutScreen() {
         <StatusBar barStyle="dark-content" />
         {/* In the tablet POS the ways to pay are a page of their own (owner, 2026-11-19): no header and no Amount due (the
             ticket beside it shows the total), and EXIT at the bottom puts the POS back as it was. */}
-        {inPane && isTapIntro ? null : <View style={styles.tapHeader}>
+        {inPane ? null : <View style={styles.tapHeader}>
           {/* Back: from a card payment to the ways to pay; from the ways to pay out of the checkout. Not while a card payment
               is going through, or one is waiting to be finalized. */}
           {isSuccess ? <View style={{ width: 84 }} /> : (
@@ -1121,6 +1146,13 @@ export default function CheckoutScreen() {
                {readerSetupText ? <Text style={[styles.setupText, { color: colors.primary }]}>{readerSetupText}</Text> : null}
              </View> : null} */}
              {!isTapIntro ? <TouchableOpacity disabled={(!isReady && !isCapturePending && !isTapIntro) || isBusy || (isTapIntro && cardsOff)} testID={isTapIntro ? 'start-tap-to-pay' : isCapturePending ? 'retry-capture' : 'accept-payment'} onPress={isTapIntro ? () => startCard('tap_to_pay') : isCapturePending ? retryCapture : processPayment} style={[styles.primaryButton, { backgroundColor: (isReady || isCapturePending || (isTapIntro && !cardsOff)) && !isBusy ? colors.primary : colors.muted }]}><Feather name={isTapIntro ? 'radio' : isCapturePending ? 'refresh-cw' : 'radio'} size={19} color={(isReady || isCapturePending || (isTapIntro && !cardsOff)) && !isBusy ? colors.primaryForeground : colors.mutedForeground} /><Text style={[styles.primaryButtonText, { color: (isReady || isCapturePending || (isTapIntro && !cardsOff)) && !isBusy ? colors.primaryForeground : colors.mutedForeground }]}>{isBusy ? (step === 'processing' ? 'Payment in progress…' : 'Preparing…') : isTapIntro ? 'Start Tap to Pay' : isCapturePending ? 'Retry capture' : 'Accept payment'}</Text></TouchableOpacity> : null}
+             {inPane && !isTapIntro && !isCapturePending ? (
+               <TouchableOpacity testID="pos-card-cancel" onPress={cancelCardPayment} style={[styles.exitButton, { borderColor: colors.border, backgroundColor: colors.card }]}>
+                 <Feather name="x-circle" size={22} color={colors.foreground} />
+                 <Text style={[styles.exitText, { color: colors.foreground }]}>CANCEL</Text>
+               </TouchableOpacity>
+             ) : null}
+             {inPane && !isTapIntro && error ? <Text testID="pos-card-error" style={[styles.setupText, { color: colors.destructive, textAlign: 'center' }]}>{error}</Text> : null}
              {/* How the client pays (owner, 2026-11-17): one list of the ways to pay, then Split payment. */}
              {isTapIntro && !inPane && offerSave && !cardsOff ? <View testID="save-card-row" style={[styles.saveCardRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
                <View style={{ flex: 1 }}>
