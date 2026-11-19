@@ -347,4 +347,10 @@ export const VI_3: Record<string, string> = {
   "Saved.": "Đã lưu.",
   "Saving…": "Đang lưu…",
   "That could not be saved.": "Không lưu được.",
+  // POS booking
+  "CREATE APPOINTMENT": "TẠO LỊCH HẸN",
+  "CHOOSE THE CLIENT, TAP THE SERVICES, THEN CREATE APPOINTMENT": "CHỌN KHÁCH, NHẤN DỊCH VỤ, RỒI TẠO LỊCH HẸN",
+  "TAP CREATE APPOINTMENT TO PICK THE DAY AND TIME": "NHẤN TẠO LỊCH HẸN ĐỂ CHỌN NGÀY VÀ GIỜ",
+  "TAP THE SERVICES, THEN CREATE APPOINTMENT": "NHẤN DỊCH VỤ, RỒI TẠO LỊCH HẸN",
+  "TAP THE SERVICES TO BOOK, THEN CREATE APPOINTMENT": "NHẤN DỊCH VỤ CẦN ĐẶT, RỒI TẠO LỊCH HẸN",
 };

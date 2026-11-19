@@ -164,6 +164,8 @@ export function TabletPos({ bookRequest }: { bookRequest?: BookRequest | null } 
   const [booking, setBooking] = useState<{ slot: BookingSlot | null } | null>(null);
   const [bookDay, setBookDay] = useState<Date | null>(null);
   const [bookBusy, setBookBusy] = useState(false);
+  // Creating a booking: the ticket shows CANCEL and CREATE APPOINTMENT instead of CLEAR, BOOK and CHARGE.
+  const [bookMode, setBookMode] = useState(false);
   const serviceLines = lines.filter((l) => l.kind === 'service' && l.serviceId);
   const bookMinutes = lines.filter((l) => l.kind === 'service' || l.kind === 'addon').reduce((n, l) => n + (l.minutes ?? 0), 0);
   const slotLabel = (s: BookingSlot) => `${new Date(s.time).toLocaleDateString('en-US', { timeZone, weekday: 'short', month: 'short', day: 'numeric' })} · ${zonedTimeLabel(s.time, timeZone)}`;
@@ -383,18 +385,22 @@ export function TabletPos({ bookRequest }: { bookRequest?: BookRequest | null } 
         </> : null}
       </View>
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      {booking ? <>
-        {booking.slot ? <View style={styles.bookedRow}><Text style={styles.bookedText}>{slotLabel(booking.slot)}</Text></View> : null}
+      {/* Creating a booking (owner, 2026-11-19): no CHARGE, just CANCEL and CREATE APPOINTMENT, which first opens the days
+          and times in the grid, then saves the time picked. */}
+      {bookMode ? <>
+        {booking?.slot ? <View style={styles.bookedRow}><Text style={styles.bookedText}>{slotLabel(booking.slot)}</Text></View> : null}
         <View style={styles.actionRow}>
-          <TouchableOpacity testID="tablet-pos-book-cancel" onPress={() => setBooking(null)} style={styles.secondaryButton}><Text style={styles.secondaryText}>CANCEL</Text></TouchableOpacity>
-          <TouchableOpacity testID="tablet-pos-book-save" disabled={!booking.slot || bookBusy} onPress={() => void saveBooking()} style={[styles.chargeButton, (!booking.slot || bookBusy) && { opacity: 0.5 }]}>
-            {bookBusy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.chargeText}>{booking.slot ? 'BOOK' : 'PICK A TIME'}</Text>}
+          <TouchableOpacity testID="tablet-pos-book-cancel" onPress={() => { setBooking(null); setBookMode(false); setBookDay(null); setStatus(null); }} style={styles.secondaryButton}><Text style={styles.secondaryText}>CANCEL</Text></TouchableOpacity>
+          <TouchableOpacity testID="tablet-pos-book-save" disabled={bookBusy || (!!booking && !booking.slot)}
+            onPress={() => (booking ? void saveBooking() : startBooking())}
+            style={[styles.chargeButton, (bookBusy || (!!booking && !booking.slot)) && { opacity: 0.5 }]}>
+            {bookBusy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.chargeText} numberOfLines={1} adjustsFontSizeToFit>{booking && !booking.slot ? 'PICK A TIME' : 'CREATE APPOINTMENT'}</Text>}
           </TouchableOpacity>
         </View>
       </> : <>
       <View style={styles.actionRow}>
         <TouchableOpacity testID="tablet-pos-clear" onPress={clear} style={[styles.secondaryButton, { flex: 1 }]}><Text style={styles.secondaryText}>CLEAR</Text></TouchableOpacity>
-        <TouchableOpacity testID="tablet-pos-book" disabled={!!paying} onPress={() => startBooking()} style={[styles.secondaryButton, { flex: 1 }]}><Text style={styles.secondaryText}>BOOK</Text></TouchableOpacity>
+        <TouchableOpacity testID="tablet-pos-book" disabled={!!paying} onPress={() => { setBookMode(true); startBooking(); }} style={[styles.secondaryButton, { flex: 1 }]}><Text style={styles.secondaryText}>BOOK</Text></TouchableOpacity>
       </View>
       <View style={[styles.actionRow, { marginTop: 10 }]}>
         <TouchableOpacity testID="tablet-pos-charge" disabled={!lines.length || busy} onPress={() => void charge()} style={[styles.chargeButton, (!lines.length || busy) && { opacity: 0.5 }]}>
@@ -522,7 +528,7 @@ export function TabletPos({ bookRequest }: { bookRequest?: BookRequest | null } 
   const startBooking = () => {
     setError('');
     if (!client) { say('CHOOSE THE CLIENT FIRST', 'error'); setPicking(true); return; }
-    if (!serviceLines.length) { say('TAP THE SERVICES TO BOOK, THEN BOOK', 'error'); return; }
+    if (!serviceLines.length) { say('TAP THE SERVICES TO BOOK, THEN CREATE APPOINTMENT', 'error'); return; }
     if (!slug) { say('YOUR BOOKING PAGE ISN\'T SET UP YET', 'error'); return; }
     if (lines.some((l) => l.kind !== 'service' && l.kind !== 'addon')) say('ONLY THE SERVICES AND ADD-ONS ARE BOOKED', 'info');
     setPanel(null); setBooking({ slot: null });
@@ -557,7 +563,7 @@ export function TabletPos({ bookRequest }: { bookRequest?: BookRequest | null } 
       if (created?.paymentHold && !created.paymentHold.notificationSent) Alert.alert('Payment link not sent', 'The appointment is on hold, but Certxa could not text the client. Contact the client before the hold expires.');
       say(`BOOKED ${client.name.split(' ')[0].toUpperCase()} · ${slotLabel(slot).toUpperCase()}`, 'ok');
       void refreshBookings();
-      setBooking(null); setBookDay(null); clear();
+      setBooking(null); setBookDay(null); setBookMode(false); clear();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not book it.');
       setBooking((b) => (b ? { ...b, slot: null } : b));
@@ -577,7 +583,8 @@ export function TabletPos({ bookRequest }: { bookRequest?: BookRequest | null } 
     const ids = String(bookRequest.serviceIds ?? '').split(',').map(Number).filter((n) => n > 0);
     const chosen = ids.flatMap((id) => services.filter((sv) => sv.id === id));
     if (chosen.length) setLines(chosen.map((sv, i) => ({ key: `book-${Date.now()}-${i}`, label: sv.name, priceCents: sv.priceCents, kind: 'service', serviceId: sv.id, minutes: sv.duration })));
-    say(!who ? 'CHOOSE THE CLIENT, TAP THE SERVICES, THEN BOOK' : chosen.length ? 'TAP BOOK TO PICK THE DAY AND TIME' : 'TAP THE SERVICES, THEN BOOK', 'info');
+    setBookMode(true);
+    say(!who ? 'CHOOSE THE CLIENT, TAP THE SERVICES, THEN CREATE APPOINTMENT' : chosen.length ? 'TAP CREATE APPOINTMENT TO PICK THE DAY AND TIME' : 'TAP THE SERVICES, THEN CREATE APPOINTMENT', 'info');
     if (!who) setPicking(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookRequest?.book, services.length]);
