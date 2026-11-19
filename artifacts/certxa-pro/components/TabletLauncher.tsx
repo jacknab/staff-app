@@ -71,6 +71,9 @@ export function TabletLauncher() {
     router.navigate(app.to);
   };
 
+  // The POS fills the whole tablet (owner, 2026-11-19): no app-icons button there.
+  if (pathname === '/pos') return null;
+
   return (
     <>
       <View pointerEvents="box-none" style={[styles.dock, { bottom: Math.max(insets.bottom, 12) + 10 }]}>

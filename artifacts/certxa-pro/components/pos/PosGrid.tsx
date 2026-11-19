@@ -47,6 +47,9 @@ export function PosKeyButton({ k, index, columns, onPress, selected, testID }: {
   else if (k.kind === 'more') face = <><Feather name="more-horizontal" size={24} color={look.subtle} /><Text style={styles.navText}>More</Text></>;
   else if (k.kind === 'grid') face = <><Feather name="grid" size={24} color={look.violetDeep} /><Text style={styles.name} numberOfLines={2}>{k.label || k.grid.name}</Text></>;
   else if (k.kind === 'category') face = <><Feather name={iconFor(k.group.name)} size={24} color={look.violetDeep} /><Text style={styles.name} numberOfLines={2}>{k.label || k.group.name}</Text></>;
+  else if (k.kind === 'action') face = k.price || k.sub
+    ? <><Text style={styles.name} numberOfLines={2}>{k.title}</Text><View style={styles.priceRow}>{k.price ? <Text style={styles.price}>{k.price}</Text> : null}{k.sub ? <Text style={styles.small}>{k.sub}</Text> : null}</View></>
+    : <><Feather name={(k.icon ?? 'circle') as Icon} size={24} color={look.violetDeep} /><Text style={styles.name} numberOfLines={2}>{k.title}</Text></>;
   else if (k.kind === 'fn') face = <><Feather name={FN_ICONS[k.fn]} size={24} color={look.violetDeep} /><Text style={styles.name} numberOfLines={2}>{k.label || POS_FN_LABELS[k.fn]}</Text></>;
   else if (k.kind === 'addon') face = <><Text style={styles.name} numberOfLines={2}>{k.label || k.addon.name}</Text><View style={styles.priceRow}><Text style={styles.price}>+{money(k.addon.price)}</Text><Text style={styles.small}>Add-on</Text></View></>;
   else face = <><Text style={styles.name} numberOfLines={2}>{k.label || k.service.name}</Text><View style={styles.priceRow}><Text style={styles.price}>{money(k.service.price)}</Text>{k.service.duration ? <Text style={styles.small}>{minutes(k.service.duration)}</Text> : null}</View></>;
@@ -67,6 +70,32 @@ export function KeyRows({ keys, columns, render }: { keys: GridKey[]; columns: n
           {keys.slice(r * columns, r * columns + columns).map((k, c) => <View key={c} style={styles.cell}>{render(k, r * columns + c)}</View>)}
         </View>
       ))}
+    </View>
+  );
+}
+
+/**
+ * One of the POS's own option grids (owner, 2026-11-19: Gift Card, Packages and Memberships change the grid, in the same
+ * key design): the options in order, More when they don't fit, and Back in the last position.
+ */
+export function OptionGrid({ items, columns, onBack, testID }: {
+  items: Extract<GridKey, { kind: 'action' }>[]; columns: number; onBack: () => void; testID?: string;
+}) {
+  const [page, setPage] = useState(0);
+  const room = columns * POS_GRID_ROWS - 1;
+  const paged = items.length > room;
+  const perPage = paged ? room - 1 : room;
+  const pages = Math.max(1, Math.ceil(items.length / perPage));
+  const keys: GridKey[] = items.slice((page % pages) * perPage, (page % pages) * perPage + perPage);
+  while (keys.length < perPage) keys.push({ kind: 'empty' });
+  if (paged) keys.push({ kind: 'more' });
+  keys.push({ kind: 'back' });
+  return (
+    <View style={{ flex: 1 }} testID={testID}>
+      <KeyRows keys={keys} columns={columns} render={(k, i) => (
+        <PosKeyButton k={k} index={i} columns={columns} testID={k.kind === 'action' ? `pos-option-${k.id}` : k.kind === 'back' ? 'pos-option-back' : k.kind === 'more' ? 'pos-option-more' : undefined}
+          onPress={k.kind === 'action' ? k.onPress : k.kind === 'back' ? onBack : k.kind === 'more' ? () => setPage((n) => n + 1) : undefined} />
+      )} />
     </View>
   );
 }
@@ -104,6 +133,7 @@ export function PosGrid({ layout, groups, addons, addonGroups, onService, onAddo
           : k.kind === 'grid' ? () => open({ at: 'grid', id: k.grid.id })
           : k.kind === 'addon' ? () => { onAddon(k.addon); afterPick(); }
           : k.kind === 'fn' ? () => onFn(k.fn)
+          : k.kind === 'action' ? k.onPress
           : () => { onService(k.service); afterPick(); }} />
     )} />
   );

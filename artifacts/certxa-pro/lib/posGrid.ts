@@ -53,6 +53,8 @@ export type GridKey =
   | { kind: 'grid'; grid: PosGrid; label?: string; color?: string }
   | { kind: 'addon'; addon: CatalogAddon; label?: string; color?: string }
   | { kind: 'fn'; fn: PosFn; label?: string; color?: string }
+  /** A key of the POS's own option grids (gift card amounts, packages, membership plans): the same key, its own action. */
+  | { kind: 'action'; id: string; title: string; price?: string; sub?: string; icon?: string; onPress: () => void }
   | { kind: 'more' }
   | { kind: 'back'; label?: string; color?: string }
   | { kind: 'empty' };

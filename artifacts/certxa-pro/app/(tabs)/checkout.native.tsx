@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { PaymentsSetupBanner } from '@/components/PaymentsSetupBanner';
 import type { ComponentProps } from 'react';
 import { Feather } from '@expo/vector-icons';
@@ -16,6 +16,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useInPane, usePaneClose, useScreenParams } from '@/components/TabletSplit';
+import { useIsTablet } from '@/components/TabletLauncher';
+import { usePosPayBridge } from '@/lib/posPayBridge';
 import { useStripeTerminal } from '@stripe/stripe-terminal-react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { useColors } from '@/hooks/useColors';
@@ -47,7 +49,7 @@ import { look, cardShadow } from '@/components/look/tokens';
 // Stripe M2 does not require that Apple entitlement.
 const TAP_TO_PAY_ENABLED = true;
 // Shown on the payment screen so a tester can tell which build is installed.
-const BUILD_LABEL = 'Build Nov 19 · Y';
+const BUILD_LABEL = 'Build Nov 19 · Z';
 const EXPO_GO_PREVIEW = process.env.EXPO_PUBLIC_EXPO_GO_PREVIEW === '1';
 
 type PaymentStep = 'idle' | 'tap_intro' | 'initializing' | 'discovering' | 'connecting' | 'ready' | 'processing' | 'capture_pending' | 'success' | 'error';
@@ -95,7 +97,7 @@ export default function CheckoutScreen() {
     }
   };
   // On a tablet the POS shows this checkout in its right side (components/TabletSplit.tsx): the details come from there.
-  const params = useScreenParams<{ appointmentId?: string; clientName?: string; serviceName?: string; amountCents?: string; depositCents?: string; phone?: string; email?: string; quickSale?: string; clientId?: string; serviceIds?: string; tipCents?: string; discountCents?: string }>();
+  const params = useScreenParams<{ appointmentId?: string; clientName?: string; serviceName?: string; amountCents?: string; depositCents?: string; phone?: string; email?: string; quickSale?: string; clientId?: string; serviceIds?: string; tipCents?: string; discountCents?: string; taxFreeCents?: string }>();
   const [digits, setDigits] = useState('0');
   const [tipCents, setTipCents] = useState(0);
   const [appointmentId, setAppointmentId] = useState('');
@@ -401,7 +403,9 @@ export default function CheckoutScreen() {
   const productCents = products.reduce((n, l) => n + l.priceCents * l.quantity, 0);
   const partialCents = giftPaidCents + cashPartCents + creditPaidCents;
   // Tax is on the visit after the discount (and on products at the retail rate), never on the tip.
-  const taxCents = (tax.services && tax.rate > 0 ? Math.round((baseCentsParam - discountCents) * tax.rate) : 0) + Math.round(productCents * tax.retail);
+  // taxFreeCents: gift cards sold at the tablet POS are not taxed (owner, 2026-11-19).
+  const taxFreeCents = Math.max(0, Math.round(Number(params.taxFreeCents) || 0));
+  const taxCents = (tax.services && tax.rate > 0 ? Math.round(Math.max(0, baseCentsParam - discountCents - taxFreeCents) * tax.rate) : 0) + Math.round(productCents * tax.retail);
   // A deposit the client paid when booking comes off this charge (it is recorded as already paid).
   const depositCents = Math.max(0, Math.round(Number(params.depositCents) || 0));
   // The client's card fee: on what is charged now, after the discount, tax, deposit and part payments, never on the tip.
@@ -673,14 +677,15 @@ export default function CheckoutScreen() {
   const [otherLabel, setOtherLabel] = useState('');
   const otherName = otherKind === 'other' ? otherLabel.trim() : ({ check: 'Check', venmo: 'Venmo', zelle: 'Zelle', paypal: 'PayPal' } as Record<string, string>)[otherKind ?? ''] ?? '';
   const offlineDueCents = Math.max(0, baseCentsParam - discountCents + productCents + taxCents + tipCents - depositCents - partialCents);
-  const recordOfflinePayment = async (method: 'cash' | 'gift_card' | 'credit' | 'other') => {
+  // `givenOverride`: the cash typed on the tablet POS keypad (lib/posPayBridge.ts) instead of this screen's cash box.
+  const recordOfflinePayment = async (method: 'cash' | 'gift_card' | 'credit' | 'other', givenOverride?: number) => {
     const apptId = Number(appointmentId);
     if (!Number.isInteger(apptId) || apptId <= 0) { setError('This payment has no booking to record it on.'); return; }
     if (method === 'gift_card' && !giftCardCode.trim()) { setError('Enter the gift card code.'); return; }
     if (offlineDueCents <= 0) { setError('There is nothing left to pay.'); return; }
     if (method === 'other' && !otherName) { setError(otherKind === 'other' ? 'Type how the client paid.' : 'Choose how the client paid.'); return; }
     // Cash: what the client handed over. Less than the bill pays part of it; more gives change.
-    const givenCents = method === 'cash' ? Math.round((Number(cashGiven.replace(/[^0-9.]/g, '')) || 0) * 100) : 0;
+    const givenCents = method === 'cash' ? givenOverride ?? Math.round((Number(cashGiven.replace(/[^0-9.]/g, '')) || 0) * 100) : 0;
     if (method === 'cash' && givenCents <= 0) { setError('Enter the cash the client gave you.'); return; }
     setRecording(true); setError('');
     try {
@@ -739,6 +744,21 @@ export default function CheckoutScreen() {
   // Card payments need Stripe set up; until then the card buttons open the set-up page.
   // Without Stripe set up the card buttons are switched off (owner, 2026-11-15): cash and gift card still work.
   const cardsOff = paymentsReady === false;
+  // The tablet POS (owner, 2026-11-19, /nail's way): its keypad's ENTER records the typed cash here, and the ticket shows
+  // what is paid and what is left.
+  const posBridge = usePosPayBridge();
+  const cashFromKeypad = useRef<(cents: number) => void>(() => undefined);
+  cashFromKeypad.current = (cents: number) => { if (step === 'tap_intro' && !recording) void recordOfflinePayment('cash', cents); };
+  useEffect(() => {
+    if (!posBridge) return;
+    posBridge.setCashHandler((cents) => cashFromKeypad.current(cents));
+    return () => posBridge.setCashHandler(null);
+  }, [posBridge]);
+  useEffect(() => {
+    posBridge?.report({ cashCents: cashPartCents, giftCents: giftPaidCents, creditCents: creditPaidCents, dueCents: step === 'success' ? 0 : offlineDueCents,
+      changeCents: step === 'success' ? changeCents : 0, paid: step === 'success', message: statusText, error });
+  }, [posBridge, cashPartCents, giftPaidCents, creditPaidCents, offlineDueCents, changeCents, step, statusText, error]);
+
   const startCard = (mode: ReaderMode) => { if (!cardsOff) void startReader(mode); };
 
   // ── Card on file and Enter new card (owner, 2026-11-17) ──
@@ -880,6 +900,7 @@ export default function CheckoutScreen() {
   };
   const inPane = useInPane();
   const closePane = usePaneClose();
+  const isTablet = useIsTablet();
   const resetCheckout = () => {
     clearCheckout();
     // Paid: the tablet POS takes its grid back and starts a new ticket.
@@ -1075,15 +1096,45 @@ export default function CheckoutScreen() {
              </View> : null} */}
              {!isTapIntro ? <TouchableOpacity disabled={(!isReady && !isCapturePending && !isTapIntro) || isBusy || (isTapIntro && cardsOff)} testID={isTapIntro ? 'start-tap-to-pay' : isCapturePending ? 'retry-capture' : 'accept-payment'} onPress={isTapIntro ? () => startCard('tap_to_pay') : isCapturePending ? retryCapture : processPayment} style={[styles.primaryButton, { backgroundColor: (isReady || isCapturePending || (isTapIntro && !cardsOff)) && !isBusy ? colors.primary : colors.muted }]}><Feather name={isTapIntro ? 'radio' : isCapturePending ? 'refresh-cw' : 'radio'} size={19} color={(isReady || isCapturePending || (isTapIntro && !cardsOff)) && !isBusy ? colors.primaryForeground : colors.mutedForeground} /><Text style={[styles.primaryButtonText, { color: (isReady || isCapturePending || (isTapIntro && !cardsOff)) && !isBusy ? colors.primaryForeground : colors.mutedForeground }]}>{isBusy ? (step === 'processing' ? 'Payment in progress…' : 'Preparing…') : isTapIntro ? 'Start Tap to Pay' : isCapturePending ? 'Retry capture' : 'Accept payment'}</Text></TouchableOpacity> : null}
              {/* How the client pays (owner, 2026-11-17): one list of the ways to pay, then Split payment. */}
-             {isTapIntro && offerSave && !cardsOff ? <View testID="save-card-row" style={[styles.saveCardRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+             {isTapIntro && !inPane && offerSave && !cardsOff ? <View testID="save-card-row" style={[styles.saveCardRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
                <View style={{ flex: 1 }}>
                  <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Save card on file</Text>
                  <Text style={[styles.saveCardSub, { color: colors.mutedForeground }]}>With the client’s OK. Used for no-show and late-cancel fees, and Card on file at checkout.</Text>
                </View>
                <Switch testID="save-card-switch" value={saveCard} onValueChange={setSaveCard} trackColor={{ true: colors.primary, false: colors.border }} accessibilityLabel="Save card on file" />
              </View> : null}
-             {isTapIntro ? <View testID="payment-methods" style={[styles.payList, { backgroundColor: colors.card, borderColor: colors.border }]}>
-               <MethodRow testID="start-tap-to-pay" icon="smartphone" title="Tap to Pay on iPhone" sub={cardsOff ? 'Set up card payments first' : 'Hold the card near this phone'} disabled={isBusy || cardsOff || !!charging} onPress={() => chooseCard('tap_to_pay')} colors={colors} />
+             {inPane && isTapIntro ? (
+               // The tablet POS's ways to pay, as /nail's: CASH (typed on the keypad), CARD (the Stripe reader), GIFT CARD, OTHER.
+               <View testID="pos-pay-tiles" style={{ width: '100%', gap: 12 }}>
+                 <View style={styles.tileRow}>
+                   <PayTile testID="pos-pay-cash" icon="dollar-sign" label="CASH" on colors={colors} onPress={() => { setGiftOpen(false); setOtherOpen(false); setStatusText('Type the cash the client gave you on the keypad, then press ENTER.'); }} />
+                   <PayTile testID="pos-pay-card" icon="credit-card" label="CARD" disabled={isBusy || cardsOff || !!charging} colors={colors} onPress={() => chooseCard('m2')} />
+                 </View>
+                 <View style={styles.tileRow}>
+                   <PayTile testID="pos-pay-gift" icon="gift" label="GIFT CARD" on={giftOpen} disabled={recording || isBusy} colors={colors} onPress={() => { setError(''); setGiftOpen((o) => !o); setOtherOpen(false); }} />
+                   <PayTile testID="pos-pay-other" icon="more-horizontal" label="OTHER" on={otherOpen} disabled={recording || isBusy} colors={colors} onPress={() => { setError(''); setOtherOpen((o) => !o); setGiftOpen(false); }} />
+                 </View>
+                 {giftOpen ? <View testID="gift-card-block" style={styles.formField}>
+                   <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Gift card code</Text>
+                   <TextInput testID="gift-card-code" autoCapitalize="characters" autoCorrect={false} value={giftCardCode} onChangeText={setGiftCardCode} placeholder="Code on the gift card" placeholderTextColor={colors.mutedForeground} style={[styles.fieldInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
+                   <TouchableOpacity testID="gift-card-use" disabled={recording || !giftCardCode.trim()} onPress={() => void recordOfflinePayment('gift_card')} style={[styles.primaryButton, { marginTop: 10, marginBottom: 0, backgroundColor: giftCardCode.trim() && !recording ? colors.primary : colors.muted }]}><Text style={[styles.primaryButtonText, { color: giftCardCode.trim() && !recording ? colors.primaryForeground : colors.mutedForeground }]}>{recording ? 'Checking the card…' : 'Use gift card'}</Text></TouchableOpacity>
+                 </View> : null}
+                 {otherOpen ? <View testID="other-block" style={styles.formField}>
+                   <Text style={[styles.fieldLabel, { color: colors.foreground }]}>How the client paid <Text style={{ color: colors.mutedForeground }}>(recorded only, no fee)</Text></Text>
+                   <SelectField testID="other-kind" title="How the client paid" placeholder="Choose" value={otherKind}
+                     options={[{ value: 'check' as const, label: 'Check' }, { value: 'venmo' as const, label: 'Venmo' }, { value: 'zelle' as const, label: 'Zelle' }, { value: 'paypal' as const, label: 'PayPal' }, { value: 'other' as const, label: 'Other (type it)' }]}
+                     onChange={(k) => { setOtherKind(k); setError(''); }} />
+                   {otherKind === 'other' ? <TextInput testID="other-label" value={otherLabel} onChangeText={(v) => setOtherLabel(v.slice(0, 30))} placeholder="For example, Apple Cash" placeholderTextColor={colors.mutedForeground} style={[styles.fieldInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground, marginTop: 8 }]} /> : null}
+                   <TouchableOpacity testID="other-record" disabled={recording || !otherName} onPress={() => void recordOfflinePayment('other')} style={[styles.primaryButton, { marginTop: 10, marginBottom: 0, backgroundColor: otherName && !recording ? colors.primary : colors.muted }]}><Text style={[styles.primaryButtonText, { color: otherName && !recording ? colors.primaryForeground : colors.mutedForeground }]}>{recording ? 'Recording…' : `Record ${dollars(String(offlineDueCents))}${otherName ? ` by ${otherName}` : ''}`}</Text></TouchableOpacity>
+                 </View> : null}
+                 <Text testID="pos-pay-hint" style={[styles.setupText, { color: colors.mutedForeground, textAlign: 'center' }]}>
+                   {error || statusText || 'Cash: type the amount on the keypad and press ENTER. Less pays part of it; more gives change. Card: tap CARD.'}
+                 </Text>
+               </View>
+             ) : null}
+             {isTapIntro && !inPane ? <View testID="payment-methods" style={[styles.payList, { backgroundColor: colors.card, borderColor: colors.border }]}>
+               {/* Tablets take cards with the Stripe card reader only (owner, 2026-11-19). */}
+               {isTablet ? null : <MethodRow testID="start-tap-to-pay" icon="smartphone" title="Tap to Pay on iPhone" sub={cardsOff ? 'Set up card payments first' : 'Hold the card near this phone'} disabled={isBusy || cardsOff || !!charging} onPress={() => chooseCard('tap_to_pay')} colors={colors} />}
                <MethodRow testID="start-stripe-m2" icon="credit-card" title="Card reader" sub={connectedReader && readerMode === 'm2' ? `Connected${typeof (connectedReader as any).batteryLevel === 'number' ? ` · ${Math.round((connectedReader as any).batteryLevel * 100)}% battery` : ''}` : 'Stripe M2'} disabled={isBusy || cardsOff || !!charging} onPress={() => chooseCard('m2')} colors={colors} />
                {savedCard ? <MethodRow testID="pay-card-on-file" icon="credit-card" title={`Card on file${savedCard.last4 ? ` (${savedCard.last4})` : ''}`} sub={charging === 'saved' ? 'Charging…' : undefined} disabled={isBusy || cardsOff || !!charging} onPress={payWithSavedCard} colors={colors} /> : null}
                {Number(appointmentId) > 0 ? <MethodRow testID="pay-new-card" icon="edit-3" title="Enter new card" sub={charging === 'keyed' ? 'Waiting for the card…' : undefined} disabled={isBusy || cardsOff || !!charging} onPress={() => void payWithoutReader('keyed')} colors={colors} /> : null}
@@ -1116,7 +1167,7 @@ export default function CheckoutScreen() {
                  </View>
                </View> : null}
              </View> : null}
-             {isTapIntro && Number(appointmentId) > 0 ? <>
+             {isTapIntro && !inPane && Number(appointmentId) > 0 ? <>
                <View style={styles.orRow}><View style={[styles.orLine, { backgroundColor: colors.border }]} /><Text style={[styles.orText, { color: colors.mutedForeground }]}>or</Text><View style={[styles.orLine, { backgroundColor: colors.border }]} /></View>
                <TouchableOpacity testID="split-payment" disabled={recording || isBusy || !!charging} onPress={() => { setError(''); setSplitOpen(true); setGiftOpen(false); setCashGiven(''); setCashOpen(true); }} style={[styles.splitButton, { backgroundColor: colors.muted }]}>
                  <Text style={[styles.splitText, { color: colors.foreground }]}>Split payment</Text>
@@ -1160,6 +1211,19 @@ export default function CheckoutScreen() {
   />;
 }
 
+/** A big way-to-pay tile in the tablet POS (as /nail's CASH · CARD · GIFT CARD); `on` = the one in use. */
+function PayTile({ testID, icon, label, on, disabled, onPress, colors }: {
+  testID: string; icon: ComponentProps<typeof Feather>['name']; label: string; on?: boolean; disabled?: boolean; onPress: () => void; colors: ReturnType<typeof useColors>;
+}) {
+  return (
+    <TouchableOpacity testID={testID} disabled={disabled} onPress={onPress} activeOpacity={0.75}
+      style={[styles.payTile, { backgroundColor: on ? colors.secondary : colors.card, borderColor: on ? colors.primary : colors.border, opacity: disabled ? 0.5 : 1 }]}>
+      <Feather name={icon} size={30} color={colors.primary} />
+      <Text style={[styles.payTileText, { color: colors.foreground }]}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
 /** One way to pay in the checkout list: icon, name, a short line under it, and an arrow. */
 function MethodRow({ testID, icon, title, sub, disabled, onPress, colors, last }: {
   testID: string; icon: ComponentProps<typeof Feather>['name']; title: string; sub?: string; disabled?: boolean;
@@ -1190,6 +1254,10 @@ const styles = StyleSheet.create({
   orRow: { width: '100%', flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 18 },
   orLine: { flex: 1, height: StyleSheet.hairlineWidth },
   orText: { fontSize: 15, fontFamily: 'Inter_400Regular' },
+  tileRow: { flexDirection: 'row', gap: 12 },
+  payTile: { flex: 1, height: 104, borderRadius: 18, borderWidth: 2, borderBottomWidth: 5, alignItems: 'center', justifyContent: 'center', gap: 8,
+    shadowColor: '#2E1065', shadowOpacity: 0.14, shadowRadius: 5, shadowOffset: { width: 0, height: 3 }, elevation: 3 },
+  payTileText: { fontSize: 17, fontFamily: 'Inter_700Bold', letterSpacing: 1 },
   exitButton: { width: '100%', height: 60, borderRadius: 16, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 'auto', paddingTop: 0,
     shadowColor: '#2E1065', shadowOpacity: 0.12, shadowRadius: 4, shadowOffset: { width: 0, height: 3 }, elevation: 3 },
   exitText: { fontSize: 18, fontFamily: 'Inter_700Bold', letterSpacing: 1 },
