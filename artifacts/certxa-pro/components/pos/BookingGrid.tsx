@@ -30,13 +30,15 @@ async function openTimes(slug: string, serviceId: number, day: string, duration:
     .sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
 }
 
-export function BookingGrid({ slug, timeZone, staffId, serviceId, duration, columns, startDay, slot, onSlot, onServices }: {
+export function BookingGrid({ slug, timeZone, staffId, serviceId, duration, columns, startDay, slot, onSlot, onServices, accent }: {
   slug: string; timeZone: string; staffId: number | null; serviceId: number; duration: number; columns: number;
   /** Open on this day (the calendar's chosen day), when there is one. */
   startDay?: Date | null;
   slot: BookingSlot | null; onSlot: (slot: BookingSlot | null) => void;
   /** Back to the service keys. */
   onServices: () => void;
+  /** The Create Appointment POS's colour for icons and the chosen key. */
+  accent?: string;
 }) {
   const keys = columns * POS_GRID_ROWS;
   const daysPerPage = keys - 3; // Services, Earlier, Later
@@ -118,7 +120,7 @@ export function BookingGrid({ slug, timeZone, staffId, serviceId, duration, colu
   return (
     <View style={{ flex: 1 }} testID="pos-booking-grid">
       <KeyRows keys={cells} columns={columns} render={(k, i) => (
-        <PosKeyButton k={k} index={i} columns={columns} selected={k.kind === 'action' && k.id === selectedId}
+        <PosKeyButton k={k} index={i} columns={columns} accent={accent} selected={k.kind === 'action' && k.id === selectedId}
           testID={k.kind === 'action' ? k.id : undefined} onPress={k.kind === 'action' ? k.onPress : undefined} />
       )} />
       {message ? <View style={styles.message} pointerEvents="none">

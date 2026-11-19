@@ -32,8 +32,10 @@ function iconFor(name: string): Icon {
 const FN_ICONS: Record<PosFn, Icon> = { discount: 'percent', giftcard: 'gift', nosale: 'log-out', reprint: 'printer' };
 
 /** One key, drawn the same on the POS and in the grid editor. */
-export function PosKeyButton({ k, index, columns, onPress, selected, testID }: {
+export function PosKeyButton({ k, index, columns, onPress, selected, testID, accent = look.violetDeep }: {
   k: GridKey; index: number; columns: number; onPress?: () => void; selected?: boolean; testID?: string;
+  /** Icons and the chosen key's outline: violet, or the Create Appointment POS's teal (components/pos/TabletPos.tsx). */
+  accent?: string;
 }) {
   const own = 'color' in k ? k.color : undefined;
   const band = own ?? ROW_BANDS[Math.floor(index / columns) % ROW_BANDS.length];
@@ -46,17 +48,17 @@ export function PosKeyButton({ k, index, columns, onPress, selected, testID }: {
   let face: React.ReactNode;
   if (k.kind === 'back') face = <><Feather name="arrow-left" size={24} color={look.subtle} /><Text style={styles.navText}>{k.label || 'Back'}</Text></>;
   else if (k.kind === 'more') face = <><Feather name="more-horizontal" size={24} color={look.subtle} /><Text style={styles.navText}>More</Text></>;
-  else if (k.kind === 'grid') face = <><Feather name="grid" size={24} color={look.violetDeep} /><Text style={styles.name} numberOfLines={2}>{k.label || k.grid.name}</Text></>;
-  else if (k.kind === 'category') face = <><Feather name={iconFor(k.group.name)} size={24} color={look.violetDeep} /><Text style={styles.name} numberOfLines={2}>{k.label || k.group.name}</Text></>;
+  else if (k.kind === 'grid') face = <><Feather name="grid" size={24} color={accent} /><Text style={styles.name} numberOfLines={2}>{k.label || k.grid.name}</Text></>;
+  else if (k.kind === 'category') face = <><Feather name={iconFor(k.group.name)} size={24} color={accent} /><Text style={styles.name} numberOfLines={2}>{k.label || k.group.name}</Text></>;
   else if (k.kind === 'action') face = k.price || k.sub
     ? <><Text style={styles.name} numberOfLines={2}>{k.title}</Text><View style={styles.priceRow}>{k.price ? <Text style={styles.price}>{k.price}</Text> : null}{k.sub ? <Text style={styles.small}>{k.sub}</Text> : null}</View></>
-    : <>{k.icon ? <Feather name={k.icon as Icon} size={24} color={look.violetDeep} /> : null}<Text style={styles.name} numberOfLines={2}>{k.title}</Text></>;
-  else if (k.kind === 'fn') face = <><Feather name={FN_ICONS[k.fn]} size={24} color={look.violetDeep} /><Text style={styles.name} numberOfLines={2}>{k.label || POS_FN_LABELS[k.fn]}</Text></>;
+    : <>{k.icon ? <Feather name={k.icon as Icon} size={24} color={accent} /> : null}<Text style={styles.name} numberOfLines={2}>{k.title}</Text></>;
+  else if (k.kind === 'fn') face = <><Feather name={FN_ICONS[k.fn]} size={24} color={accent} /><Text style={styles.name} numberOfLines={2}>{k.label || POS_FN_LABELS[k.fn]}</Text></>;
   else if (k.kind === 'addon') face = <><Text style={styles.name} numberOfLines={2}>{k.label || k.addon.name}</Text><View style={styles.priceRow}><Text style={styles.price}>+{money(k.addon.price)}</Text><Text style={styles.small}>Add-on</Text></View></>;
   else face = <><Text style={styles.name} numberOfLines={2}>{k.label || k.service.name}</Text><View style={styles.priceRow}><Text style={styles.price}>{money(k.service.price)}</Text>{k.service.duration ? <Text style={styles.small}>{minutes(k.service.duration)}</Text> : null}</View></>;
   return (
     <TouchableOpacity testID={testID} onPress={onPress} disabled={!onPress} activeOpacity={0.7}
-      style={[styles.key, nav && styles.nav, { borderBottomColor: band }, selected && styles.selected]}>
+      style={[styles.key, nav && styles.nav, { borderBottomColor: band }, selected && styles.selected, selected && { borderColor: accent }]}>
       {face}
     </TouchableOpacity>
   );
@@ -101,8 +103,8 @@ export function OptionGrid({ items, columns, onBack, testID }: {
   );
 }
 
-export function PosGrid({ layout, groups, addons, addonGroups, onService, onAddon, onFn }: {
-  layout: PosGridConfig | null; groups: CatalogGroup[]; addons: CatalogAddon[]; addonGroups: CatalogGroup[];
+export function PosGrid({ layout, groups, addons, addonGroups, onService, onAddon, onFn, accent }: {
+  layout: PosGridConfig | null; groups: CatalogGroup[]; addons: CatalogAddon[]; addonGroups: CatalogGroup[]; accent?: string;
   onService: (svc: CatalogService) => void; onAddon: (addon: CatalogAddon) => void; onFn: (fn: PosFn) => void;
 }) {
   // The way here: the main grid first, then whatever was opened from it. Back takes one step off.
@@ -123,7 +125,7 @@ export function PosGrid({ layout, groups, addons, addonGroups, onService, onAddo
   };
   return (
     <KeyRows keys={keys} columns={columns} render={(k, i) => (
-      <PosKeyButton k={k} index={i} columns={columns}
+      <PosKeyButton k={k} index={i} columns={columns} accent={accent}
         testID={k.kind === 'back' ? 'pos-grid-back' : k.kind === 'more' ? 'pos-grid-more' : k.kind === 'category' ? `pos-cat-${k.group.key}`
           : k.kind === 'service' ? `pos-service-${k.service.id}` : k.kind === 'grid' ? `pos-grid-open-${k.grid.id}` : k.kind === 'addon' ? `pos-addon-${k.addon.id}`
           : k.kind === 'fn' ? `pos-fn-key-${k.fn}` : undefined}

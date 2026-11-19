@@ -59,6 +59,9 @@ type Client = { customerId: number; name: string; phone: string; email: string }
 const MAX_CENTS = 10_000_000;
 const KEYS = ['7', '8', '9', '⌫', '4', '5', '6', '↶', '1', '2', '3', 'X', '00', '0', 'ENTER'];
 const KEY_GAP = 10;
+/** The Create Appointment POS's colours (owner, 2026-11-20): teal, so it never looks like the violet checkout POS. */
+const BOOK = { main: '#0F9488', deep: '#0B766C', tint: '#E3F6F3', panel: '#F5FCFB', border: '#CDEEEA', edge: '#B5E3DC' };
+const BOOK_GRADIENT: [string, string] = ['#14B8A6', BOOK.deep];
 const money = (cents: number) => `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const digitsOnly = (value: string) => value.replace(/\D/g, '');
 /** Products and packages ride on the grid as service keys with ids no service has: a package is its id negated (as on
@@ -342,9 +345,9 @@ export function TabletPos({ bookRequest }: { bookRequest?: BookRequest | null } 
   };
 
   const ticket = (
-    <View pointerEvents={paying ? 'none' : 'auto'} style={[styles.panel, styles.ticket, wide && styles.ticketWide]} testID="tablet-pos-ticket">
+    <View pointerEvents={paying ? 'none' : 'auto'} style={[styles.panel, styles.ticket, wide && styles.ticketWide, bookMode && styles.panelBook]} testID="tablet-pos-ticket">
       <TouchableOpacity testID="tablet-pos-client" onPress={() => setPicking(true)} style={styles.clientRow}>
-        <View style={styles.clientIcon}><Feather name="user" size={22} color={look.violetDeep} /></View>
+        <View style={[styles.clientIcon, bookMode && { backgroundColor: BOOK.tint }]}><Feather name="user" size={22} color={bookMode ? BOOK.deep : look.violetDeep} /></View>
         <View style={{ flex: 1 }}>
           <Text style={styles.clientName} numberOfLines={1}>{client ? client.name : 'Choose a client'}</Text>
           <Text style={styles.subtle} numberOfLines={1}>{client ? client.phone || client.email || 'Client' : 'Tap to pick or add one'}</Text>
@@ -385,15 +388,14 @@ export function TabletPos({ bookRequest }: { bookRequest?: BookRequest | null } 
         </> : null}
       </View>
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      {/* Creating a booking (owner, 2026-11-19): no CHARGE, just CANCEL and CREATE APPOINTMENT, which first opens the days
-          and times in the grid, then saves the time picked. */}
+      {/* Creating a booking (owner, 2026-11-19/20): no CHARGE and no Cancel, just CREATE APPOINTMENT, which first opens the
+          days and times in the grid, then saves the time picked. Teal, so it never looks like the checkout POS. */}
       {bookMode ? <>
         {booking?.slot ? <View style={styles.bookedRow}><Text style={styles.bookedText}>{slotLabel(booking.slot)}</Text></View> : null}
         <View style={styles.actionRow}>
-          <TouchableOpacity testID="tablet-pos-book-cancel" onPress={() => { setBooking(null); setBookMode(false); setBookDay(null); setStatus(null); }} style={styles.secondaryButton}><Text style={styles.secondaryText}>CANCEL</Text></TouchableOpacity>
           <TouchableOpacity testID="tablet-pos-book-save" disabled={bookBusy || (!!booking && !booking.slot)}
             onPress={() => (booking ? void saveBooking() : startBooking())}
-            style={[styles.chargeButton, (bookBusy || (!!booking && !booking.slot)) && { opacity: 0.5 }]}>
+            style={[styles.chargeButton, styles.bookButton, (bookBusy || (!!booking && !booking.slot)) && { opacity: 0.5 }]}>
             {bookBusy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.chargeText} numberOfLines={1} adjustsFontSizeToFit>{booking && !booking.slot ? 'PICK A TIME' : 'CREATE APPOINTMENT'}</Text>}
           </TouchableOpacity>
         </View>
@@ -421,12 +423,12 @@ export function TabletPos({ bookRequest }: { bookRequest?: BookRequest | null } 
   const [keySize, setKeySize] = useState(0);
   const [displayHeight, setDisplayHeight] = useState(0);
   const keypad = (
-    <View style={[styles.panel, styles.keypad, !wide && styles.keypadUnder]} testID="tablet-pos-keypad">
-      <View style={[styles.status, status?.tone === 'error' && styles.statusError, status?.tone === 'ok' && styles.statusOk, prompt != null && styles.statusPrompt]} testID="tablet-pos-status">
+    <View style={[styles.panel, styles.keypad, !wide && styles.keypadUnder, bookMode && styles.panelBook]} testID="tablet-pos-keypad">
+      <View style={[styles.status, bookMode && styles.statusBook, status?.tone === 'error' && styles.statusError, status?.tone === 'ok' && styles.statusOk, prompt != null && styles.statusPrompt, prompt != null && bookMode && styles.statusPromptBook]} testID="tablet-pos-status">
         <Text style={[styles.statusText, prompt != null && { color: '#FFFFFF' }]} numberOfLines={2}>{prompt ?? status?.text ?? ' '}</Text>
       </View>
       {/* The digits fill most of the box's height (owner, 2026-11-19), however tall the box is on this tablet. */}
-      <View style={styles.display} onLayout={(e) => setDisplayHeight(e.nativeEvent.layout.height)}>
+      <View style={[styles.display, bookMode && styles.displayBook]} onLayout={(e) => setDisplayHeight(e.nativeEvent.layout.height)}>
         {qtyDigits !== null ? <Text style={styles.displayQty}>QTY {qtyDigits || '_'} ×</Text> : qty > 1 ? <Text style={styles.displayQty}>{qty} ×</Text> : null}
         {/* Just the number, no $ (as /barber). */}
         {/* A gift card number shows as typed; an amount as dollars and cents. */}
@@ -435,14 +437,15 @@ export function TabletPos({ bookRequest }: { bookRequest?: BookRequest | null } 
       <View style={styles.keys} onLayout={(e) => setKeySize(Math.floor((e.nativeEvent.layout.width - 3 * KEY_GAP) / 4))}>
         {KEYS.map((k) => (
           <TouchableOpacity key={k} testID={`tablet-pos-key-${k === '⌫' ? 'back' : k === '↶' ? 'undo' : k}`} onPress={() => press(k)} accessibilityLabel={k === '⌫' ? 'Delete' : k === '↶' ? 'Undo' : k === 'X' ? 'Quantity' : k} activeOpacity={0.7}
-            style={[styles.key, keySize > 0 && { width: k === 'ENTER' ? keySize * 2 + KEY_GAP : keySize, height: keySize }, k === 'ENTER' && styles.enterKey, k === '↶' && styles.undoKey]}>
+            style={[styles.key, keySize > 0 && { width: k === 'ENTER' ? keySize * 2 + KEY_GAP : keySize, height: keySize }, k === 'ENTER' && styles.enterKey, k === '↶' && styles.undoKey, bookMode && styles.keyBook, bookMode && k === 'ENTER' && styles.enterKeyBook, bookMode && k === '↶' && styles.undoKeyBook]}>
             {k === '⌫' ? <Feather name="delete" size={28} color={look.heading} />
               : <Text style={[styles.keyText, k === 'ENTER' && styles.enterText, k === '↶' && guided !== null && styles.exitText]}>{k === '↶' && guided !== null ? 'EXIT' : k}</Text>}
             {k === 'X' ? <Text style={styles.keySmall}>Qty</Text> : null}
           </TouchableOpacity>
         ))}
       </View>
-      {fns.map((row, r) => (
+      {/* The function buttons are the checkout POS's; creating an appointment has none. */}
+      {bookMode ? null : fns.map((row, r) => (
         <View key={r} pointerEvents={paying ? 'none' : 'auto'} style={[styles.fnRow, paying && styles.lockedOn]}>
           {row.map((fn) => (
             <TouchableOpacity key={fn.id} testID={`tablet-pos-fn-${fn.id}`} onPress={() => runFn(fn.id)} style={[styles.fnButton, fn.id === 'quick' && guided !== null && styles.fnActive]}>
@@ -612,10 +615,10 @@ export function TabletPos({ bookRequest }: { bookRequest?: BookRequest | null } 
     </View>
   ) : (
     <View style={styles.catalogColumn}>
-      <View style={[styles.panel, styles.catalog]} testID="tablet-pos-catalog">
+      <View style={[styles.panel, styles.catalog, bookMode && styles.panelBook]} testID="tablet-pos-catalog">
         {booking && serviceLines.length ? (
           <BookingGrid slug={slug} timeZone={timeZone} staffId={ownStaffId} serviceId={serviceLines[0].serviceId!} duration={Math.max(5, bookMinutes)} columns={posGridColumns(gridConfig)}
-            startDay={bookDay} slot={booking.slot} onSlot={(s) => setBooking((b) => (b ? { ...b, slot: s } : b))} onServices={() => setBooking(null)} />
+            accent={BOOK.deep} startDay={bookDay} slot={booking.slot} onSlot={(s) => setBooking((b) => (b ? { ...b, slot: s } : b))} onServices={() => setBooking(null)} />
         ) : panel ? (
           (panel === 'packages' && shopPackages == null) || (panel === 'memberships' && plans == null) ? <ActivityIndicator color={look.violet} style={{ marginTop: 30 }} />
             : optionKeys.length === 0 ? <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 }}>
@@ -625,18 +628,18 @@ export function TabletPos({ bookRequest }: { bookRequest?: BookRequest | null } 
             : <OptionGrid key={panel} testID={`pos-options-${panel}`} items={optionKeys} columns={posGridColumns(gridConfig)} onBack={() => setPanel(null)} />
         ) : loading ? <ActivityIndicator color={look.violet} style={{ marginTop: 30 }} />
           : groups.length === 0 ? <Text style={[styles.subtle, styles.empty]}>No services yet. Add them in Services.</Text>
-          : <PosGrid key={JSON.stringify(gridConfig)} layout={gridConfig} groups={groups} addons={addons} addonGroups={addonGroups.map((g) => g.group)} onService={pickKey} onAddon={pickAddon} onFn={gridFn} />}
+          : <PosGrid key={JSON.stringify(gridConfig)} layout={gridConfig} groups={groups} addons={addons} addonGroups={addonGroups.map((g) => g.group)} accent={bookMode ? BOOK.deep : undefined} onService={pickKey} onAddon={pickAddon} onFn={gridFn} />}
       </View>
       {/* Under the grid, in the app-icons button's style: the key grid editor on the left, and Home on the right — the way
           out of the POS, which has no app-icons button (owner, 2026-11-19). */}
       <View style={styles.underGrid}>
         <TouchableOpacity testID="tablet-pos-grid-settings" accessibilityLabel="Key grid" onPress={() => setEditingGrid(true)} activeOpacity={0.85} style={styles.gearShadow}>
-          <LinearGradient colors={['#8B5CF6', '#6D28D9']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.gear}>
+          <LinearGradient colors={bookMode ? BOOK_GRADIENT : ['#8B5CF6', '#6D28D9']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.gear}>
             <Feather name="settings" size={28} color="#FFFFFF" />
           </LinearGradient>
         </TouchableOpacity>
         <TouchableOpacity testID="tablet-pos-home" accessibilityLabel="Home" onPress={() => router.navigate('/' as Href)} activeOpacity={0.85} style={styles.gearShadow}>
-          <LinearGradient colors={['#8B5CF6', '#6D28D9']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.gear}>
+          <LinearGradient colors={bookMode ? BOOK_GRADIENT : ['#8B5CF6', '#6D28D9']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.gear}>
             <Feather name="home" size={28} color="#FFFFFF" />
           </LinearGradient>
         </TouchableOpacity>
@@ -691,8 +694,16 @@ const styles = StyleSheet.create({
   gearShadow: { alignSelf: 'flex-start', borderRadius: 22, shadowColor: '#4C1D95', shadowOpacity: 0.35, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 8 },
   gear: { width: 62, height: 62, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   noneText: { fontSize: 28, fontFamily: 'Inter_700Bold', color: look.subtle },
-  bookedRow: { borderRadius: 12, backgroundColor: look.tile, paddingHorizontal: 12, paddingVertical: 10, marginTop: 10 },
-  bookedText: { fontSize: 17, fontFamily: 'Inter_700Bold', color: look.violetDeep, textAlign: 'center' },
+  panelBook: { backgroundColor: BOOK.panel, borderColor: BOOK.border },
+  statusBook: { backgroundColor: BOOK.tint },
+  statusPromptBook: { backgroundColor: BOOK.main },
+  displayBook: { backgroundColor: '#FFFFFF', borderColor: BOOK.border },
+  keyBook: { borderColor: BOOK.border, borderBottomColor: BOOK.edge },
+  enterKeyBook: { backgroundColor: BOOK.main, borderColor: BOOK.main, borderBottomColor: BOOK.deep },
+  undoKeyBook: { backgroundColor: BOOK.tint },
+  bookButton: { backgroundColor: BOOK.main },
+  bookedRow: { borderRadius: 12, backgroundColor: BOOK.tint, paddingHorizontal: 12, paddingVertical: 10, marginTop: 10 },
+  bookedText: { fontSize: 17, fontFamily: 'Inter_700Bold', color: BOOK.deep, textAlign: 'center' },
   clientRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: look.cardBorder },
   clientIcon: { width: 48, height: 48, borderRadius: 14, backgroundColor: look.tile, alignItems: 'center', justifyContent: 'center' },
   clientName: { fontSize: 20, fontFamily: 'Inter_700Bold', color: look.heading },
