@@ -6,6 +6,10 @@
  * and lib/appAlert.ts, which translate through tr().
  *
  * Kept on this device (AsyncStorage "app.language").
+ *
+ * The salon's own catalog names (categories, services, add-ons, products, packages) translate the same way, from their
+ * translations on the server (lib/catalogNames.ts → setCatalogNames): text that is exactly one of those names shows its
+ * translation, and a line joined with " · " is translated part by part.
  */
 import { useSyncExternalStore } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -17,6 +21,13 @@ export const APP_LANGS: { value: AppLang; label: string }[] = [{ value: 'en', la
 const KEY = 'app.language';
 let lang: AppLang = 'en';
 const listeners = new Set<() => void>();
+// Changes whenever the words can change (the language, or the catalog names arriving), so every Text redraws.
+let version = 0;
+let catalog = new Map<string, string>();
+const notify = () => { version += 1; for (const fn of listeners) fn(); };
+
+/** The salon's catalog names in the chosen language: English name → translated name (lib/catalogNames.ts). */
+export function setCatalogNames(names: Map<string, string>) { catalog = names; notify(); }
 
 /** Read the saved language once at start (the app waits for it, so the first screen is already in that language). */
 export async function loadLang(): Promise<void> {
@@ -38,14 +49,18 @@ for (const name of dateFns) {
 export function setLang(next: AppLang) {
   if (next === lang) return;
   lang = next;
+  catalog = new Map();
   void AsyncStorage.setItem(KEY, next).catch(() => undefined);
-  for (const fn of listeners) fn();
+  notify();
 }
 
 export const getLang = () => lang;
 const subscribe = (fn: () => void) => { listeners.add(fn); return () => { listeners.delete(fn); }; };
 /** The language, re-rendering when it changes. */
 export const useLang = () => useSyncExternalStore(subscribe, getLang, getLang);
+const getTextKey = () => `${lang}:${version}`;
+/** For translating Text: changes with the language and when the catalog names arrive. Pass it to tr(). */
+export const useTextKey = () => useSyncExternalStore(subscribe, getTextKey, getTextKey);
 
 /** Sentences with a number or name in them: the English pattern and its Vietnamese ($1, $2… are kept). */
 const PATTERNS_VI: [RegExp, string][] = [
@@ -74,11 +89,17 @@ const PATTERNS_VI: [RegExp, string][] = [
 /** `english` in the chosen language, or as it is when it isn't a known phrase. Spaces around it are kept.
  *  Components pass the language from useLang() as `_lang`, so remembered results (React Compiler) follow a change. */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function tr(english: string, _lang: AppLang = lang): string {
+export function tr(english: string, _key: string = getTextKey()): string {
   if (lang === 'en' || !english) return english;
   const core = english.trim();
   if (!core) return english;
-  let out = VI[core];
+  let out = VI[core] ?? catalog.get(core);
+  // "Gel Manicure · 60 min", "PAID · Gel Manicure": each part on its own.
+  if (out === undefined && core.includes(' · ')) {
+    const parts = core.split(' · ');
+    const done = parts.map((p) => tr(p));
+    if (done.some((d, i) => d !== parts[i])) out = done.join(' · ');
+  }
   if (out === undefined) {
     for (const [re, to] of PATTERNS_VI) if (re.test(core)) { out = core.replace(re, to); break; }
   }

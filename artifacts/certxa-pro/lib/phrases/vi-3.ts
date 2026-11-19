@@ -337,4 +337,14 @@ export const VI_3: Record<string, string> = {
   "Calendar view": "Kiểu xem lịch",
   "Card reader & Checkout": "Máy đọc thẻ & Thanh toán",
   "Online booking": "Đặt lịch trực tuyến",
+  // Language page and Vietnamese names
+  "App language": "Ngôn ngữ ứng dụng",
+  "The app is shown in English.": "Ứng dụng hiển thị bằng tiếng Anh.",
+  "Vietnamese name": "Tên tiếng Việt",
+  "Not translated yet": "Chưa dịch",
+  "Could not load": "Không tải được",
+  "Shown when the app is in Vietnamese. Made by AI; change it here if it reads wrong.": "Hiện khi ứng dụng bằng tiếng Việt. Do AI dịch; sửa ở đây nếu chưa đúng.",
+  "Saved.": "Đã lưu.",
+  "Saving…": "Đang lưu…",
+  "That could not be saved.": "Không lưu được.",
 };

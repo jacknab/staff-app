@@ -9,6 +9,7 @@ import { CatalogScreen, Checklist, Empty, ErrorLine, Field, Label, List, Loading
 import { useBookingData } from '@/contexts/BookingContext';
 import { api } from '@/lib/live-api';
 
+import { TranslationField } from '@/components/TranslationField';
 type Item = { id: number; name: string; price: number; duration: number };
 type Pkg = { id: number; name: string; description: string; imageUrl: string | null; fixed: boolean; fixedPrice: string; hiddenFromPublic: boolean; price: number; duration: number; serviceIds: number[]; addonIds: number[] };
 type Draft = Omit<Pkg, 'price' | 'duration'>;
@@ -105,6 +106,7 @@ export default function PackagesScreen() {
       {draft && sum ? (
         <>
           <Field label="Name" testID="package-name" autoCapitalize="words" value={draft.name} onChangeText={(name) => setDraft({ ...draft, name })} placeholder="For example, Mani + pedi" />
+          {draft.id > 0 ? <TranslationField type="bundle" id={draft.id} /> : null}
           <Field label="Description" testID="package-description" multiline value={draft.description} onChangeText={(description) => setDraft({ ...draft, description })} placeholder="Optional" />
           <Label>Services</Label>
           <Checklist testID="package-service" items={services.map((s) => ({ id: s.id, title: s.name, hint: money(s.price) }))} picked={draft.serviceIds} onToggle={(id) => setDraft({ ...draft, serviceIds: toggle(draft.serviceIds, id) })} empty="Add a service first." />

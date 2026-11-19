@@ -17,6 +17,7 @@ import { AppBackground } from '@/components/look/AppBackground';
 import { SectionTitle } from '@/components/look/SectionHeader';
 import { look, cardShadow } from '@/components/look/tokens';
 import { useInPane } from '@/components/TabletSplit';
+import { TranslationField } from '@/components/TranslationField';
 type OfferedAt = 'place' | 'client' | 'any';
 type Service = { id: number; name: string; duration: number; price: number; offeredAt: OfferedAt; categoryId: number | null; allowQuantity: boolean; color: string | null; processingStart: number | null; processing: number | null; parentId: number | null; optionLabel: string | null };
 type Category = { id: number; name: string; sortOrder: number };
@@ -179,6 +180,7 @@ export default function ServicesScreen() {
           <>
             <Text style={[styles.label, { color: colors.foreground }]}>Name</Text>
             <TextInput testID="service-name" autoCapitalize="words" value={draft.name} onChangeText={(name) => setDraft({ ...draft, name })} placeholder="For example, Gel manicure" placeholderTextColor={colors.mutedForeground} style={[styles.input, input]} />
+            {draft.id > 0 ? <TranslationField type="service" id={draft.id} /> : null}
             <View style={styles.pair}>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.label, { color: colors.foreground }]}>Minutes</Text>

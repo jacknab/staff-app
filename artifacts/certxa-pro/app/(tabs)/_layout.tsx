@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Platform, StyleSheet, useColorScheme, View } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { Feather } from '@expo/vector-icons';
@@ -10,7 +10,8 @@ import { usePaymentsReady } from '@/lib/usePaymentsReady';
 import { ReviewAsk } from '@/components/ReviewAsk';
 import { TabletLauncher, useIsTablet } from '@/components/TabletLauncher';
 
-import { tr, useLang } from '@/lib/i18n';
+import { tr, useLang, useTextKey } from '@/lib/i18n';
+import { loadCatalogNames } from '@/lib/catalogNames';
 function ClassicTabLayout() {
   const colors = useColors();
   const colorScheme = useColorScheme();
@@ -23,8 +24,11 @@ function ClassicTabLayout() {
   const paymentsReady = usePaymentsReady();
   // Tablets (owner, 2026-11-19): no tab bar; the launcher button opens the app icons (components/TabletLauncher.tsx).
   const isTablet = useIsTablet();
-  // The tab names in the chosen language (Settings › Language; lib/i18n.ts).
-  const lang = useLang();
+  // The tab names in the chosen language (Settings › Language; lib/i18n.ts), and the salon's catalog names in it once
+  // signed in (lib/catalogNames.ts), loaded again when the language changes.
+  const lang = useTextKey();
+  const language = useLang();
+  useEffect(() => { void loadCatalogNames(); }, [language]);
 
   return (
     <>

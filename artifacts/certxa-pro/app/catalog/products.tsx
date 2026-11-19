@@ -8,6 +8,7 @@ import { Alert } from '@/lib/appAlert';
 import { CatalogScreen, Empty, ErrorLine, Field, List, Loading, Pair, QuietButton, Row, SaveButton, errorText, money } from '@/components/catalog/CatalogKit';
 import { api } from '@/lib/live-api';
 
+import { TranslationField } from '@/components/TranslationField';
 type Product = { id: number; name: string; brand: string; price: number; stock: number; lowAt: number };
 type Draft = { id: number; name: string; brand: string; price: string; stock: string; lowAt: string };
 
@@ -78,6 +79,7 @@ export default function ProductsScreen() {
       {draft ? (
         <>
           <Field label="Product name" testID="product-name" autoCapitalize="words" value={draft.name} onChangeText={(name) => setDraft({ ...draft, name })} placeholder="For example, Cuticle oil" />
+          {draft.id > 0 ? <TranslationField type="product" id={draft.id} /> : null}
           <Field label="Brand" testID="product-brand" autoCapitalize="words" value={draft.brand} onChangeText={(brand) => setDraft({ ...draft, brand })} placeholder="Optional" />
           <Pair>
             <Field label="Price ($)" testID="product-price" keyboardType="decimal-pad" value={draft.price} onChangeText={(price) => setDraft({ ...draft, price: price.replace(/[^\d.]/g, '') })} placeholder="24.99" />

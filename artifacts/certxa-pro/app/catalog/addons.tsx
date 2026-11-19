@@ -12,6 +12,7 @@ import { useBookingData } from '@/contexts/BookingContext';
 import { useColors } from '@/hooks/useColors';
 import { api } from '@/lib/live-api';
 
+import { TranslationField } from '@/components/TranslationField';
 type Addon = { id: number; name: string; description: string; duration: number; price: number; hiddenFromPublic: boolean; allowQuantity: boolean };
 type Draft = { id: number; name: string; description: string; minutes: string; price: string; hiddenFromPublic: boolean; allowQuantity: boolean; serviceIds: number[] };
 type Service = { id: number; name: string };
@@ -104,6 +105,7 @@ export default function AddonsScreen() {
       {draft ? (
         <>
           <Field label="Name" testID="addon-name" autoCapitalize="sentences" value={draft.name} onChangeText={(name) => setDraft({ ...draft, name })} placeholder="For example, French tips" />
+          {draft.id > 0 ? <TranslationField type="addon" id={draft.id} /> : null}
           <Field label="Description" testID="addon-description" multiline value={draft.description} onChangeText={(description) => setDraft({ ...draft, description })} placeholder="Optional" />
           <Pair>
             <Field label="Extra minutes" testID="addon-minutes" keyboardType="number-pad" value={draft.minutes} onChangeText={(minutes) => setDraft({ ...draft, minutes: minutes.replace(/\D/g, '') })} placeholder="15" />

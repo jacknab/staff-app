@@ -12,6 +12,7 @@ import { CatalogScreen, Empty, ErrorLine, Field, Label, List, Loading, PhotoFiel
 import { useColors } from '@/hooks/useColors';
 import { api } from '@/lib/live-api';
 
+import { TranslationField } from '@/components/TranslationField';
 type Category = { id: number; name: string; color: string | null; imageUrl: string | null; hiddenFromPublic: boolean; sortOrder: number };
 type Draft = { id: number; name: string; color: string | null; imageUrl: string | null; hiddenFromPublic: boolean };
 
@@ -97,6 +98,7 @@ export default function CategoriesScreen() {
       {draft ? (
         <>
           <Field label="Name" testID="category-name" autoCapitalize="words" value={draft.name} onChangeText={(name) => setDraft({ ...draft, name })} placeholder="For example, Manicures" />
+          {draft.id > 0 ? <TranslationField type="category" id={draft.id} /> : null}
           <Label>Calendar colour</Label>
           <View style={styles.swatches}>
             <TouchableOpacity testID="category-colour-none" accessibilityLabel="No colour" onPress={() => setDraft({ ...draft, color: null })} style={[styles.swatch, { backgroundColor: colors.card, borderColor: !draft.color ? colors.foreground : colors.border, borderWidth: !draft.color ? 2 : 1 }]}>

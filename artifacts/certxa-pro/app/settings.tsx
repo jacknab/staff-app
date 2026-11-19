@@ -815,9 +815,25 @@ export default function SettingsScreen() {
         {valueRow('discounts', 'POS discount buttons', String(draft.discounts ?? '').split(/[\s,%]+/).filter(Boolean).map((n) => `${n}%`).join(', ') || 'None')}
       </>);
     }
+    // Like the website's Features page (owner, 2026-11-19): a card per language with a check, its name and a line under
+    // it; tapping a card switches at once. One language at a time.
     if (screen === 'language') return (<>
-      <Label>Language</Label>
-      <SelectField testID="settings-language-choice" title="Language" value={lang} options={APP_LANGS} onChange={(v) => setLang(v as AppLang)} />
+      <Group title="App language">
+        {APP_LANGS.map((l) => {
+          const on = lang === l.value;
+          return (
+            <TouchableOpacity key={l.value} testID={`settings-language-${l.value}`} accessibilityRole="checkbox" accessibilityState={{ checked: on }}
+              onPress={() => setLang(l.value as AppLang)} activeOpacity={0.8}
+              style={[styles.row, { backgroundColor: colors.card, borderColor: on ? colors.primary : colors.border }, on && { borderWidth: 2 }]}>
+              <Feather name={on ? 'check-square' : 'square'} size={26} color={on ? colors.primary : colors.mutedForeground} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.rowTitle, { color: colors.foreground }]}>{l.label}</Text>
+                <Text style={[styles.rowHint, { color: colors.mutedForeground }]}>{l.value === 'vi' ? 'Ứng dụng hiển thị bằng tiếng Việt.' : 'The app is shown in English.'}</Text>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
+      </Group>
       <Help>The app's words change at once. Names, services and anything you typed stay as they are. Kept on this device.</Help>
     </>);
     return (<>

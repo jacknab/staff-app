@@ -620,8 +620,8 @@ export function TabletPos({ bookRequest }: { bookRequest?: BookRequest | null } 
           : groups.length === 0 ? <Text style={[styles.subtle, styles.empty]}>No services yet. Add them in Services.</Text>
           : <PosGrid key={JSON.stringify(gridConfig)} layout={gridConfig} groups={groups} addons={addons} addonGroups={addonGroups.map((g) => g.group)} onService={pickKey} onAddon={pickAddon} onFn={gridFn} />}
       </View>
-      {/* Under the grid on the left, in the app-icons button's style: the key grid editor, and Home — the way out of the
-          POS, which has no app-icons button (owner, 2026-11-19). */}
+      {/* Under the grid, in the app-icons button's style: the key grid editor on the left, and Home on the right — the way
+          out of the POS, which has no app-icons button (owner, 2026-11-19). */}
       <View style={styles.underGrid}>
         <TouchableOpacity testID="tablet-pos-grid-settings" accessibilityLabel="Key grid" onPress={() => setEditingGrid(true)} activeOpacity={0.85} style={styles.gearShadow}>
           <LinearGradient colors={['#8B5CF6', '#6D28D9']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.gear}>
@@ -679,7 +679,8 @@ const styles = StyleSheet.create({
   balanceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderRadius: 12, backgroundColor: look.tile, paddingHorizontal: 12, paddingVertical: 10, marginTop: 6 },
   balancePaid: { backgroundColor: '#E7F6EC' },
   balanceText: { fontSize: 18, fontFamily: 'Inter_700Bold', color: look.heading },
-  underGrid: { flexDirection: 'row', gap: 12 },
+  // The key grid gear on the left, Home on the right (owner, 2026-11-19).
+  underGrid: { flexDirection: 'row', justifyContent: 'space-between' },
   gearShadow: { alignSelf: 'flex-start', borderRadius: 22, shadowColor: '#4C1D95', shadowOpacity: 0.35, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 8 },
   gear: { width: 62, height: 62, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   noneText: { fontSize: 28, fontFamily: 'Inter_700Bold', color: look.subtle },
