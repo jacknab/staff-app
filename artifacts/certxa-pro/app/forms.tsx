@@ -13,6 +13,11 @@ import { useRouter } from 'expo-router';
 import { CatalogScreen, Checklist, Choice, Empty, ErrorLine, Field, Label, List, Loading, QuietButton, Row, SaveButton, SectionTitle, Toggle, errorText } from '@/components/catalog/CatalogKit';
 import { useColors } from '@/hooks/useColors';
 import { api } from '@/lib/live-api';
+import { useWindowDimensions } from 'react-native';
+import { EmptyHero } from '@/components/EmptyHero';
+import { PageIntro } from '@/components/PageIntro';
+import { HELP_PANEL_MIN_WIDTH } from '@/components/TabletFrame';
+import { TABLET_INTRO } from '@/lib/tabletIntro';
 
 type FieldType = 'text' | 'long_text' | 'yes_no' | 'choice' | 'multi' | 'date' | 'agree' | 'info' | 'signature';
 type Question = { label: string; fieldType: FieldType; options: string; required: boolean };
@@ -43,6 +48,8 @@ export default function FormsScreen() {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const { width } = useWindowDimensions();
+  const startNew = () => { setError(''); setPicking(true); };
 
   const load = useCallback(async () => {
     try {
@@ -128,7 +135,7 @@ export default function FormsScreen() {
       title={draft ? (draft.id > 0 ? 'Edit form' : 'New form') : picking ? 'Start a form' : 'Forms & Waivers'}
       onBack={back}
       inner={!!draft || picking}
-      onAdd={draft || picking ? undefined : () => { setError(''); setPicking(true); }}
+      onAdd={draft || picking ? undefined : startNew}
       addLabel="Add a form"
       testID="forms"
     >
@@ -190,10 +197,21 @@ export default function FormsScreen() {
       ) : loading ? <Loading /> : (
         <>
           <ErrorLine>{error}</ErrorLine>
-          {forms.length === 0 && !error ? <Empty>No forms yet. Tap + to add an intake form or a waiver your clients fill in before their visit.</Empty> : null}
-          <List>
-            {forms.map((f) => <Row key={f.id} testID={`form-${f.id}`} dim={!f.isActive} title={f.name} hint={f.isActive ? hint(f) : 'Switched off'} onPress={() => { setError(''); setDraft(toDraft(f, f.id)); }} />)}
-          </List>
+          {/* Nothing made yet (owner's mock-up, 2026-11-20): the big intro with Create a Form or Waiver; on a phone or an
+              upright tablet the intro panel's rows go under it. */}
+          {forms.length === 0 && !error ? (
+            <>
+              <EmptyHero testID="forms-empty" compact={width < 600} icons={['shield', 'clipboard', 'user']} badge="edit-2" title="Create Forms & Waivers"
+                text="Collect client information, agreements, and consent forms digitally."
+                button="Create a Form or Waiver" onPress={startNew} note="No forms yet. Tap + to make one." />
+              {width < HELP_PANEL_MIN_WIDTH ? <PageIntro compact={width < 600} intro={TABLET_INTRO.forms} /> : null}
+            </>
+          ) : null}
+          {forms.length > 0 ? (
+            <List>
+              {forms.map((f) => <Row key={f.id} testID={`form-${f.id}`} dim={!f.isActive} title={f.name} hint={f.isActive ? hint(f) : 'Switched off'} onPress={() => { setError(''); setDraft(toDraft(f, f.id)); }} />)}
+            </List>
+          ) : null}
         </>
       )}
     </CatalogScreen>

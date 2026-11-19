@@ -32,4 +32,13 @@ export const TABLET_INTRO: Record<string, TabletIntro> = {
     ],
     examples: ['Monthly Wellness Plan', 'Self-Care Membership', 'VIP Membership', 'Annual Membership'],
   },
+  forms: {
+    intro: 'Create digital forms and waivers to collect important information and client consent before services.',
+    cards: [
+      { icon: 'file-text', title: 'What are forms & waivers?', text: 'Digital documents that collect client information, permission, and agreements (e.g., intake forms, consent waivers, policies).' },
+      { icon: 'settings', title: 'How it works', text: 'Build a form or waiver, customize the questions and terms, then share it with clients to complete and sign digitally on their device.' },
+      { icon: 'shield', title: 'Client benefits', text: 'A quick, paperless experience that keeps their information secure and on file for future visits.' },
+    ],
+    examples: ['Client Intake Form', 'Service Agreement', 'Consent Waiver', 'Policy Acknowledgment'],
+  },
 };
