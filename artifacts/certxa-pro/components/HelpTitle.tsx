@@ -10,7 +10,7 @@ import { Text } from '@/components/AppText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
-import { HELP } from '@/lib/help';
+import { HELP, type HelpPage } from '@/lib/help';
 
 let openId: string | null = null;
 const listeners = new Set<() => void>();
@@ -21,6 +21,56 @@ export function openHelp(id: string) {
   const page = HELP[id] ? id : HELP[id.split('.')[0]] ? id.split('.')[0] : null;
   if (!page) return;
   setOpen(page);
+}
+
+/**
+ * The help page for a screen's route, for the tablet's help panel (components/TabletFrame.tsx): '/packages' → packages,
+ * '/promo-codes' → promoCodes, '/catalog/packages' → catalog.packages, '/client/12' → client.
+ */
+export function helpIdForPath(pathname: string): string | null {
+  const parts = pathname.replace(/^\/+|\/+$/g, '').split('/').filter(Boolean);
+  const camel = (v: string) => v.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
+  for (let n = parts.length; n > 0; n--) {
+    const id = parts.slice(0, n).join('.');
+    if (HELP[id]) return id;
+    if (HELP[camel(id)]) return camel(id);
+  }
+  return null;
+}
+
+/** A help page's title, intro, sections and examples: the full-screen help, and the tablet's help panel. */
+export function HelpContent({ page, tip = true }: { page: HelpPage; tip?: boolean }) {
+  const colors = useColors();
+  return (
+    <>
+      <Text style={[styles.title, { color: colors.foreground }]}>{page.title}</Text>
+      <Text style={[styles.intro, { color: colors.mutedForeground }]}>{page.intro}</Text>
+      {page.sections.map((section) => (
+        <View key={section.heading} style={styles.section}>
+          <Text style={[styles.heading, { color: colors.foreground }]}>{section.heading}</Text>
+          {section.points.map((point) => (
+            <View key={point} style={styles.point}>
+              <View style={[styles.bullet, { backgroundColor: colors.primary }]} />
+              <Text style={[styles.pointText, { color: colors.foreground }]}>{point}</Text>
+            </View>
+          ))}
+        </View>
+      ))}
+      {page.examples?.length ? (
+        <View style={styles.section}>
+          <Text style={[styles.heading, { color: colors.foreground }]}>Examples</Text>
+          <Text style={[styles.intro, { color: colors.mutedForeground, marginTop: 0, marginBottom: 6 }]}>Things you can ask, with the kind of answer you get.</Text>
+          {page.examples.map((e) => (
+            <View key={e.q} style={styles.example}>
+              <View style={[styles.bubble, styles.mine, { backgroundColor: colors.primary }]}><Text style={[styles.bubbleText, { color: colors.primaryForeground }]}>{e.q}</Text></View>
+              <View style={[styles.bubble, styles.theirs, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.bubbleText, { color: colors.foreground }]}>{e.a}</Text></View>
+            </View>
+          ))}
+        </View>
+      ) : null}
+      {tip ? <Text style={[styles.tip, { color: colors.mutedForeground }]}>Hold the title at the top of any page for help with that page.</Text> : null}
+    </>
+  );
 }
 
 /** How long a hold takes to open help (React Native's own long press is 500 ms). */
@@ -63,32 +113,7 @@ export function HelpHost() {
           </TouchableOpacity>
         </View>
         <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]}>
-          <Text style={[styles.title, { color: colors.foreground }]}>{page.title}</Text>
-          <Text style={[styles.intro, { color: colors.mutedForeground }]}>{page.intro}</Text>
-          {page.sections.map((section) => (
-            <View key={section.heading} style={styles.section}>
-              <Text style={[styles.heading, { color: colors.foreground }]}>{section.heading}</Text>
-              {section.points.map((point) => (
-                <View key={point} style={styles.point}>
-                  <View style={[styles.bullet, { backgroundColor: colors.primary }]} />
-                  <Text style={[styles.pointText, { color: colors.foreground }]}>{point}</Text>
-                </View>
-              ))}
-            </View>
-          ))}
-          {page.examples?.length ? (
-            <View style={styles.section}>
-              <Text style={[styles.heading, { color: colors.foreground }]}>Examples</Text>
-              <Text style={[styles.intro, { color: colors.mutedForeground, marginTop: 0, marginBottom: 6 }]}>Things you can ask, with the kind of answer you get.</Text>
-              {page.examples.map((e) => (
-                <View key={e.q} style={styles.example}>
-                  <View style={[styles.bubble, styles.mine, { backgroundColor: colors.primary }]}><Text style={[styles.bubbleText, { color: colors.primaryForeground }]}>{e.q}</Text></View>
-                  <View style={[styles.bubble, styles.theirs, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.bubbleText, { color: colors.foreground }]}>{e.a}</Text></View>
-                </View>
-              ))}
-            </View>
-          ) : null}
-          <Text style={[styles.tip, { color: colors.mutedForeground }]}>Hold the title at the top of any page for help with that page.</Text>
+          <HelpContent page={page} />
         </ScrollView>
       </View>
     </Modal>
