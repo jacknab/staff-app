@@ -358,4 +358,6 @@ export const VI_3: Record<string, string> = {
   "MARK AS COMPLETED": "ĐÁNH DẤU ĐÃ XONG",
   "MARK AS DONE": "ĐÁNH DẤU ĐÃ XONG",
   "UPDATING…": "ĐANG CẬP NHẬT…",
+  "Numeric keyboard": "Bàn phím số",
+  "Letter keyboard": "Bàn phím chữ",
 };

@@ -134,7 +134,7 @@ type BookingContextValue = {
   refresh: () => Promise<void>;
   addClient: (client: NewClient) => Promise<ClientProfile>;
   /** A client from just a name, a phone number or an e-mail (the POS). */
-  addQuickClient: (client: { name?: string; phone?: string; email?: string }) => Promise<ClientProfile>;
+  addQuickClient: (client: { name?: string; phone?: string; email?: string }, opts?: { sharedPhone?: boolean }) => Promise<ClientProfile>;
   addBooking: (appointment: NewAppointment) => Promise<void>;
   /** `notifyClient`: text the client the new day and time (the "Notify client" switch). */
   rescheduleBooking: (appointmentId: number, dateIso: string, durationMinutes: number, notifyClient?: boolean) => Promise<void>;
@@ -277,8 +277,10 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       const created = await api.post<ApiCustomer>('/api/customers', { name: client.name, phone: client.phone || undefined });
       const record = mapCustomer(created, 0); setClients((current) => [record, ...current]); return record;
     },
-    addQuickClient: async (client) => {
+    addQuickClient: async (client, opts) => {
       const created = await api.post<ApiCustomer>('/api/customers', {
+        // sharedPhone: a different person may give a number already on file (a new record, never a takeover).
+        ...(opts?.sharedPhone ? { sharedPhone: true } : {}),
         ...(client.name?.trim() ? { name: client.name.trim() } : {}),
         ...(client.phone?.trim() ? { phone: client.phone.trim() } : {}),
         ...(client.email?.trim() ? { email: client.email.trim() } : {}),

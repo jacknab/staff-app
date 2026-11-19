@@ -303,8 +303,12 @@ export function TabletPos({ bookRequest }: { bookRequest?: BookRequest | null } 
     if (!newName.trim() && !newPhone.trim()) return;
     setBusy(true); setError('');
     try {
+      // The same name on the same number is that client, not a new one.
+      const same = clients.find((c) => !!newPhone && digitsOnly(c.phone).slice(-10) === digitsOnly(newPhone).slice(-10) && c.name.trim().toLowerCase() === newName.trim().toLowerCase());
+      if (same) { pickExisting(same); setPicking(false); return; }
       try {
-        const created = await addQuickClient({ name: newName, phone: newPhone, email: '' });
+        // Numbers change hands: a new name on a number already on file is a new client record (owner, 2026-11-20).
+        const created = await addQuickClient({ name: newName, phone: newPhone, email: '' }, { sharedPhone: !!newName.trim() });
         setClient({ customerId: created.customerId, name: created.name, phone: created.phone, email: created.email ?? '' });
       } catch (cause) {
         // That phone number already belongs to a client: use that client.

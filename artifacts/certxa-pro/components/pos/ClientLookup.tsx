@@ -3,6 +3,10 @@
  * keyboard never opens. Type a name or a phone number; the matching clients show above what is typed, and tapping one
  * puts them on the ticket. Nobody found: Add new client takes what was typed (a name, or a mobile number) to the new
  * client's form, which the same keyboard fills in.
+ *
+ * ENTER (owner, 2026-11-20): in the search it means a new client (nobody was picked from the matches), so it opens the
+ * form with the typed name and the cursor in Mobile; in the form it goes from Name to Mobile, then adds the client.
+ * "Numeric keyboard" swaps the letters for a number pad laid out like the POS keypad (the Mobile box opens it by itself).
  */
 import { useMemo, useState } from 'react';
 import { Feather } from '@expo/vector-icons';
@@ -44,19 +48,30 @@ export function ClientLookup<T extends ClientRow>({ visible, clients, busy, erro
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [field, setField] = useState<'name' | 'phone'>('name');
+  const [numeric, setNumeric] = useState(false);
+  const chooseField = (f: 'name' | 'phone') => { setField(f); setNumeric(f === 'phone'); };
   const results = useMemo(() => matchClients(clients, query), [clients, query]);
 
-  const reset = () => { setMode('search'); setQuery(''); setName(''); setPhone(''); setField('name'); };
+  const reset = () => { setMode('search'); setQuery(''); setName(''); setPhone(''); setField('name'); setNumeric(false); };
   const close = () => { reset(); onClose(); };
   const startNew = () => {
     // What was typed goes to the form: digits to Mobile, anything else to Name.
     const typed = query.trim();
-    if (typed && digitsOnly(typed).length === typed.replace(/[\s()+-]/g, '').length) { setPhone(digitsOnly(typed).slice(0, 10)); setName(''); setField('name'); }
-    else { setName(typed); setPhone(''); setField(typed ? 'phone' : 'name'); }
+    if (typed && digitsOnly(typed).length === typed.replace(/[\s()+-]/g, '').length) { setPhone(digitsOnly(typed).slice(0, 10)); setName(''); chooseField('name'); }
+    else { setName(typed); setPhone(''); chooseField(typed ? 'phone' : 'name'); }
     setMode('new');
+  };
+  const enter = () => {
+    if (mode === 'search') {
+      if (query.trim()) startNew();
+      return;
+    }
+    if (field === 'name') { chooseField('phone'); return; }
+    if (canAdd) onAdd(name.trim(), phone);
   };
   // Typing: letters in Name start each word with a capital; Mobile takes digits only.
   const press = (key: string) => {
+    if (key === 'ENTER') { enter(); return; }
     if (mode === 'search') {
       if (key === '⌫') setQuery((v) => v.slice(0, -1));
       else if (key === 'CLEAR') setQuery('');
@@ -112,12 +127,15 @@ export function ClientLookup<T extends ClientRow>({ visible, clients, busy, erro
                 <Text style={[styles.fieldText, !query && styles.placeholder]} numberOfLines={1}>{query || 'Name or phone number'}</Text>
                 <View style={styles.caret} />
               </View>
+              <TouchableOpacity testID="client-lookup-numeric" onPress={() => setNumeric((n) => !n)} style={styles.linkButton}>
+                <Text style={styles.linkText}>{numeric ? 'Letter keyboard' : 'Numeric keyboard'}</Text>
+              </TouchableOpacity>
               <TouchableOpacity testID="client-lookup-new-any" onPress={startNew} style={styles.newSmall}><Feather name="user-plus" size={20} color={look.violetDeep} /><Text style={styles.newSmallText}>New client</Text></TouchableOpacity>
             </View>
           </> : <>
             <View style={styles.formRow}>
               {(['name', 'phone'] as const).map((f) => (
-                <TouchableOpacity key={f} testID={`client-lookup-field-${f}`} onPress={() => setField(f)} style={[styles.formField, field === f && styles.fieldOn]}>
+                <TouchableOpacity key={f} testID={`client-lookup-field-${f}`} onPress={() => chooseField(f)} style={[styles.formField, field === f && styles.fieldOn]}>
                   <Text style={styles.formLabel}>{f === 'name' ? 'NAME' : 'MOBILE'}</Text>
                   <View style={styles.formValueRow}>
                     <Text style={[styles.fieldText, !(f === 'name' ? name : phone) && styles.placeholder]} numberOfLines={1}>
@@ -136,7 +154,19 @@ export function ClientLookup<T extends ClientRow>({ visible, clients, busy, erro
             </View>
           </>}
 
-          {/* The keyboard. */}
+          {/* The keyboard: letters, or the number pad. */}
+          {numeric ? (
+            <View style={styles.pad} testID="client-lookup-numpad">
+              {PAD_KEYS.map((k) => (
+                <TouchableOpacity key={k} testID={`kb-${k === '⌫' ? 'back' : k.toLowerCase()}`} accessibilityLabel={k === '⌫' ? 'Delete' : k} activeOpacity={0.7}
+                  onPress={() => (k === 'CLOSE' ? close() : press(k))}
+                  style={[styles.padKey, (k === '0' || k === 'ENTER') && styles.padWide, k === 'ENTER' && styles.enterKey, (k === 'CLEAR' || k === 'CLOSE') && styles.kbDark]}>
+                  {k === '⌫' ? <Feather name="delete" size={28} color={look.heading} />
+                    : <Text style={k === 'ENTER' ? styles.enterText : k.length > 1 ? styles.kbSmall : styles.padText}>{k}</Text>}
+                </TouchableOpacity>
+              ))}
+            </View>
+          ) : (
           <View style={styles.keyboard} testID="client-lookup-keyboard">
             {ROWS.map((row, r) => (
               <View key={row} style={styles.kbRow}>
@@ -144,7 +174,7 @@ export function ClientLookup<T extends ClientRow>({ visible, clients, busy, erro
                 {row.split('').map((k) => (
                   <TouchableOpacity key={k} testID={`kb-${k}`} onPress={() => press(k)} activeOpacity={0.7} style={styles.kbKey}><Text style={styles.kbText}>{k}</Text></TouchableOpacity>
                 ))}
-                {r === 2 ? <View style={{ flex: 0.5 }} /> : null}
+                {r === 2 ? <TouchableOpacity testID="kb-enter" onPress={() => press('ENTER')} style={[styles.kbKey, styles.enterKey, { flex: 1.5 }]}><Text style={styles.enterText}>ENTER</Text></TouchableOpacity> : null}
                 {r === 3 ? <TouchableOpacity testID="kb-back" accessibilityLabel="Delete" onPress={() => press('⌫')} style={[styles.kbKey, styles.kbWide, styles.kbDark]}><Feather name="delete" size={28} color={look.heading} /></TouchableOpacity> : null}
               </View>
             ))}
@@ -154,11 +184,17 @@ export function ClientLookup<T extends ClientRow>({ visible, clients, busy, erro
               <TouchableOpacity testID="kb-done" onPress={close} style={[styles.kbKey, styles.kbWide, styles.kbDark]}><Text style={styles.kbSmall}>CLOSE</Text></TouchableOpacity>
             </View>
           </View>
+          )}
         </View>
       </View>
     </Modal>
   );
 }
+
+// The number pad, laid out like the POS keypad (owner, 2026-11-20): 0 and ENTER are two keys wide.
+const PAD_KEYS = ['7', '8', '9', '⌫', '4', '5', '6', 'CLEAR', '1', '2', '3', 'CLOSE', '0', 'ENTER'];
+const PAD_KEY = 92;
+const PAD_GAP = 10;
 
 const depth = { shadowColor: '#2E1065', shadowOpacity: 0.16, shadowRadius: 4, shadowOffset: { width: 0, height: 3 }, elevation: 3 };
 const styles = StyleSheet.create({
@@ -193,6 +229,16 @@ const styles = StyleSheet.create({
   addText: { fontSize: 18, fontFamily: 'Inter_700Bold', color: '#FFFFFF', letterSpacing: 0.5 },
   keyboard: { gap: 8 },
   kbRow: { flexDirection: 'row', gap: 8 },
+  // Raised square keys, as the POS keypad.
+  pad: { width: PAD_KEY * 4 + PAD_GAP * 3, alignSelf: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: PAD_GAP },
+  padKey: { width: PAD_KEY, height: PAD_KEY, borderRadius: 16, backgroundColor: look.card, borderWidth: 1, borderColor: look.cardBorder, borderBottomWidth: 5, borderBottomColor: '#D8CEF6',
+    alignItems: 'center', justifyContent: 'center', shadowColor: '#2E1065', shadowOpacity: 0.18, shadowRadius: 5, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
+  padWide: { width: PAD_KEY * 2 + PAD_GAP },
+  padText: { fontSize: 32, fontFamily: 'Inter_600SemiBold', color: look.heading },
+  enterKey: { backgroundColor: look.violet, borderColor: look.violet, borderBottomColor: look.violetDeep },
+  enterText: { fontSize: 18, fontFamily: 'Inter_700Bold', color: '#FFFFFF', letterSpacing: 1 },
+  linkButton: { height: 64, paddingHorizontal: 10, justifyContent: 'center' },
+  linkText: { fontSize: 17, fontFamily: 'Inter_700Bold', color: look.violetDeep, textDecorationLine: 'underline' },
   kbKey: { flex: 1, height: 64, borderRadius: 14, backgroundColor: look.card, borderWidth: 1, borderColor: look.cardBorder, borderBottomWidth: 4, borderBottomColor: '#D8CEF6',
     alignItems: 'center', justifyContent: 'center', ...depth },
   kbWide: { flex: 1.6 },
