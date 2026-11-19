@@ -50,7 +50,7 @@ import { look, cardShadow } from '@/components/look/tokens';
 // Stripe M2 does not require that Apple entitlement.
 const TAP_TO_PAY_ENABLED = true;
 // Shown on the payment screen so a tester can tell which build is installed.
-const BUILD_LABEL = 'Build Nov 20 · A';
+const BUILD_LABEL = 'Build Nov 20 · B';
 const EXPO_GO_PREVIEW = process.env.EXPO_PUBLIC_EXPO_GO_PREVIEW === '1';
 
 type PaymentStep = 'idle' | 'tap_intro' | 'initializing' | 'discovering' | 'connecting' | 'ready' | 'processing' | 'capture_pending' | 'success' | 'error';
@@ -693,12 +693,18 @@ export default function CheckoutScreen() {
   const otherName = otherKind === 'other' ? otherLabel.trim() : ({ check: 'Check', venmo: 'Venmo', zelle: 'Zelle', paypal: 'PayPal' } as Record<string, string>)[otherKind ?? ''] ?? '';
   const offlineDueCents = Math.max(0, baseCentsParam - discountCents + productCents + taxCents + tipCents - depositCents - partialCents);
   // `givenOverride`: the cash typed on the tablet POS keypad (lib/posPayBridge.ts) instead of this screen's cash box.
-  const recordOfflinePayment = async (method: 'cash' | 'gift_card' | 'credit' | 'other', givenOverride?: number) => {
+  // `override`: from the tablet POS, the gift card number typed on its keypad and the Other button tapped (their state may
+  // not be set yet when the payment is recorded).
+  const recordOfflinePayment = async (method: 'cash' | 'gift_card' | 'credit' | 'other', givenOverride?: number,
+    override?: { code?: string; otherName?: string; otherKind?: string }) => {
     const apptId = Number(appointmentId);
+    const giftCode = (override?.code ?? giftCardCode).trim();
+    const otherNameNow = override?.otherName ?? otherName;
+    const otherKindNow = override?.otherKind ?? otherKind;
     if (!Number.isInteger(apptId) || apptId <= 0) { setError('This payment has no booking to record it on.'); return; }
-    if (method === 'gift_card' && !giftCardCode.trim()) { setError('Enter the gift card code.'); return; }
+    if (method === 'gift_card' && !giftCode) { setError('Enter the gift card code.'); return; }
     if (offlineDueCents <= 0) { setError('There is nothing left to pay.'); return; }
-    if (method === 'other' && !otherName) { setError(otherKind === 'other' ? 'Type how the client paid.' : 'Choose how the client paid.'); return; }
+    if (method === 'other' && !otherNameNow) { setError(otherKind === 'other' ? 'Type how the client paid.' : 'Choose how the client paid.'); return; }
     // Cash: what the client handed over. Less than the bill pays part of it; more gives change.
     const givenCents = method === 'cash' ? givenOverride ?? Math.round((Number(cashGiven.replace(/[^0-9.]/g, '')) || 0) * 100) : 0;
     if (method === 'cash' && givenCents <= 0) { setError('Enter the cash the client gave you.'); return; }
@@ -707,7 +713,7 @@ export default function CheckoutScreen() {
       let thisCents = method === 'cash' ? Math.min(givenCents, offlineDueCents) : offlineDueCents;
       if (method === 'gift_card' && !EXPO_GO_PREVIEW) {
         // Pays what the card has, up to the bill. What a card already paid on this visit is never counted twice.
-        await api.post(`/api/pro/appointments/${apptId}/gift-card`, { code: giftCardCode.trim(), amountCents: offlineDueCents, partial: true });
+        await api.post(`/api/pro/appointments/${apptId}/gift-card`, { code: giftCode, amountCents: offlineDueCents, partial: true });
         const r = await api.get<{ giftCard: { redeemedCents: number } }>(`/api/pro/appointments/${apptId}/checkout`);
         const total = Number(r?.giftCard?.redeemedCents) || 0;
         thisCents = total - giftPaidCents;
@@ -736,13 +742,13 @@ export default function CheckoutScreen() {
       }
       if (!EXPO_GO_PREVIEW) {
         await api.patch(`/api/appointments/${apptId}`, {
-          status: 'completed', paymentMethod: tenderString(method === 'other' ? (otherKind === 'other' ? otherName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 30) || 'other' : String(otherKind)) : method, thisCents),
+          status: 'completed', paymentMethod: tenderString(method === 'other' ? (otherKindNow === 'other' ? otherNameNow.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 30) || 'other' : String(otherKindNow)) : method, thisCents),
           totalPaid: ((thisCents + partialCents + depositCents) / 100).toFixed(2),
           tipAmount: (tipCents / 100).toFixed(2), discountAmount: (discountCents / 100).toFixed(2),
           serviceRevenue: (Math.max(0, baseCentsParam - discountCents) / 100).toFixed(2), productRevenue: (productCents / 100).toFixed(2),
         });
       }
-      const label = method === 'cash' ? 'Cash' : method === 'credit' ? 'Credit' : method === 'other' ? otherName : 'Gift card';
+      const label = method === 'cash' ? 'Cash' : method === 'credit' ? 'Credit' : method === 'other' ? otherNameNow : 'Gift card';
       if (partialCents > 0 || method === 'credit') setPaidSummary(partsSummary(label, thisCents));
       else if (method === 'other') setPaidSummary(label);
       setChangeCents(method === 'cash' ? Math.max(0, givenCents - offlineDueCents) : 0);
@@ -763,7 +769,12 @@ export default function CheckoutScreen() {
   // what is paid and what is left.
   const posBridge = usePosPayBridge();
   const cashFromKeypad = useRef<(cents: number) => void>(() => undefined);
-  cashFromKeypad.current = (cents: number) => { if (step === 'tap_intro' && !recording) void recordOfflinePayment('cash', cents); };
+  // GIFT CARD chosen: the typed digits are the gift card number (number-only for now; owner, 2026-11-19). Otherwise cash.
+  cashFromKeypad.current = (cents: number) => {
+    if (step !== 'tap_intro' || recording) return;
+    if (giftOpen) { const code = String(cents); setGiftCardCode(code); void recordOfflinePayment('gift_card', undefined, { code }); return; }
+    void recordOfflinePayment('cash', cents);
+  };
   useEffect(() => {
     if (!posBridge) return;
     posBridge.setCashHandler((cents) => cashFromKeypad.current(cents));
@@ -771,8 +782,8 @@ export default function CheckoutScreen() {
   }, [posBridge]);
   useEffect(() => {
     posBridge?.report({ cashCents: cashPartCents, giftCents: giftPaidCents, creditCents: creditPaidCents, dueCents: step === 'success' ? 0 : offlineDueCents,
-      changeCents: step === 'success' ? changeCents : 0, paid: step === 'success', message: statusText, error });
-  }, [posBridge, cashPartCents, giftPaidCents, creditPaidCents, offlineDueCents, changeCents, step, statusText, error]);
+      changeCents: step === 'success' ? changeCents : 0, paid: step === 'success', message: statusText, error, keypad: giftOpen ? 'gift' : 'cash' });
+  }, [posBridge, cashPartCents, giftPaidCents, creditPaidCents, offlineDueCents, changeCents, step, statusText, error, giftOpen]);
 
   const startCard = (mode: ReaderMode) => { if (!cardsOff) void startReader(mode); };
 
@@ -1122,28 +1133,29 @@ export default function CheckoutScreen() {
                // The tablet POS's ways to pay, as /nail's: CASH (typed on the keypad), CARD (the Stripe reader), GIFT CARD, OTHER.
                <View testID="pos-pay-tiles" style={{ width: '100%', gap: 12 }}>
                  <View style={styles.tileRow}>
-                   <PayTile testID="pos-pay-cash" icon="dollar-sign" label="CASH" on colors={colors} onPress={() => { setGiftOpen(false); setOtherOpen(false); setStatusText('Type the cash the client gave you on the keypad, then press ENTER.'); }} />
+                   <PayTile testID="pos-pay-cash" icon="dollar-sign" label="CASH" on={!giftOpen && !otherOpen} colors={colors} onPress={() => { setGiftOpen(false); setOtherOpen(false); setError(''); setStatusText(''); }} />
                    <PayTile testID="pos-pay-card" icon="credit-card" label="CARD" disabled={isBusy || cardsOff || !!charging} colors={colors} onPress={() => chooseCard('m2')} />
                  </View>
                  <View style={styles.tileRow}>
-                   <PayTile testID="pos-pay-gift" icon="gift" label="GIFT CARD" on={giftOpen} disabled={recording || isBusy} colors={colors} onPress={() => { setError(''); setGiftOpen((o) => !o); setOtherOpen(false); }} />
-                   <PayTile testID="pos-pay-other" icon="more-horizontal" label="OTHER" on={otherOpen} disabled={recording || isBusy} colors={colors} onPress={() => { setError(''); setOtherOpen((o) => !o); setGiftOpen(false); }} />
+                   <PayTile testID="pos-pay-gift" icon="gift" label="GIFT CARD" on={giftOpen} disabled={recording || isBusy} colors={colors} onPress={() => { setError(''); setStatusText(''); setGiftCardCode(''); setGiftOpen((o) => !o); setOtherOpen(false); }} />
+                   <PayTile testID="pos-pay-other" icon="more-horizontal" label="OTHER" on={otherOpen} disabled={recording || isBusy} colors={colors} onPress={() => { setError(''); setStatusText(''); setOtherOpen((o) => !o); setGiftOpen(false); }} />
                  </View>
-                 {giftOpen ? <View testID="gift-card-block" style={styles.formField}>
-                   <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Gift card code</Text>
-                   <TextInput testID="gift-card-code" autoCapitalize="characters" autoCorrect={false} value={giftCardCode} onChangeText={setGiftCardCode} placeholder="Code on the gift card" placeholderTextColor={colors.mutedForeground} style={[styles.fieldInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
-                   <TouchableOpacity testID="gift-card-use" disabled={recording || !giftCardCode.trim()} onPress={() => void recordOfflinePayment('gift_card')} style={[styles.primaryButton, { marginTop: 10, marginBottom: 0, backgroundColor: giftCardCode.trim() && !recording ? colors.primary : colors.muted }]}><Text style={[styles.primaryButtonText, { color: giftCardCode.trim() && !recording ? colors.primaryForeground : colors.mutedForeground }]}>{recording ? 'Checking the card…' : 'Use gift card'}</Text></TouchableOpacity>
-                 </View> : null}
-                 {otherOpen ? <View testID="other-block" style={styles.formField}>
-                   <Text style={[styles.fieldLabel, { color: colors.foreground }]}>How the client paid <Text style={{ color: colors.mutedForeground }}>(recorded only, no fee)</Text></Text>
-                   <SelectField testID="other-kind" title="How the client paid" placeholder="Choose" value={otherKind}
-                     options={[{ value: 'check' as const, label: 'Check' }, { value: 'venmo' as const, label: 'Venmo' }, { value: 'zelle' as const, label: 'Zelle' }, { value: 'paypal' as const, label: 'PayPal' }, { value: 'other' as const, label: 'Other (type it)' }]}
-                     onChange={(k) => { setOtherKind(k); setError(''); }} />
-                   {otherKind === 'other' ? <TextInput testID="other-label" value={otherLabel} onChangeText={(v) => setOtherLabel(v.slice(0, 30))} placeholder="For example, Apple Cash" placeholderTextColor={colors.mutedForeground} style={[styles.fieldInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground, marginTop: 8 }]} /> : null}
-                   <TouchableOpacity testID="other-record" disabled={recording || !otherName} onPress={() => void recordOfflinePayment('other')} style={[styles.primaryButton, { marginTop: 10, marginBottom: 0, backgroundColor: otherName && !recording ? colors.primary : colors.muted }]}><Text style={[styles.primaryButtonText, { color: otherName && !recording ? colors.primaryForeground : colors.mutedForeground }]}>{recording ? 'Recording…' : `Record ${dollars(String(offlineDueCents))}${otherName ? ` by ${otherName}` : ''}`}</Text></TouchableOpacity>
+                 {/* Other: one button per way, under the others (owner, 2026-11-19); a tap asks before recording. */}
+                 {otherOpen ? <View style={styles.tileRow}>
+                   {([['check', 'Check'], ['venmo', 'Venmo'], ['zelle', 'Zelle'], ['paypal', 'PayPal']] as const).map(([kind, name]) => (
+                     <TouchableOpacity key={kind} testID={`pos-pay-other-${kind}`} disabled={recording} activeOpacity={0.75}
+                       onPress={() => Alert.alert(`Record ${dollars(String(offlineDueCents))} paid by ${name}?`, 'Recorded only; no fee.', [
+                         { text: 'Cancel', style: 'cancel' },
+                         { text: 'Record', onPress: () => { setOtherKind(kind); void recordOfflinePayment('other', undefined, { otherName: name, otherKind: kind }); } },
+                       ])}
+                       style={[styles.otherTile, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                       <Text style={[styles.payTileText, { color: colors.foreground, fontSize: 15 }]}>{name}</Text>
+                     </TouchableOpacity>
+                   ))}
                  </View> : null}
                  <Text testID="pos-pay-hint" style={[styles.setupText, { color: colors.mutedForeground, textAlign: 'center' }]}>
-                   {error || statusText || 'Cash: type the amount on the keypad and press ENTER. Less pays part of it; more gives change. Card: tap CARD.'}
+                   {error || statusText || (giftOpen ? 'Gift card: type the gift card number on the keypad and press ENTER.'
+                     : otherOpen ? 'Tap how the client paid.' : 'Cash: type the amount on the keypad and press ENTER. Less pays part of it; more gives change. Card: tap CARD.')}
                  </Text>
                </View>
              ) : null}
@@ -1272,6 +1284,8 @@ const styles = StyleSheet.create({
   tileRow: { flexDirection: 'row', gap: 12 },
   payTile: { flex: 1, height: 104, borderRadius: 18, borderWidth: 2, borderBottomWidth: 5, alignItems: 'center', justifyContent: 'center', gap: 8,
     shadowColor: '#2E1065', shadowOpacity: 0.14, shadowRadius: 5, shadowOffset: { width: 0, height: 3 }, elevation: 3 },
+  otherTile: { flex: 1, height: 64, borderRadius: 14, borderWidth: 1, borderBottomWidth: 4, alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#2E1065', shadowOpacity: 0.12, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
   payTileText: { fontSize: 17, fontFamily: 'Inter_700Bold', letterSpacing: 1 },
   exitButton: { width: '100%', height: 60, borderRadius: 16, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 'auto', paddingTop: 0,
     shadowColor: '#2E1065', shadowOpacity: 0.12, shadowRadius: 4, shadowOffset: { width: 0, height: 3 }, elevation: 3 },

@@ -31,6 +31,7 @@ import { PaneHost } from '@/components/TabletSplit';
 import { PosPayBridgeContext, type PosPayBridge, type PosPayState } from '@/lib/posPayBridge';
 import CheckoutScreen from '@/app/(tabs)/checkout';
 import { ClientLookup } from '@/components/pos/ClientLookup';
+import { useReaderSetup } from '@/components/pos/useReaderSetup';
 import { PosGridEditor } from '@/components/pos/PosGridEditor';
 import { addonGroupKey, posGridColumns, type GridKey, type CatalogAddon, type CatalogGroup, type CatalogService, type PosFn, type PosGridConfig } from '@/lib/posGrid';
 import { AppBackground } from '@/components/look/AppBackground';
@@ -155,6 +156,8 @@ export function TabletPos() {
   // The line over the keypad (as /barber's): what just happened, or what to type next.
   const [status, setStatus] = useState<{ text: string; tone: 'info' | 'ok' | 'error' } | null>(null);
   const say = (text: string, tone: 'info' | 'ok' | 'error' = 'info') => setStatus({ text, tone });
+  // The Stripe M2 reader is set up and connected when the POS opens (components/pos/useReaderSetup.native.tsx).
+  useReaderSetup(true, say);
   // X: how many of the next item.
   const [qty, setQty] = useState(1);
   const [qtyDigits, setQtyDigits] = useState<string | null>(null);
@@ -203,7 +206,7 @@ export function TabletPos() {
     // Paying (owner, 2026-11-19, /nail's way): the keypad types the cash the client hands over; ENTER records it.
     if (paying) {
       if (key === 'ENTER') {
-        if (cents <= 0) { say('TYPE THE CASH AMOUNT, THEN ENTER', 'error'); return; }
+        if (cents <= 0) { say(payState?.keypad === 'gift' ? 'TYPE THE GIFT CARD NUMBER, THEN ENTER' : 'TYPE THE CASH AMOUNT, THEN ENTER', 'error'); return; }
         cashHandler.current?.(cents); setCents(0); return;
       }
       if (key === '↶') { setCents(0); return; }
@@ -261,7 +264,7 @@ export function TabletPos() {
     if (cents > servicesCents) { say('A DISCOUNT CAN\'T BE MORE THAN THE SERVICES', 'error'); return; }
     setDiscountCents(cents); setCents(0); say(`DISCOUNT · ${money(cents)}`, 'ok');
   };
-  const prompt = paying && payState && !payState.paid ? (payState.error || payState.message || 'CASH: TYPE THE AMOUNT, THEN ENTER').toUpperCase()
+  const prompt = paying && payState && !payState.paid ? (payState.error || payState.message || (payState.keypad === 'gift' ? 'GIFT CARD: TYPE THE NUMBER, THEN ENTER' : 'CASH: TYPE THE AMOUNT, THEN ENTER')).toUpperCase()
     : guided !== null ? `${steps[guided].toUpperCase()} AMOUNT · THEN ENTER` : qtyDigits !== null ? 'QTY: TYPE HOW MANY, THEN TAP THE ITEM' : null;
 
   // ── Choosing the client ──
@@ -359,7 +362,9 @@ export function TabletPos() {
       <View style={styles.actionRow}>
         <TouchableOpacity testID="tablet-pos-clear" onPress={clear} style={[styles.secondaryButton]}><Text style={styles.secondaryText}>CLEAR</Text></TouchableOpacity>
         <TouchableOpacity testID="tablet-pos-charge" disabled={!lines.length || busy} onPress={() => void charge()} style={[styles.chargeButton, (!lines.length || busy) && { opacity: 0.5 }]}>
-          {busy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.chargeText}>CHARGE {money(totalCents)}</Text>}
+          {/* Paying: what is still owed after the payments taken so far (owner, 2026-11-19). */}
+          {busy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.chargeText}>
+            {paying && payState ? (payState.paid ? 'PAID' : `CHARGE ${money(payState.dueCents)}`) : `CHARGE ${money(totalCents)}`}</Text>}
         </TouchableOpacity>
       </View>
     </View>
@@ -379,7 +384,8 @@ export function TabletPos() {
       <View style={styles.display}>
         {qtyDigits !== null ? <Text style={styles.displayQty}>QTY {qtyDigits || '_'} ×</Text> : qty > 1 ? <Text style={styles.displayQty}>{qty} ×</Text> : null}
         {/* Just the number, no $ (as /barber). */}
-        <Text testID="tablet-pos-display" style={styles.displayText} numberOfLines={1} adjustsFontSizeToFit>{cents ? (cents / 100).toFixed(2) : ''}</Text>
+        {/* A gift card number shows as typed; an amount as dollars and cents. */}
+        <Text testID="tablet-pos-display" style={styles.displayText} numberOfLines={1} adjustsFontSizeToFit>{!cents ? '' : paying && payState?.keypad === 'gift' ? String(cents) : (cents / 100).toFixed(2)}</Text>
       </View>
       <View style={styles.keys} onLayout={(e) => setKeySize(Math.floor((e.nativeEvent.layout.width - 3 * KEY_GAP) / 4))}>
         {KEYS.map((k) => (

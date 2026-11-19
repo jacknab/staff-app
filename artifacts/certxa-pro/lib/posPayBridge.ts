@@ -1,7 +1,8 @@
 /**
  * The tablet POS and the checkout it shows in its right side (owner, 2026-11-19: cash taken as /nail takes it). The POS
- * keypad types the cash the client hands over and ENTER records it on the checkout; the checkout tells the POS what is
- * paid and what is left, which the ticket shows like /nail's cart (Cash −$20.00 · Balance due / Change due / Paid in full).
+ * keypad types the cash the client hands over (or, with GIFT CARD chosen, the gift card number) and ENTER records it on
+ * the checkout; the checkout tells the POS what is paid and what is left, which the ticket shows like /nail's cart
+ * (Cash −$20.00 · Balance due / Change due / Paid in full).
  * Outside the POS there is no bridge and the checkout works on its own.
  */
 import { createContext, useContext } from 'react';
@@ -16,6 +17,8 @@ export type PosPayState = {
   paid: boolean;
   /** The checkout's latest message ("Cash $20.00 taken. $35.00 left to pay.") or error. */
   message: string; error: string;
+  /** What the POS keypad types: cash, or the gift card number while GIFT CARD is chosen. */
+  keypad: 'cash' | 'gift';
 };
 
 export type PosPayBridge = {
