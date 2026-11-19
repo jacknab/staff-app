@@ -16,7 +16,8 @@ import { StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 type Params = Record<string, string | undefined>;
-type Pane = { params: Params; close: () => void; setParams: (next: Params) => void };
+/** `close(done)`: done = the page finished its job (a sale paid), not just closed. */
+type Pane = { params: Params; close: (done?: boolean) => void; setParams: (next: Params) => void };
 const PaneContext = createContext<Pane | null>(null);
 
 export const useInPane = () => useContext(PaneContext) != null;
@@ -30,7 +31,7 @@ export function useScreenParams<T extends Record<string, string | undefined>>():
 export function usePaneClose() {
   const pane = useContext(PaneContext);
   const router = useRouter();
-  return pane ? pane.close : () => router.back();
+  return pane ? pane.close : (_done?: boolean) => router.back();
 }
 
 export function usePaneSetParams() {
@@ -42,7 +43,7 @@ export function usePaneSetParams() {
 /** What the right side shows: a screen and its details; `key` makes a new choice start the screen afresh. */
 export type PaneScreen = { key: string; Screen: ComponentType; params?: Record<string, string | undefined> };
 
-export function TabletSplit({ list, pane, onClose }: { list: ReactNode; pane: PaneScreen | null; onClose: () => void }) {
+export function TabletSplit({ list, pane, onClose }: { list: ReactNode; pane: PaneScreen | null; onClose: (done?: boolean) => void }) {
   return (
     <View style={styles.split}>
       <View style={styles.list}>{list}</View>
@@ -54,7 +55,8 @@ export function TabletSplit({ list, pane, onClose }: { list: ReactNode; pane: Pa
   );
 }
 
-function PaneHost({ pane, onClose }: { pane: PaneScreen; onClose: () => void }) {
+/** One page given its details, outside TabletSplit too (the tablet POS shows its checkout in its right side this way). */
+export function PaneHost({ pane, onClose }: { pane: PaneScreen; onClose: (done?: boolean) => void }) {
   const [params, setParams] = useState<Params>(pane.params ?? {});
   return (
     <PaneContext.Provider value={{ params, close: onClose, setParams: (next) => setParams((current) => ({ ...current, ...next })) }}>

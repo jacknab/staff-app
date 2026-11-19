@@ -8,12 +8,14 @@
  * arrangement from the key grid editor (the gear under the grid, on the left; GET · PUT /api/pro/pos-grid).
  *
  * The keypad is /barber's: 7 8 9 ⌫ · 4 5 6 ↶ · 1 2 3 X (quantity) · 00 0 ENTER, then Quick Ticket, Retail, Gift Card,
- * Tip Adjust and Discount (/barber's Combine, No Sale and Split Ticket need things the app doesn't have; owner's choice
- * to leave them out). A typed amount goes on the ticket with ENTER; X sets how many of the next item; ↶ clears what is
- * typed, or takes the last item off. Tip and discount go to the checkout with the sale.
+ * Packages, Memberships and Discount (/barber's Combine, No Sale and Split Ticket need things the app doesn't have, and
+ * Packages took Tip Adjust's place; owner, 2026-11-19). A typed amount goes on the ticket with ENTER as a +Misc Item; X
+ * sets how many of the next item; ↶ clears what is typed, or takes the last item off.
  *
+ * The ticket shows tax as a register does (the checkout's own rule and Settings › Card reader & Checkout rates).
  * CHARGE makes the sale a ticket of its own for the client (POST /api/quick-sales with its lines and products, kept off
- * the calendar) and the payment continues in the usual checkout (tip, card, cash, gift card, receipt), as on the phone.
+ * the calendar) and the usual checkout opens in the grid's place (cash, gift card, card; the tip is asked last, before a
+ * card payment). Paid, the grid comes back with a new ticket; Back keeps the ticket to change it.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { Feather } from '@expo/vector-icons';
@@ -25,6 +27,8 @@ import { useBookingData } from '@/contexts/BookingContext';
 import { api } from '@/lib/live-api';
 import { CertxaApiError } from '@/lib/certxa-api';
 import { PosGrid } from '@/components/pos/PosGrid';
+import { PaneHost } from '@/components/TabletSplit';
+import CheckoutScreen from '@/app/(tabs)/checkout';
 import { ClientLookup } from '@/components/pos/ClientLookup';
 import { PosGridEditor } from '@/components/pos/PosGridEditor';
 import { addonGroupKey, type CatalogAddon, type CatalogGroup, type CatalogService, type PosFn, type PosGridConfig } from '@/lib/posGrid';
@@ -57,6 +61,19 @@ export function TabletPos() {
   const [packages, setPackages] = useState<any[]>([]);
   const [addonGroupRows, setAddonGroupRows] = useState<{ id: number; name: string; addonIds: number[] }[]>([]);
   const [gridConfig, setGridConfig] = useState<PosGridConfig | null>(null);
+  // Sales tax, as the checkout reads it (Settings › Card reader & Checkout): services at the sales rate when they are
+  // taxable, products at the retail rate (no retail rate yet = the sales rate).
+  const [taxRates, setTaxRates] = useState<{ rate: number; services: boolean; retail: number }>({ rate: 0, services: false, retail: 0 });
+  useEffect(() => {
+    api.get<Array<{ id: number }>>('/api/stores').then(async (rows) => {
+      const id = Array.isArray(rows) ? Number(rows[0]?.id) : 0;
+      if (!id) return;
+      const pos = await api.get<{ salesTaxRate?: string | number; taxServicesTaxable?: boolean; retailTaxRate?: string | number | null; taxProductsTaxable?: boolean }>(`/api/pos-settings/${id}`);
+      const rate = Number(pos?.salesTaxRate ?? 0);
+      const retail = pos?.taxProductsTaxable === false ? 0 : Number(pos?.retailTaxRate != null && pos.retailTaxRate !== '' ? pos.retailTaxRate : rate);
+      setTaxRates({ rate: Number.isFinite(rate) && rate > 0 && rate <= 0.3 ? rate : 0, services: Boolean(pos?.taxServicesTaxable), retail: Number.isFinite(retail) && retail > 0 && retail <= 0.3 ? retail : 0 });
+    }).catch(() => undefined);
+  }, []);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
@@ -124,7 +141,6 @@ export function TabletPos() {
   const [client, setClient] = useState<Client | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const [tip, setTip] = useState<number | null>(null);
   const [discountCents, setDiscountCents] = useState(0);
   // The line over the keypad (as /barber's): what just happened, or what to type next.
   const [status, setStatus] = useState<{ text: string; tone: 'info' | 'ok' | 'error' } | null>(null);
@@ -153,8 +169,13 @@ export function TabletPos() {
   const servicesCents = lines.filter((l) => l.kind !== 'product').reduce((n, l) => n + l.priceCents, 0);
   const productsCents = lines.filter((l) => l.kind === 'product').reduce((n, l) => n + l.priceCents, 0);
   const discount = Math.min(discountCents, servicesCents);
-  const totalCents = servicesCents - discount + productsCents + (tip ?? 0);
-  const clear = () => { setLines([]); setClient(null); setCents(0); setError(''); setTip(null); setDiscountCents(0); setQty(1); setQtyDigits(null); setGuided(null); setStatus(null); };
+  // Tax on the services after the discount, and on products; never on a tip (the checkout's rule).
+  const taxCents = (taxRates.services && taxRates.rate > 0 ? Math.round((servicesCents - discount) * taxRates.rate) : 0) + Math.round(productsCents * taxRates.retail);
+  const totalCents = servicesCents - discount + productsCents + taxCents;
+  const percent = (r: number) => `${(r * 100).toFixed(3).replace(/\.?0+$/, '')}%`;
+  const taxLabel = taxRates.services && taxRates.rate > 0 && productsCents > 0 && taxRates.retail > 0 && taxRates.retail !== taxRates.rate ? 'Tax'
+    : `Tax (${percent(taxRates.services && taxRates.rate > 0 ? taxRates.rate : taxRates.retail)})`;
+  const clear = () => { setLines([]); setClient(null); setCents(0); setError(''); setDiscountCents(0); setQty(1); setQtyDigits(null); setGuided(null); setStatus(null); };
 
   // ── The keypad (/barber's keys) ──
   const [cents, setCents] = useState(0);
@@ -202,7 +223,7 @@ export function TabletPos() {
     }
     setCents((c) => { const next = key === '00' ? c * 100 : c * 10 + Number(key); return next > MAX_CENTS ? c : next; });
   };
-  const runFn = (fn: 'quick' | 'retail' | 'gift' | 'tip' | 'discount') => {
+  const runFn = (fn: 'quick' | 'retail' | 'gift' | 'packages' | 'memberships' | 'discount') => {
     setError('');
     if (fn === 'quick') { setCents(0); if (guided !== null) { setGuided(null); say('QUICK TICKET CANCELLED'); } else setGuided(0); return; }
     if (fn === 'retail') {
@@ -211,7 +232,9 @@ export function TabletPos() {
       add({ label: 'Retail Item', priceCents: cents, kind: 'amount' }); setCents(0); return;
     }
     if (fn === 'gift') { router.push('/gift-cards' as Href); return; }
-    if (fn === 'tip') { setTip(cents); setCents(0); say(cents ? `TIP · ${money(cents)}` : 'NO TIP', 'ok'); return; }
+    // Sell a package or a membership on their own pages (owner, 2026-11-19), as Gift Card does.
+    if (fn === 'packages') { router.push('/packages' as Href); return; }
+    if (fn === 'memberships') { router.push('/memberships' as Href); return; }
     if (cents <= 0) return needAmount();
     if (cents > servicesCents) { say('A DISCOUNT CAN\'T BE MORE THAN THE SERVICES', 'error'); return; }
     setDiscountCents(cents); setCents(0); say(`DISCOUNT · ${money(cents)}`, 'ok');
@@ -240,6 +263,8 @@ export function TabletPos() {
   };
 
   // ── CHARGE ──
+  // The checkout open in the grid's place, with the sale's details.
+  const [paying, setPaying] = useState<Record<string, string> | null>(null);
   const charge = async () => {
     if (!lines.length || busy) return;
     if (!client) { setPicking(true); return; }
@@ -255,15 +280,11 @@ export function TabletPos() {
         ...(counts.size ? { products: [...counts].map(([productId, quantity]) => ({ productId, quantity })) } : {}),
       });
       const first = grouped[0]?.line.label ?? 'Sale';
-      router.push({
-        pathname: '/(tabs)/checkout',
-        params: {
-          appointmentId: String(sale.id), amountCents: String(servicesCents), clientName: client.name,
-          serviceName: grouped.length > 1 ? `${first} + ${grouped.length - 1} more` : first, phone: client.phone, email: client.email, quickSale: '1',
-          ...(tip != null ? { tipCents: String(tip) } : {}), ...(discount > 0 ? { discountCents: String(discount) } : {}),
-        },
+      setPaying({
+        appointmentId: String(sale.id), amountCents: String(servicesCents), clientName: client.name,
+        serviceName: grouped.length > 1 ? `${first} + ${grouped.length - 1} more` : first, phone: client.phone, email: client.email, quickSale: '1',
+        ...(discount > 0 ? { discountCents: String(discount) } : {}),
       });
-      clear();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not start the sale. Please try again.');
     } finally { setBusy(false); }
@@ -295,16 +316,11 @@ export function TabletPos() {
         ))}
       </ScrollView>
       <View style={styles.totals}>
-        {productsCents > 0 && servicesCents > 0 ? <>
-          <View style={styles.totalRow}><Text style={styles.subtle}>Services</Text><Text style={styles.subtle}>{money(servicesCents)}</Text></View>
-          <View style={styles.totalRow}><Text style={styles.subtle}>Products</Text><Text style={styles.subtle}>{money(productsCents)}</Text></View>
-        </> : null}
+        <View style={styles.totalRow}><Text style={styles.subtle}>Subtotal</Text><Text testID="tablet-pos-subtotal" style={styles.subtle}>{money(servicesCents + productsCents)}</Text></View>
         {discount > 0 ? <View style={styles.totalRow}><Text style={styles.subtle}>Discount</Text><View style={styles.adjust}><Text style={styles.subtle}>−{money(discount)}</Text>
           <TouchableOpacity testID="tablet-pos-remove-discount" accessibilityLabel="Remove discount" onPress={() => setDiscountCents(0)} style={styles.removeSmall}><Feather name="x" size={16} color={look.subtle} /></TouchableOpacity></View></View> : null}
-        {tip != null ? <View style={styles.totalRow}><Text style={styles.subtle}>Tip</Text><View style={styles.adjust}><Text style={styles.subtle}>{money(tip)}</Text>
-          <TouchableOpacity testID="tablet-pos-remove-tip" accessibilityLabel="Remove tip" onPress={() => setTip(null)} style={styles.removeSmall}><Feather name="x" size={16} color={look.subtle} /></TouchableOpacity></View></View> : null}
+        {taxCents > 0 ? <View style={styles.totalRow}><Text style={styles.subtle}>{taxLabel}</Text><Text testID="tablet-pos-tax" style={styles.subtle}>{money(taxCents)}</Text></View> : null}
         <View style={styles.totalRow}><Text style={styles.totalLabel}>Total</Text><Text testID="tablet-pos-total" style={styles.totalValue}>{money(totalCents)}</Text></View>
-        <Text style={styles.subtle}>{tip != null ? 'Tax is added at checkout.' : 'Tax and tip are added at checkout.'}</Text>
       </View>
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <View style={styles.actionRow}>
@@ -316,9 +332,9 @@ export function TabletPos() {
     </View>
   );
 
-  const fns: { id: 'quick' | 'retail' | 'gift' | 'tip' | 'discount'; label: string; icon: React.ComponentProps<typeof Feather>['name'] }[][] = [
+  const fns: { id: 'quick' | 'retail' | 'gift' | 'packages' | 'memberships' | 'discount'; label: string; icon: React.ComponentProps<typeof Feather>['name'] }[][] = [
     [{ id: 'quick', label: 'Quick Ticket', icon: 'zap' }, { id: 'retail', label: 'Retail', icon: 'shopping-bag' }, { id: 'gift', label: 'Gift Card', icon: 'gift' }],
-    [{ id: 'tip', label: 'Tip Adjust', icon: 'dollar-sign' }, { id: 'discount', label: 'Discount', icon: 'percent' }],
+    [{ id: 'packages', label: 'Packages', icon: 'package' }, { id: 'memberships', label: 'Memberships', icon: 'award' }, { id: 'discount', label: 'Discount', icon: 'percent' }],
   ];
   // Square keys (owner, 2026-11-19), as big as the keypad's width allows.
   const [keySize, setKeySize] = useState(0);
@@ -376,7 +392,14 @@ export function TabletPos() {
     finally { setSavingGrid(false); }
   };
 
-  const catalog = (
+  const catalog = paying ? (
+    <View style={styles.catalogColumn}>
+      <View style={[styles.panel, styles.catalog, styles.payPanel]} testID="tablet-pos-checkout">
+        <PaneHost pane={{ key: paying.appointmentId, Screen: CheckoutScreen, params: paying }}
+          onClose={(done) => { setPaying(null); if (done) clear(); }} />
+      </View>
+    </View>
+  ) : (
     <View style={styles.catalogColumn}>
       <View style={[styles.panel, styles.catalog]} testID="tablet-pos-catalog">
         {loading ? <ActivityIndicator color={look.violet} style={{ marginTop: 30 }} />
@@ -395,11 +418,15 @@ export function TabletPos() {
   return (
     <View style={[styles.root, { paddingTop: insets.top + 18, paddingBottom: insets.bottom }]}>
       <AppBackground />
+      {/* While the checkout is open the ticket and keypad wait (Back on the checkout brings them back). */}
       {wide ? (
-        <View style={styles.columns}>{ticket}{keypad}{catalog}</View>
+        <View style={styles.columns}>
+          <View pointerEvents={paying ? 'none' : 'auto'} style={[styles.locked, paying && styles.lockedOn]}>{ticket}{keypad}</View>
+          {catalog}
+        </View>
       ) : (
         <View style={styles.columns}>
-          <View style={styles.leftColumn}>{ticket}{keypad}</View>
+          <View pointerEvents={paying ? 'none' : 'auto'} style={[styles.leftColumn, paying && styles.lockedOn]}>{ticket}{keypad}</View>
           {catalog}
         </View>
       )}
@@ -426,6 +453,9 @@ const styles = StyleSheet.create({
   // never under it; the gear sits in that row on the left.
   catalogColumn: { flex: 1, minHeight: 0, gap: 12, paddingBottom: 4 },
   catalog: { flex: 1, minHeight: 0 },
+  payPanel: { padding: 0, overflow: 'hidden' },
+  locked: { flexDirection: 'row', gap: 14, minHeight: 0 },
+  lockedOn: { opacity: 0.55 },
   gearShadow: { alignSelf: 'flex-start', borderRadius: 22, shadowColor: '#4C1D95', shadowOpacity: 0.35, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 8 },
   gear: { width: 62, height: 62, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   clientRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: look.cardBorder },

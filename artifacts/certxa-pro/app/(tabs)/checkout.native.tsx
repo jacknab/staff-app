@@ -14,7 +14,8 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router } from 'expo-router';
+import { useInPane, usePaneClose, useScreenParams } from '@/components/TabletSplit';
 import { useStripeTerminal } from '@stripe/stripe-terminal-react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { useColors } from '@/hooks/useColors';
@@ -46,7 +47,7 @@ import { look, cardShadow } from '@/components/look/tokens';
 // Stripe M2 does not require that Apple entitlement.
 const TAP_TO_PAY_ENABLED = true;
 // Shown on the payment screen so a tester can tell which build is installed.
-const BUILD_LABEL = 'Build Nov 19 · W';
+const BUILD_LABEL = 'Build Nov 19 · X';
 const EXPO_GO_PREVIEW = process.env.EXPO_PUBLIC_EXPO_GO_PREVIEW === '1';
 
 type PaymentStep = 'idle' | 'tap_intro' | 'initializing' | 'discovering' | 'connecting' | 'ready' | 'processing' | 'capture_pending' | 'success' | 'error';
@@ -93,7 +94,8 @@ export default function CheckoutScreen() {
       setRebooking(false);
     }
   };
-  const params = useLocalSearchParams<{ appointmentId?: string; clientName?: string; serviceName?: string; amountCents?: string; depositCents?: string; phone?: string; email?: string; quickSale?: string; clientId?: string; serviceIds?: string; tipCents?: string; discountCents?: string }>();
+  // On a tablet the POS shows this checkout in its right side (components/TabletSplit.tsx): the details come from there.
+  const params = useScreenParams<{ appointmentId?: string; clientName?: string; serviceName?: string; amountCents?: string; depositCents?: string; phone?: string; email?: string; quickSale?: string; clientId?: string; serviceIds?: string; tipCents?: string; discountCents?: string }>();
   const [digits, setDigits] = useState('0');
   const [tipCents, setTipCents] = useState(0);
   const [appointmentId, setAppointmentId] = useState('');
@@ -116,22 +118,18 @@ export default function CheckoutScreen() {
   const topInset = insets.top;
   const selectedMethod = paymentMethods.find((method) => method.key === paymentMethod) || paymentMethods[0];
 
-  // Opened again for another sale while the last one still shows "Payment successful": start fresh.
+  // The tip comes last (owner, 2026-11-19): checkout opens on the ways to pay. Tap to Pay or Card reader first asks for
+  // the tip (tipFor), then starts that payment. A tip already set with the tablet POS's Tip Adjust key skips the question.
+  const [tipFor, setTipFor] = useState<ReaderMode | null>(null);
+  const presetTip = params.tipCents != null ? Math.max(0, Math.round(Number(params.tipCents) || 0)) : null;
+  // Opened for a sale (again, or another one): start on the ways to pay.
   useEffect(() => {
-    if (step === 'success' && params.appointmentId && String(params.appointmentId) !== appointmentId) {
-      setStep('idle'); setTipCents(0); setPaymentIntentId(null); setError(''); setStatusText('');
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.appointmentId]);
-  // The tablet POS's Tip Adjust key (owner, 2026-11-19): the tip is already chosen, so the tip screen is skipped.
-  useEffect(() => {
-    if (params.tipCents == null || step !== 'idle' || !params.appointmentId) return;
-    const tip = Math.max(0, Math.round(Number(params.tipCents) || 0));
-    setTipCents(tip);
-    setDigits(String((Number(params.amountCents) || 0) + tip));
+    if (!params.appointmentId || (step !== 'idle' && step !== 'success')) return;
+    if (step === 'success' && String(params.appointmentId) === appointmentId) return;
+    setTipFor(null); setTipCents(presetTip ?? 0); setPaymentIntentId(null); setError(''); setStatusText('');
     setStep('tap_intro');
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.appointmentId, params.tipCents]);
+  }, [params.appointmentId, step === 'idle']);
   // A POS quick sale (app/(tabs)/pos.tsx) is its own ticket; leaving before paying removes it again.
   const isQuickSale = params.quickSale === '1';
 
@@ -845,6 +843,7 @@ export default function CheckoutScreen() {
   };
 
   const exitReaderCheckout = async () => {
+    if (step === 'tap_intro') { leaveCheckout(); return; }
     if (pendingCaptureId) {
       setError('Retry capture before leaving. This payment is authorized but not finalized.');
       return;
@@ -853,7 +852,8 @@ export default function CheckoutScreen() {
     setLocationId(null);
     setPaymentIntentId(null);
     setError('');
-    setStep('idle');
+    // Back to the ways to pay.
+    setStep('tap_intro');
     setStatusText('');
   };
 
@@ -878,15 +878,58 @@ export default function CheckoutScreen() {
     setProducts([]); setGiftPaidCents(0); setCashPartCents(0); setCreditPaidCents(0); setCreditBalanceCents(0);
     void clearPendingTerminalCapture();
   };
+  const inPane = useInPane();
+  const closePane = usePaneClose();
   const resetCheckout = () => {
     clearCheckout();
-    if (isQuickSale) router.replace('/(tabs)/pos');
+    // Paid: the tablet POS takes its grid back and starts a new ticket.
+    if (isQuickSale) { if (inPane) closePane(true); else router.replace('/(tabs)/pos'); }
+  };
+  // Back from the ways to pay: out of the checkout. An unpaid quick sale's ticket is removed (refused by the server once
+  // anything was paid).
+  const leaveCheckout = () => {
+    if (isQuickSale) {
+      const saleId = Number(params.appointmentId);
+      if (Number.isInteger(saleId) && saleId > 0) void api.del(`/api/quick-sales/${saleId}`).catch(() => undefined);
+      clearCheckout();
+      if (inPane) closePane(); else router.replace('/(tabs)/pos');
+      return;
+    }
+    clearCheckout();
+    if (router.canGoBack()) router.back(); else router.replace('/(tabs)');
+  };
+  // What is due before the tip: the visit after the discount, products, tax, the card fee, less what is already paid.
+  const dueBeforeTip = Math.max(0, baseCentsParam - discountCents + productCents + taxCents - depositCents - partialCents + feeCents);
+  const chooseCard = (mode: ReaderMode) => {
+    if (cardsOff) return;
+    if (presetTip != null) { startCard(mode); return; }
+    setTipFor(mode);
   };
   // A receipt sent from "Payment successful" finishes the checkout: back to Home (owner, 2026-11-15).
   const goHome = () => {
     clearCheckout();
+    // In the tablet POS: the grid comes back with a new ticket.
+    if (inPane) { closePane(true); return; }
     router.replace('/(tabs)');
   };
+
+  // Tap to Pay or Card reader chosen: the tip, then that payment starts.
+  if (tipFor) {
+    return <TipCheckout
+      baseCents={Number(params.amountCents) || 0}
+      presets={tipPresets}
+      defaultPercent={defaultTip}
+      serviceName={String(params.serviceName || '')}
+      onBack={() => setTipFor(null)}
+      onConfirmTip={(nextTipCents) => {
+        const mode = tipFor;
+        setTipCents(nextTipCents);
+        setDigits(String(dueBeforeTip + nextTipCents));
+        setTipFor(null);
+        startCard(mode);
+      }}
+    />;
+  }
 
   if (step !== 'idle') {
     const isTapIntro = step === 'tap_intro';
@@ -902,7 +945,8 @@ export default function CheckoutScreen() {
         <AppBackground />
         <StatusBar barStyle="dark-content" />
         <View style={styles.tapHeader}>
-          {/* Back to the tip screen. Not while a card payment is going through, or one is waiting to be finalized. */}
+          {/* Back: from a card payment to the ways to pay; from the ways to pay out of the checkout. Not while a card payment
+              is going through, or one is waiting to be finalized. */}
           {isSuccess ? <View style={{ width: 84 }} /> : (
             <TouchableOpacity disabled={isCapturePending || step === 'processing'} testID="cancel-reader" onPress={exitReaderCheckout}
               style={styles.backButton} accessibilityRole="button" accessibilityLabel="Back">
@@ -1037,8 +1081,8 @@ export default function CheckoutScreen() {
                <Switch testID="save-card-switch" value={saveCard} onValueChange={setSaveCard} trackColor={{ true: colors.primary, false: colors.border }} accessibilityLabel="Save card on file" />
              </View> : null}
              {isTapIntro ? <View testID="payment-methods" style={[styles.payList, { backgroundColor: colors.card, borderColor: colors.border }]}>
-               <MethodRow testID="start-tap-to-pay" icon="smartphone" title="Tap to Pay on iPhone" sub={cardsOff ? 'Set up card payments first' : 'Hold the card near this phone'} disabled={isBusy || cardsOff || !!charging} onPress={() => startCard('tap_to_pay')} colors={colors} />
-               <MethodRow testID="start-stripe-m2" icon="credit-card" title="Card reader" sub={connectedReader && readerMode === 'm2' ? `Connected${typeof (connectedReader as any).batteryLevel === 'number' ? ` · ${Math.round((connectedReader as any).batteryLevel * 100)}% battery` : ''}` : 'Stripe M2'} disabled={isBusy || cardsOff || !!charging} onPress={() => startCard('m2')} colors={colors} />
+               <MethodRow testID="start-tap-to-pay" icon="smartphone" title="Tap to Pay on iPhone" sub={cardsOff ? 'Set up card payments first' : 'Hold the card near this phone'} disabled={isBusy || cardsOff || !!charging} onPress={() => chooseCard('tap_to_pay')} colors={colors} />
+               <MethodRow testID="start-stripe-m2" icon="credit-card" title="Card reader" sub={connectedReader && readerMode === 'm2' ? `Connected${typeof (connectedReader as any).batteryLevel === 'number' ? ` · ${Math.round((connectedReader as any).batteryLevel * 100)}% battery` : ''}` : 'Stripe M2'} disabled={isBusy || cardsOff || !!charging} onPress={() => chooseCard('m2')} colors={colors} />
                {savedCard ? <MethodRow testID="pay-card-on-file" icon="credit-card" title={`Card on file${savedCard.last4 ? ` (${savedCard.last4})` : ''}`} sub={charging === 'saved' ? 'Charging…' : undefined} disabled={isBusy || cardsOff || !!charging} onPress={payWithSavedCard} colors={colors} /> : null}
                {Number(appointmentId) > 0 ? <MethodRow testID="pay-new-card" icon="edit-3" title="Enter new card" sub={charging === 'keyed' ? 'Waiting for the card…' : undefined} disabled={isBusy || cardsOff || !!charging} onPress={() => void payWithoutReader('keyed')} colors={colors} /> : null}
                {Number(appointmentId) > 0 && creditBalanceCents > 0 && creditPaidCents === 0 && offlineDueCents > 0 ? <MethodRow testID="pay-credit" icon="award" title="Client credit" sub={recording ? 'Recording…' : dollars(String(Math.min(creditBalanceCents, offlineDueCents)))} disabled={recording || isBusy || !!charging} onPress={() => void recordOfflinePayment('credit')} colors={colors} /> : null}
