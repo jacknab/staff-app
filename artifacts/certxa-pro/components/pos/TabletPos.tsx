@@ -172,6 +172,10 @@ export function TabletPos({ bookRequest }: { bookRequest?: BookRequest | null } 
   const cashHandler = useRef<((cents: number) => void) | null>(null);
   const bridge = useMemo<PosPayBridge>(() => ({ report: setPayState, setCashHandler: (h) => { cashHandler.current = h; } }), []);
   const [discountCents, setDiscountCents] = useState(0);
+  // A percent off the services (Discount key's buttons, set in Settings › Card reader & Checkout), or null for an amount.
+  const [discountPct, setDiscountPct] = useState<number | null>(null);
+  const [discountChoices, setDiscountChoices] = useState<number[]>([10, 20]);
+  useEffect(() => { api.get<{ percents: number[] }>('/api/pro/pos-discounts').then((r) => { if (Array.isArray(r?.percents) && r.percents.length) setDiscountChoices(r.percents); }).catch(() => undefined); }, []);
   // The line over the keypad (as /barber's): what just happened, or what to type next.
   const [status, setStatus] = useState<{ text: string; tone: 'info' | 'ok' | 'error' } | null>(null);
   const say = (text: string, tone: 'info' | 'ok' | 'error' = 'info') => setStatus({ text, tone });
@@ -200,7 +204,7 @@ export function TabletPos({ bookRequest }: { bookRequest?: BookRequest | null } 
   }, [lines]);
   const servicesCents = lines.filter((l) => l.kind !== 'product').reduce((n, l) => n + l.priceCents, 0);
   const productsCents = lines.filter((l) => l.kind === 'product').reduce((n, l) => n + l.priceCents, 0);
-  const discount = Math.min(discountCents, servicesCents);
+  const discount = Math.min(discountPct != null ? Math.round(servicesCents * discountPct / 100) : discountCents, servicesCents);
   // Tax on the services after the discount, and on products; never on a tip (the checkout's rule).
   // A gift card sold is money held for the client, not a sale: no tax on it.
   const giftCardCents = lines.filter((l) => l.kind === 'giftcard').reduce((n, l) => n + l.priceCents, 0);
@@ -209,7 +213,7 @@ export function TabletPos({ bookRequest }: { bookRequest?: BookRequest | null } 
   const percent = (r: number) => `${(r * 100).toFixed(3).replace(/\.?0+$/, '')}%`;
   const taxLabel = taxRates.services && taxRates.rate > 0 && productsCents > 0 && taxRates.retail > 0 && taxRates.retail !== taxRates.rate ? 'Tax'
     : `Tax (${percent(taxRates.services && taxRates.rate > 0 ? taxRates.rate : taxRates.retail)})`;
-  const clear = () => { setLines([]); setClient(null); setCents(0); setError(''); setDiscountCents(0); setQty(1); setQtyDigits(null); setGuided(null); setStatus(null); };
+  const clear = () => { setLines([]); setClient(null); setCents(0); setError(''); setDiscountCents(0); setDiscountPct(null); setQty(1); setQtyDigits(null); setGuided(null); setStatus(null); };
 
   // ── The keypad (/barber's keys) ──
   const [cents, setCents] = useState(0);
@@ -279,9 +283,8 @@ export function TabletPos({ bookRequest }: { bookRequest?: BookRequest | null } 
     if (fn === 'gift') { setPanel('gift'); return; }
     if (fn === 'packages') { setPanel('packages'); return; }
     if (fn === 'memberships') { setPanel('memberships'); return; }
-    if (cents <= 0) return needAmount();
-    if (cents > servicesCents) { say('A DISCOUNT CAN\'T BE MORE THAN THE SERVICES', 'error'); return; }
-    setDiscountCents(cents); setCents(0); say(`DISCOUNT · ${money(cents)}`, 'ok');
+    // Discount opens its buttons in the grid (owner, 2026-11-19): the percents from Settings, a typed $ amount, none.
+    setPanel('discount');
   };
   const prompt = paying && payState && !payState.paid ? (payState.error || payState.message || (payState.keypad === 'gift' ? 'GIFT CARD: TYPE THE NUMBER, THEN ENTER' : 'CASH: TYPE THE AMOUNT, THEN ENTER')).toUpperCase()
     : guided !== null ? `${steps[guided].toUpperCase()} AMOUNT · THEN ENTER` : qtyDigits !== null ? 'QTY: TYPE HOW MANY, THEN TAP THE ITEM' : null;
@@ -362,8 +365,8 @@ export function TabletPos({ bookRequest }: { bookRequest?: BookRequest | null } 
       </ScrollView>
       <View style={styles.totals}>
         <View style={styles.totalRow}><Text style={styles.subtle}>Subtotal</Text><Text testID="tablet-pos-subtotal" style={styles.subtle}>{money(servicesCents + productsCents)}</Text></View>
-        {discount > 0 ? <View style={styles.totalRow}><Text style={styles.subtle}>Discount</Text><View style={styles.adjust}><Text style={styles.subtle}>−{money(discount)}</Text>
-          <TouchableOpacity testID="tablet-pos-remove-discount" accessibilityLabel="Remove discount" onPress={() => setDiscountCents(0)} style={styles.removeSmall}><Feather name="x" size={16} color={look.subtle} /></TouchableOpacity></View></View> : null}
+        {discount > 0 ? <View style={styles.totalRow}><Text style={styles.subtle}>{discountPct != null ? `Discount (${discountPct}%)` : 'Discount'}</Text><View style={styles.adjust}><Text style={styles.subtle}>−{money(discount)}</Text>
+          <TouchableOpacity testID="tablet-pos-remove-discount" accessibilityLabel="Remove discount" onPress={() => { setDiscountCents(0); setDiscountPct(null); }} style={styles.removeSmall}><Feather name="x" size={16} color={look.subtle} /></TouchableOpacity></View></View> : null}
         {taxCents > 0 ? <View style={styles.totalRow}><Text style={styles.subtle}>{taxLabel}</Text><Text testID="tablet-pos-tax" style={styles.subtle}>{money(taxCents)}</Text></View> : null}
         <View style={styles.totalRow}><Text style={styles.totalLabel}>Total</Text><Text testID="tablet-pos-total" style={styles.totalValue}>{money(totalCents)}</Text></View>
         {/* Paying: what is paid so far and what is left, as /nail's cart shows it. */}
@@ -445,7 +448,12 @@ export function TabletPos({ bookRequest }: { bookRequest?: BookRequest | null } 
   );
 
   // ── Gift Card, Packages and Memberships: the grid shows their options, in the same keys ──
-  const [panel, setPanel] = useState<null | 'gift' | 'packages' | 'memberships'>(null);
+  const [panel, setPanel] = useState<null | 'gift' | 'packages' | 'memberships' | 'discount'>(null);
+  const discountAmount = () => {
+    if (cents <= 0) { say('TYPE THE AMOUNT OFF, THEN TAP $ AMOUNT', 'error'); return; }
+    if (cents > servicesCents) { say('A DISCOUNT CAN\'T BE MORE THAN THE SERVICES', 'error'); return; }
+    setDiscountPct(null); setDiscountCents(cents); setCents(0); setPanel(null); say(`DISCOUNT · ${money(cents)}`, 'ok');
+  };
   const [shopPackages, setShopPackages] = useState<ShopPackage[] | null>(null);
   const [plans, setPlans] = useState<Plan[] | null>(null);
   useEffect(() => {
@@ -475,6 +483,12 @@ export function TabletPos({ bookRequest }: { bookRequest?: BookRequest | null } 
     { kind: 'action', id: 'gift-lookup', title: 'Look up / redeem', icon: 'search', onPress: () => router.push('/gift-cards' as Href) },
   ] : panel === 'packages' ? (shopPackages ?? []).map((p) => ({ kind: 'action' as const, id: `pack-${p.id}`, title: p.name, price: money(p.priceCents), sub: `${p.visits} visits`,
       onPress: () => add({ label: p.name, priceCents: p.priceCents, kind: 'packageSale', packageId: p.id }) }))
+    : panel === 'discount' ? [
+      ...discountChoices.map((pct) => ({ kind: 'action' as const, id: `discount-${pct}`, title: `${pct}% off`, sub: servicesCents ? `−${money(Math.round(servicesCents * pct / 100))}` : undefined,
+        onPress: () => { setDiscountCents(0); setDiscountPct(pct); setPanel(null); say(`DISCOUNT · ${pct}%`, 'ok'); } })),
+      { kind: 'action' as const, id: 'discount-amount', title: '$ amount', sub: 'Type it first', onPress: discountAmount },
+      { kind: 'action' as const, id: 'discount-none', title: 'No discount', icon: 'x', onPress: () => { setDiscountCents(0); setDiscountPct(null); setPanel(null); say('NO DISCOUNT', 'ok'); } },
+    ]
     : panel === 'memberships' ? (plans ?? []).map((p) => ({ kind: 'action' as const, id: `plan-${p.id}`, title: p.name, price: money(p.priceCents), sub: p.interval === 'year' ? 'a year' : 'a month', onPress: () => startMembership(p) }))
     : [];
 
@@ -554,7 +568,7 @@ export function TabletPos({ bookRequest }: { bookRequest?: BookRequest | null } 
     const who = clients.find((c) => String(c.customerId) === String(bookRequest.clientId ?? ''))
       ?? (bookRequest.phone && digits(bookRequest.phone).length === 10 ? clients.find((c) => digits(c.phone) === digits(bookRequest.phone!)) : undefined);
     setPaying(null); setPanel(null); setBooking(null);
-    setLines([]); setDiscountCents(0);
+    setLines([]); setDiscountCents(0); setDiscountPct(null);
     setClient(who ? { customerId: who.customerId, name: who.name, phone: who.phone, email: who.email ?? '' } : null);
     const [y, m, d] = String(bookRequest.day ?? '').split('-').map(Number);
     setBookDay(y && m !== undefined && d ? new Date(y, m, d) : null);
@@ -596,7 +610,7 @@ export function TabletPos({ bookRequest }: { bookRequest?: BookRequest | null } 
         ) : panel ? (
           (panel === 'packages' && shopPackages == null) || (panel === 'memberships' && plans == null) ? <ActivityIndicator color={look.violet} style={{ marginTop: 30 }} />
             : optionKeys.length === 0 ? <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 }}>
-                <Text style={[styles.subtle, styles.empty]}>{panel === 'packages' ? 'No packages for sale yet. Make them in Packages.' : 'No membership plans yet. Make them in Memberships.'}</Text>
+                <Text style={styles.noneText}>{panel === 'packages' ? 'No Packages' : 'No Memberships'}</Text>
                 <TouchableOpacity testID="pos-option-back" onPress={() => setPanel(null)} style={styles.secondaryButton}><Text style={styles.secondaryText}>BACK</Text></TouchableOpacity>
               </View>
             : <OptionGrid key={panel} testID={`pos-options-${panel}`} items={optionKeys} columns={posGridColumns(gridConfig)} onBack={() => setPanel(null)} />
@@ -666,6 +680,7 @@ const styles = StyleSheet.create({
   underGrid: { flexDirection: 'row', gap: 12 },
   gearShadow: { alignSelf: 'flex-start', borderRadius: 22, shadowColor: '#4C1D95', shadowOpacity: 0.35, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 8 },
   gear: { width: 62, height: 62, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  noneText: { fontSize: 28, fontFamily: 'Inter_700Bold', color: look.subtle },
   bookedRow: { borderRadius: 12, backgroundColor: look.tile, paddingHorizontal: 12, paddingVertical: 10, marginTop: 10 },
   bookedText: { fontSize: 17, fontFamily: 'Inter_700Bold', color: look.violetDeep, textAlign: 'center' },
   clientRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: look.cardBorder },

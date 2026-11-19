@@ -52,6 +52,11 @@ const TITLES: Record<Screen, string> = {
   approval: 'Booking approval', blocked: 'Blocked clients', phone: 'Business Phone', website: 'Website', stripe: 'Stripe account', readers: 'Connect card reader', deposits: 'Deposits', tax: 'Card reader & Checkout', account: 'Account',
 };
 
+/** The POS discount buttons on the Card reader & Checkout draft ("10, 20"), saved with the rest (Edit's back restores them). */
+function withDiscounts<T extends { saved: Record<string, any> }>(draft: T, percents: number[]) {
+  const discounts = percents.join(', ');
+  return { ...draft, discounts, saved: { ...draft.saved, discounts } };
+}
 function errorText(cause: unknown, fallback: string) { return cause instanceof Error && cause.message ? cause.message : fallback; }
 function minutesOf(time: string) { const [h, m] = time.split(':').map(Number); return (h || 0) * 60 + (m || 0); }
 function formatPhone(raw: string) { const d = (raw ?? '').replace(/\D/g, '').replace(/^1(?=\d{10}$)/, ''); return d.length === 10 ? `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}` : raw; }
@@ -168,8 +173,10 @@ export default function SettingsScreen() {
       else if (next === 'tax') {
         // Card reader & Checkout (owner, 2026-11-11; after GlossGenius's): the client's card fee, service and retail
         // sales tax, and the tip choices clients see. Each value has its own Edit, like GlossGenius.
-        const [tax, tips] = await Promise.all([api.get<Record<string, any>>(`/api/pos-settings/${current.id}`), api.get<{ presets?: number[]; defaultPreset?: number | null }>('/api/tip-presets').catch(() => null)]);
-        setDraft(checkoutDraft(tax, tips));
+        // POS discount buttons (owner, 2026-11-19): the percents the tablet POS's Discount key offers.
+        const [tax, tips, discounts] = await Promise.all([api.get<Record<string, any>>(`/api/pos-settings/${current.id}`), api.get<{ presets?: number[]; defaultPreset?: number | null }>('/api/tip-presets').catch(() => null),
+          api.get<{ percents: number[] }>('/api/pro/pos-discounts').catch(() => ({ percents: [10, 20] }))]);
+        setDraft(withDiscounts(checkoutDraft(tax, tips), discounts.percents));
       }
     } catch (cause) { setError(errorText(cause, 'Could not load this from Certxa.')); }
     finally { setLoading(false); }
@@ -283,8 +290,11 @@ export default function SettingsScreen() {
         salesTaxRate: (service / 100).toFixed(4), taxServicesTaxable: service > 0,
         retailTaxRate: (retail / 100).toFixed(4), taxProductsTaxable: retail > 0,
       });
+      const percents = String(draft.discounts ?? '').split(/[\s,%]+/).filter(Boolean).map(Number);
+      if (!percents.length || percents.length > 8 || percents.some((n) => !Number.isInteger(n) || n < 1 || n > 100)) throw new Error('POS discounts are 1 to 8 whole percents from 1 to 100, like 10, 20.');
       const saved = await api.put<{ presets: number[]; defaultPreset?: number | null }>('/api/tip-presets', { presets: tips, defaultPreset: defaultTip || null });
-      setDraft(checkoutDraft({ ...tax, clientFeeRate: fee / 100, salesTaxRate: service / 100, taxServicesTaxable: service > 0, retailTaxRate: retail / 100, taxProductsTaxable: retail > 0 }, saved));
+      const discounts = await api.put<{ percents: number[] }>('/api/pro/pos-discounts', { percents });
+      setDraft(withDiscounts(checkoutDraft({ ...tax, clientFeeRate: fee / 100, salesTaxRate: service / 100, taxServicesTaxable: service > 0, retailTaxRate: retail / 100, taxProductsTaxable: retail > 0 }, saved), discounts.percents));
     });
   };
 
@@ -770,6 +780,11 @@ export default function SettingsScreen() {
         <Help>Tax rules differ by place, so check with your tax adviser before changing this.</Help>
         {saveButton()}
       </>);
+      if (draft.editing === 'discounts') return (<>
+        <Label>POS discount buttons (%)</Label>{field('discounts', '10, 20', { keyboardType: 'numbers-and-punctuation' })}
+        <Help>The tablet POS's Discount key shows a button for each, like 10, 20. Up to 8, whole percents.</Help>
+        {saveButton()}
+      </>);
       if (draft.editing === 'tips') {
         const filled = tips.map((t) => Number(t.trim())).filter((t) => Number.isInteger(t) && t > 0);
         return (<>
@@ -791,6 +806,7 @@ export default function SettingsScreen() {
         {valueRow('service', 'Service sales tax', pct(draft.service))}
         {valueRow('retail', 'Retail sales tax', pct(draft.retail))}
         {valueRow('tips', 'Tip customized options', Number(draft.defaultTip) ? `${tipList} · ${draft.defaultTip}% selected by default` : tipList)}
+        {valueRow('discounts', 'POS discount buttons', String(draft.discounts ?? '').split(/[\s,%]+/).filter(Boolean).map((n) => `${n}%`).join(', ') || 'None')}
       </>);
     }
     return (<>
