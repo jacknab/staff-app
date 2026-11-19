@@ -20,6 +20,8 @@ import { ClientAvatar } from '@/components/ClientAvatar';
 
 import { AppBackground } from '@/components/look/AppBackground';
 import { look, cardShadow } from '@/components/look/tokens';
+import { useIsTablet } from '@/components/TabletLauncher';
+import { TabletPos } from '@/components/pos/TabletPos';
 const MAX_CENTS = 10_000_000; // $100,000
 const MIN_CENTS = 50; // Stripe's smallest card payment
 
@@ -30,7 +32,12 @@ const digitsOnly = (value: string) => value.replace(/\D/g, '');
 
 type Picked = { customerId: number; name: string; phone: string; email: string };
 
+// Tablets get the full POS (owner, 2026-11-19; components/pos/TabletPos.tsx); phones keep this quick sale.
 export default function PosScreen() {
+  return useIsTablet() ? <TabletPos /> : <PhonePos />;
+}
+
+function PhonePos() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { clients, addQuickClient } = useBookingData();

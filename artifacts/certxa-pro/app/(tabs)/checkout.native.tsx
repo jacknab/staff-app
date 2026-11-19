@@ -46,7 +46,7 @@ import { look, cardShadow } from '@/components/look/tokens';
 // Stripe M2 does not require that Apple entitlement.
 const TAP_TO_PAY_ENABLED = true;
 // Shown on the payment screen so a tester can tell which build is installed.
-const BUILD_LABEL = 'Build Nov 19 · Q';
+const BUILD_LABEL = 'Build Nov 19 · R';
 const EXPO_GO_PREVIEW = process.env.EXPO_PUBLIC_EXPO_GO_PREVIEW === '1';
 
 type PaymentStep = 'idle' | 'tap_intro' | 'initializing' | 'discovering' | 'connecting' | 'ready' | 'processing' | 'capture_pending' | 'success' | 'error';
@@ -364,7 +364,8 @@ export default function CheckoutScreen() {
   useEffect(() => {
     const id = Number(params.appointmentId);
     setProducts([]); setGiftPaidCents(0); setCashPartCents(0); setCreditPaidCents(0); setCreditBalanceCents(0);
-    if (EXPO_GO_PREVIEW || !id || params.quickSale === '1') return;
+    // A quick sale from the tablet POS can hold products too (owner, 2026-11-19), so they are read for it as well.
+    if (EXPO_GO_PREVIEW || !id) return;
     api.get<{ products: ProductLine[]; giftCard: { redeemedCents: number }; credit?: { usedCents: number; balanceCents: number } }>(`/api/pro/appointments/${id}/checkout`).then((r) => {
       setProducts(Array.isArray(r?.products) ? r.products : []);
       setGiftPaidCents(Number(r?.giftCard?.redeemedCents) || 0);
