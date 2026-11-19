@@ -44,13 +44,14 @@ import { usePaymentsReady } from '@/lib/usePaymentsReady';
 
 import { AppBackground } from '@/components/look/AppBackground';
 import { look, cardShadow } from '@/components/look/tokens';
+import { useOpenBooking } from '@/lib/openBooking';
 // Tap to Pay on iPhone needs Apple's managed entitlement in the provisioning
 // profile. Today only the development profile carries it (the "preview-dev"
 // EAS build profile), so ad hoc and App Store builds cannot use it yet.
 // Stripe M2 does not require that Apple entitlement.
 const TAP_TO_PAY_ENABLED = true;
 // Shown on the payment screen so a tester can tell which build is installed.
-const BUILD_LABEL = 'Build Nov 20 · C';
+const BUILD_LABEL = 'Build Nov 20 · D';
 const EXPO_GO_PREVIEW = process.env.EXPO_PUBLIC_EXPO_GO_PREVIEW === '1';
 
 type PaymentStep = 'idle' | 'tap_intro' | 'initializing' | 'discovering' | 'connecting' | 'ready' | 'processing' | 'capture_pending' | 'success' | 'error';
@@ -951,6 +952,8 @@ export default function CheckoutScreen() {
   };
   const inPane = useInPane();
   const closePane = usePaneClose();
+  // Choose another time: New booking on a phone, the POS's booking on a tablet (lib/openBooking.ts).
+  const openBooking = useOpenBooking();
   const isTablet = useIsTablet();
   const resetCheckout = () => {
     clearCheckout();
@@ -1061,7 +1064,7 @@ export default function CheckoutScreen() {
               {nextWeeks ? <>
                 <TouchableOpacity testID="rebook-calendar" onPress={() => { const d = nextDay(); clearCheckout(); setCalendarDate(d); router.replace('/(tabs)/calendar'); }} style={[styles.primaryButton, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, marginBottom: 0 }]}><Text style={[styles.primaryButtonText, { color: colors.foreground }]}>See my calendar</Text></TouchableOpacity>
                 <TouchableOpacity testID="rebook-instant" disabled={rebooking} onPress={() => void instantBook()} style={[styles.primaryButton, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, marginBottom: 0 }]}><Text style={[styles.primaryButtonText, { color: colors.foreground }]}>{rebooking ? 'Booking…' : 'Instant book'}</Text></TouchableOpacity>
-                <TouchableOpacity testID="rebook-choose" onPress={() => { const d = nextDay(); const next = { clientId: String(params.clientId ?? ''), phone: String(params.phone ?? ''), serviceIds: String(params.serviceIds ?? ''), day: `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}` }; clearCheckout(); router.push({ pathname: '/booking', params: next }); }} style={[styles.primaryButton, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, marginBottom: 0 }]}><Text style={[styles.primaryButtonText, { color: colors.foreground }]}>Choose another time</Text></TouchableOpacity>
+                <TouchableOpacity testID="rebook-choose" onPress={() => { const d = nextDay(); const next = { clientId: String(params.clientId ?? ''), phone: String(params.phone ?? ''), serviceIds: String(params.serviceIds ?? ''), day: `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}` }; clearCheckout(); openBooking(next); }} style={[styles.primaryButton, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, marginBottom: 0 }]}><Text style={[styles.primaryButtonText, { color: colors.foreground }]}>Choose another time</Text></TouchableOpacity>
               </> : null}
               {rebookNote ? <Text testID="rebook-note" style={[styles.setupText, { color: colors.primary }]}>{rebookNote}</Text> : null}
             </View> : null}

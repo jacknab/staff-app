@@ -21,6 +21,7 @@ import { APP_MAX_WIDTH } from '@/components/TabletFrame';
 import { look, cardShadow } from '@/components/look/tokens';
 import { usePaymentsReady } from '@/lib/usePaymentsReady';
 import { useInPane, usePaneClose, usePaneSetParams, useScreenParams } from '@/components/TabletSplit';
+import { useOpenBooking } from '@/lib/openBooking';
 /** Every quarter hour of the working day, and the booking's own time when it is between them. */
 function timeChoices(current: string): string[] {
   const label = (m: number) => `${((Math.floor(m / 60) + 11) % 12) + 1}:${String(m % 60).padStart(2, '0')} ${m < 720 ? 'AM' : 'PM'}`;
@@ -242,10 +243,9 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
   const partRefunded = paidRecorded && refundedCents > 0 && refundable > 0;
   const [refundOpen, setRefundOpen] = useState(false);
   const rebookServiceIds = [Number(params.serviceId) || 0, ...extraLines.map((line) => services.find((item) => item.name === line.label)?.id ?? 0)].filter((v) => v > 0).join(',');
-  const rebook = () => router.push({
-    pathname: '/booking',
-    params: { clientId: params.customerId ?? '', phone: params.phone ?? '', serviceIds: rebookServiceIds },
-  });
+  // Rebook: New booking on a phone, the POS's booking on a tablet (lib/openBooking.ts).
+  const openBooking = useOpenBooking();
+  const rebook = () => openBooking({ clientId: params.customerId ?? '', phone: params.phone ?? '', serviceIds: rebookServiceIds });
 
   const shiftDay = (amount: number) => setDay((current) => {
     const next = new Date(current);

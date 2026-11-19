@@ -16,6 +16,10 @@
  * CHARGE makes the sale a ticket of its own for the client (POST /api/quick-sales with its lines and products, kept off
  * the calendar) and the usual checkout opens in the grid's place (cash, gift card, card; the tip is asked last, before a
  * card payment). Paid, the grid comes back with a new ticket; Back keeps the ticket to change it.
+ *
+ * BOOK books the ticket's services and add-ons as an appointment instead (owner, 2026-11-19, /nail's way without its
+ * technician step): the days and times show in the grid's place (components/pos/BookingGrid.tsx). On a tablet every
+ * New booking in the app opens here (lib/openBooking.ts) with its client, services and day.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Feather } from '@expo/vector-icons';
@@ -31,6 +35,9 @@ import { PaneHost } from '@/components/TabletSplit';
 import { PosPayBridgeContext, type PosPayBridge, type PosPayState } from '@/lib/posPayBridge';
 import CheckoutScreen from '@/app/(tabs)/checkout';
 import { ClientLookup } from '@/components/pos/ClientLookup';
+import { BookingGrid, type BookingSlot } from '@/components/pos/BookingGrid';
+import { zonedTimeLabel } from '@/lib/businessTime';
+import { usePaymentsReady } from '@/lib/usePaymentsReady';
 import { useReaderSetup } from '@/components/pos/useReaderSetup';
 import { PosGridEditor } from '@/components/pos/PosGridEditor';
 import { addonGroupKey, posGridColumns, type GridKey, type CatalogAddon, type CatalogGroup, type CatalogService, type PosFn, type PosGridConfig } from '@/lib/posGrid';
@@ -40,7 +47,9 @@ import { look, cardShadow } from '@/components/look/tokens';
 type Service = { id: number; name: string; priceCents: number; duration: number; categoryId: number | null; category: string };
 type Product = { id: number; name: string; priceCents: number; stock: number | null };
 type Line = { key: string; label: string; priceCents: number; kind: 'service' | 'amount' | 'product' | 'addon' | 'package' | 'giftcard' | 'packageSale';
-  serviceId?: number; productId?: number; packageId?: number };
+  serviceId?: number; productId?: number; packageId?: number; addonId?: number; minutes?: number };
+/** A New booking from elsewhere in the app (lib/openBooking.ts): who, which services, which day ("2026-10-20", month from 0). */
+export type BookRequest = { book?: string; clientId?: string; phone?: string; serviceIds?: string; day?: string };
 type Plan = { id: number; name: string; priceCents: number; interval: string; isActive: boolean };
 type ShopPackage = { id: number; name: string; visits: number; priceCents: number; isActive: boolean };
 type Client = { customerId: number; name: string; phone: string; email: string };
@@ -54,11 +63,12 @@ const digitsOnly = (value: string) => value.replace(/\D/g, '');
  *  /nail); a product is PRODUCT_KEY minus its id. */
 const PRODUCT_KEY = -1_000_000_000;
 
-export function TabletPos() {
+export function TabletPos({ bookRequest }: { bookRequest?: BookRequest | null } = {}) {
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const wide = width > height;
-  const { clients, addQuickClient } = useBookingData();
+  const { clients, addQuickClient, timeZone, ownStaffId, refresh: refreshBookings } = useBookingData();
+  const paymentsReady = usePaymentsReady();
 
   const [services, setServices] = useState<Service[]>([]);
   const [categories, setCategories] = useState<{ id: number; name: string; sortOrder: number }[]>([]);
@@ -68,11 +78,13 @@ export function TabletPos() {
   const [gridConfig, setGridConfig] = useState<PosGridConfig | null>(null);
   // Sales tax, as the checkout reads it (Settings › Card reader & Checkout): services at the sales rate when they are
   // taxable, products at the retail rate (no retail rate yet = the sales rate).
+  const [slug, setSlug] = useState('');
   const [taxRates, setTaxRates] = useState<{ rate: number; services: boolean; retail: number }>({ rate: 0, services: false, retail: 0 });
   useEffect(() => {
-    api.get<Array<{ id: number }>>('/api/stores').then(async (rows) => {
+    api.get<Array<{ id: number; bookingSlug?: string | null }>>('/api/stores').then(async (rows) => {
       const id = Array.isArray(rows) ? Number(rows[0]?.id) : 0;
       if (!id) return;
+      setSlug(String(rows[0]?.bookingSlug ?? ''));
       const pos = await api.get<{ salesTaxRate?: string | number; taxServicesTaxable?: boolean; retailTaxRate?: string | number | null; taxProductsTaxable?: boolean }>(`/api/pos-settings/${id}`);
       const rate = Number(pos?.salesTaxRate ?? 0);
       const retail = pos?.taxProductsTaxable === false ? 0 : Number(pos?.retailTaxRate != null && pos.retailTaxRate !== '' ? pos.retailTaxRate : rate);
@@ -146,6 +158,13 @@ export function TabletPos() {
   const [client, setClient] = useState<Client | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  // BOOK (below): the visit being booked, the day to open on, and its saving.
+  const [booking, setBooking] = useState<{ slot: BookingSlot | null } | null>(null);
+  const [bookDay, setBookDay] = useState<Date | null>(null);
+  const [bookBusy, setBookBusy] = useState(false);
+  const serviceLines = lines.filter((l) => l.kind === 'service' && l.serviceId);
+  const bookMinutes = lines.filter((l) => l.kind === 'service' || l.kind === 'addon').reduce((n, l) => n + (l.minutes ?? 0), 0);
+  const slotLabel = (s: BookingSlot) => `${new Date(s.time).toLocaleDateString('en-US', { timeZone, weekday: 'short', month: 'short', day: 'numeric' })} · ${zonedTimeLabel(s.time, timeZone)}`;
   // The checkout open in the grid's place, with the sale's details.
   const [paying, setPaying] = useState<Record<string, string> | null>(null);
   // What the checkout says is paid and left (lib/posPayBridge.ts), and where ENTER sends typed cash.
@@ -359,14 +378,27 @@ export function TabletPos() {
         </> : null}
       </View>
       {error ? <Text style={styles.error}>{error}</Text> : null}
+      {booking ? <>
+        {booking.slot ? <View style={styles.bookedRow}><Text style={styles.bookedText}>{slotLabel(booking.slot)}</Text></View> : null}
+        <View style={styles.actionRow}>
+          <TouchableOpacity testID="tablet-pos-book-cancel" onPress={() => setBooking(null)} style={styles.secondaryButton}><Text style={styles.secondaryText}>CANCEL</Text></TouchableOpacity>
+          <TouchableOpacity testID="tablet-pos-book-save" disabled={!booking.slot || bookBusy} onPress={() => void saveBooking()} style={[styles.chargeButton, (!booking.slot || bookBusy) && { opacity: 0.5 }]}>
+            {bookBusy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.chargeText}>{booking.slot ? 'BOOK' : 'PICK A TIME'}</Text>}
+          </TouchableOpacity>
+        </View>
+      </> : <>
       <View style={styles.actionRow}>
-        <TouchableOpacity testID="tablet-pos-clear" onPress={clear} style={[styles.secondaryButton]}><Text style={styles.secondaryText}>CLEAR</Text></TouchableOpacity>
+        <TouchableOpacity testID="tablet-pos-clear" onPress={clear} style={[styles.secondaryButton, { flex: 1 }]}><Text style={styles.secondaryText}>CLEAR</Text></TouchableOpacity>
+        <TouchableOpacity testID="tablet-pos-book" disabled={!!paying} onPress={() => startBooking()} style={[styles.secondaryButton, { flex: 1 }]}><Text style={styles.secondaryText}>BOOK</Text></TouchableOpacity>
+      </View>
+      <View style={[styles.actionRow, { marginTop: 10 }]}>
         <TouchableOpacity testID="tablet-pos-charge" disabled={!lines.length || busy} onPress={() => void charge()} style={[styles.chargeButton, (!lines.length || busy) && { opacity: 0.5 }]}>
           {/* Paying: what is still owed after the payments taken so far (owner, 2026-11-19). */}
           {busy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.chargeText}>
             {paying && payState ? (payState.paid ? 'PAID' : `CHARGE ${money(payState.dueCents)}`) : `CHARGE ${money(totalCents)}`}</Text>}
         </TouchableOpacity>
       </View>
+      </>}
     </View>
   );
 
@@ -464,9 +496,73 @@ export function TabletPos() {
     const cents = Math.round(svc.price * 100);
     if (svc.id <= PRODUCT_KEY) add({ label: svc.name, priceCents: cents, kind: 'product', productId: PRODUCT_KEY - svc.id });
     else if (svc.id < 0) add({ label: svc.name, priceCents: cents, kind: 'package' });
-    else add({ label: svc.name, priceCents: cents, kind: 'service', serviceId: svc.id });
+    else add({ label: svc.name, priceCents: cents, kind: 'service', serviceId: svc.id, minutes: svc.duration });
   };
-  const pickAddon = (a: CatalogAddon) => add({ label: a.name, priceCents: Math.round(a.price * 100), kind: 'addon' });
+  const pickAddon = (a: CatalogAddon) => add({ label: a.name, priceCents: Math.round(a.price * 100), kind: 'addon', addonId: a.id, minutes: a.duration ?? 0 });
+
+  // ── BOOK: the ticket's services and add-ons as an appointment ──
+  const startBooking = () => {
+    setError('');
+    if (!client) { say('CHOOSE THE CLIENT FIRST', 'error'); setPicking(true); return; }
+    if (!serviceLines.length) { say('TAP THE SERVICES TO BOOK, THEN BOOK', 'error'); return; }
+    if (!slug) { say('YOUR BOOKING PAGE ISN\'T SET UP YET', 'error'); return; }
+    if (lines.some((l) => l.kind !== 'service' && l.kind !== 'addon')) say('ONLY THE SERVICES AND ADD-ONS ARE BOOKED', 'info');
+    setPanel(null); setBooking({ slot: null });
+  };
+  const saveBooking = async (choice?: 'request' | 'skip') => {
+    if (!client || !booking?.slot || bookBusy) return;
+    const slot = booking.slot;
+    // A client who must pay a deposit or keep a card on file: ask whether to text them the link (as New booking does).
+    if (choice === undefined) {
+      setBookBusy(true);
+      const policy = await api.get<{ requirement: 'deposit' | 'card_on_file' | null }>(`/api/booking-payment-policy?customerId=${client.customerId}`).catch(() => null);
+      setBookBusy(false);
+      if (policy?.requirement && paymentsReady !== false) {
+        Alert.alert(policy.requirement === 'deposit' ? 'Deposit' : 'Card on file', `Text ${client.name} a link to ${policy.requirement === 'deposit' ? 'pay the deposit' : 'save a card'}?`, [
+          { text: 'Yes, send it', onPress: () => void saveBooking('request') },
+          { text: 'No, confirm', onPress: () => void saveBooking('skip') },
+          { text: 'Cancel', style: 'cancel' },
+        ]);
+        return;
+      }
+      if (policy?.requirement) choice = 'skip';
+    }
+    setBookBusy(true); setError('');
+    try {
+      const [first, ...more] = serviceLines;
+      const created = await api.post<{ id?: number; paymentHold?: { notificationSent?: boolean } }>('/api/appointments', {
+        customerId: client.customerId, serviceId: first.serviceId, staffId: slot.staffId, duration: bookMinutes, date: slot.time,
+        ...(more.length ? { additionalServiceIds: more.map((l) => l.serviceId) } : {}),
+        ...(lines.some((l) => l.addonId) ? { addonIds: lines.filter((l) => l.addonId).map((l) => l.addonId) } : {}),
+        ...(choice ? { paymentChoice: choice } : {}),
+      });
+      if (created?.paymentHold && !created.paymentHold.notificationSent) Alert.alert('Payment link not sent', 'The appointment is on hold, but Certxa could not text the client. Contact the client before the hold expires.');
+      say(`BOOKED ${client.name.split(' ')[0].toUpperCase()} · ${slotLabel(slot).toUpperCase()}`, 'ok');
+      void refreshBookings();
+      setBooking(null); setBookDay(null); clear();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not book it.');
+      setBooking((b) => (b ? { ...b, slot: null } : b));
+    } finally { setBookBusy(false); }
+  };
+  // A New booking from elsewhere in the app: its client, services and day.
+  useEffect(() => {
+    if (!bookRequest?.book) return;
+    const digits = (v: string) => v.replace(/\D/g, '').slice(-10);
+    const who = clients.find((c) => String(c.customerId) === String(bookRequest.clientId ?? ''))
+      ?? (bookRequest.phone && digits(bookRequest.phone).length === 10 ? clients.find((c) => digits(c.phone) === digits(bookRequest.phone!)) : undefined);
+    setPaying(null); setPanel(null); setBooking(null);
+    setLines([]); setDiscountCents(0);
+    setClient(who ? { customerId: who.customerId, name: who.name, phone: who.phone, email: who.email ?? '' } : null);
+    const [y, m, d] = String(bookRequest.day ?? '').split('-').map(Number);
+    setBookDay(y && m !== undefined && d ? new Date(y, m, d) : null);
+    const ids = String(bookRequest.serviceIds ?? '').split(',').map(Number).filter((n) => n > 0);
+    const chosen = ids.flatMap((id) => services.filter((sv) => sv.id === id));
+    if (chosen.length) setLines(chosen.map((sv, i) => ({ key: `book-${Date.now()}-${i}`, label: sv.name, priceCents: sv.priceCents, kind: 'service', serviceId: sv.id, minutes: sv.duration })));
+    say(!who ? 'CHOOSE THE CLIENT, TAP THE SERVICES, THEN BOOK' : chosen.length ? 'TAP BOOK TO PICK THE DAY AND TIME' : 'TAP THE SERVICES, THEN BOOK', 'info');
+    if (!who) setPicking(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookRequest?.book, services.length]);
   const gridFn = (fn: PosFn) => { if (fn === 'discount') runFn('discount'); else if (fn === 'giftcard') runFn('gift'); };
   const [editingGrid, setEditingGrid] = useState(false);
   const [savingGrid, setSavingGrid] = useState(false);
@@ -492,7 +588,10 @@ export function TabletPos() {
   ) : (
     <View style={styles.catalogColumn}>
       <View style={[styles.panel, styles.catalog]} testID="tablet-pos-catalog">
-        {panel ? (
+        {booking && serviceLines.length ? (
+          <BookingGrid slug={slug} timeZone={timeZone} staffId={ownStaffId} serviceId={serviceLines[0].serviceId!} duration={Math.max(5, bookMinutes)} columns={posGridColumns(gridConfig)}
+            startDay={bookDay} slot={booking.slot} onSlot={(s) => setBooking((b) => (b ? { ...b, slot: s } : b))} onServices={() => setBooking(null)} />
+        ) : panel ? (
           (panel === 'packages' && shopPackages == null) || (panel === 'memberships' && plans == null) ? <ActivityIndicator color={look.violet} style={{ marginTop: 30 }} />
             : optionKeys.length === 0 ? <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 }}>
                 <Text style={[styles.subtle, styles.empty]}>{panel === 'packages' ? 'No packages for sale yet. Make them in Packages.' : 'No membership plans yet. Make them in Memberships.'}</Text>
@@ -556,6 +655,8 @@ const styles = StyleSheet.create({
   balanceText: { fontSize: 18, fontFamily: 'Inter_700Bold', color: look.heading },
   gearShadow: { alignSelf: 'flex-start', borderRadius: 22, shadowColor: '#4C1D95', shadowOpacity: 0.35, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 8 },
   gear: { width: 62, height: 62, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  bookedRow: { borderRadius: 12, backgroundColor: look.tile, paddingHorizontal: 12, paddingVertical: 10, marginTop: 10 },
+  bookedText: { fontSize: 17, fontFamily: 'Inter_700Bold', color: look.violetDeep, textAlign: 'center' },
   clientRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: look.cardBorder },
   clientIcon: { width: 48, height: 48, borderRadius: 14, backgroundColor: look.tile, alignItems: 'center', justifyContent: 'center' },
   clientName: { fontSize: 20, fontFamily: 'Inter_700Bold', color: look.heading },

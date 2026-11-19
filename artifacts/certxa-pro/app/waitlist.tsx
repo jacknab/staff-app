@@ -18,6 +18,7 @@ import { HelpTitle } from '@/components/HelpTitle';
 import { AppBackground } from '@/components/look/AppBackground';
 import { look, cardShadow } from '@/components/look/tokens';
 import { useInPane } from '@/components/TabletSplit';
+import { useOpenBooking } from '@/lib/openBooking';
 type Entry = { id: number; customerName: string; customerPhone: string | null; customerId: number | null; serviceId: number | null;
   preferredDate: string | null; preferredTimeStart: string | null; preferredTimeEnd: string | null; notes: string | null; status: string };
 const WHEN = [
@@ -31,6 +32,8 @@ const dayKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 
 export default function WaitlistScreen() {
   const colors = useColors();
+  // Book now: New booking on a phone, the POS's booking on a tablet (lib/openBooking.ts).
+  const openBooking = useOpenBooking();
   const inPane = useInPane();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -69,7 +72,7 @@ export default function WaitlistScreen() {
   const act = (e: Entry) => {
     const d = e.preferredDate ? new Date(e.preferredDate) : null;
     Alert.alert(e.customerName, [e.serviceId ? serviceName.get(e.serviceId) : null, d ? d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : null, whenLabel(e)].filter(Boolean).join(' · '), [
-      { text: 'Book now', onPress: () => router.push({ pathname: '/booking', params: { phone: e.customerPhone ?? '', ...(e.serviceId ? { serviceIds: String(e.serviceId) } : {}), ...(d ? { day: dayKey(d) } : {}) } }) },
+      { text: 'Book now', onPress: () => openBooking({ phone: e.customerPhone ?? '', ...(e.serviceId ? { serviceIds: String(e.serviceId) } : {}), ...(d ? { day: dayKey(d) } : {}) }) },
       ...(e.customerPhone ? [{ text: 'Text them', onPress: () => router.push({ pathname: '/messages', params: { phone: e.customerPhone!, name: e.customerName } }) }] : []),
       { text: 'Take off the waitlist', style: 'destructive' as const, onPress: () => { void api.del(`/api/waitlist/${e.id}`).then(load).catch(() => undefined); } },
       { text: 'Close', style: 'cancel' as const },

@@ -49,7 +49,7 @@ export function PosKeyButton({ k, index, columns, onPress, selected, testID }: {
   else if (k.kind === 'category') face = <><Feather name={iconFor(k.group.name)} size={24} color={look.violetDeep} /><Text style={styles.name} numberOfLines={2}>{k.label || k.group.name}</Text></>;
   else if (k.kind === 'action') face = k.price || k.sub
     ? <><Text style={styles.name} numberOfLines={2}>{k.title}</Text><View style={styles.priceRow}>{k.price ? <Text style={styles.price}>{k.price}</Text> : null}{k.sub ? <Text style={styles.small}>{k.sub}</Text> : null}</View></>
-    : <><Feather name={(k.icon ?? 'circle') as Icon} size={24} color={look.violetDeep} /><Text style={styles.name} numberOfLines={2}>{k.title}</Text></>;
+    : <>{k.icon ? <Feather name={k.icon as Icon} size={24} color={look.violetDeep} /> : null}<Text style={styles.name} numberOfLines={2}>{k.title}</Text></>;
   else if (k.kind === 'fn') face = <><Feather name={FN_ICONS[k.fn]} size={24} color={look.violetDeep} /><Text style={styles.name} numberOfLines={2}>{k.label || POS_FN_LABELS[k.fn]}</Text></>;
   else if (k.kind === 'addon') face = <><Text style={styles.name} numberOfLines={2}>{k.label || k.addon.name}</Text><View style={styles.priceRow}><Text style={styles.price}>+{money(k.addon.price)}</Text><Text style={styles.small}>Add-on</Text></View></>;
   else face = <><Text style={styles.name} numberOfLines={2}>{k.label || k.service.name}</Text><View style={styles.priceRow}><Text style={styles.price}>{money(k.service.price)}</Text>{k.service.duration ? <Text style={styles.small}>{minutes(k.service.duration)}</Text> : null}</View></>;

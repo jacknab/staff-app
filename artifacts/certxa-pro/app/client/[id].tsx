@@ -32,6 +32,7 @@ import { MenuCard } from '@/components/look/MenuCard';
 import { APP_MAX_WIDTH } from '@/components/TabletFrame';
 import { look, cardShadow } from '@/components/look/tokens';
 import { useInPane, useScreenParams, usePaneClose } from '@/components/TabletSplit';
+import { useOpenBooking } from '@/lib/openBooking';
 type Note = { id: number; noteContent: string; createdAt: string; pinned?: boolean | null };
 type Tag = { id: number; tagName: string; tagColor?: string | null };
 type Prefs = { smsMarketingOptIn?: boolean | null; emailMarketingOptIn?: boolean | null; promotionalNotifications?: boolean | null; appointmentReminders?: boolean | null; reviewRequests?: boolean | null };
@@ -71,6 +72,8 @@ export default function ClientProfileScreen() {
   const colors = useColors();
   const inPane = useInPane();
   const closePane = usePaneClose();
+  // Book appointment: New booking on a phone, the POS's booking on a tablet (lib/openBooking.ts).
+  const openBooking = useOpenBooking();
   const insets = useSafeAreaInsets();
   const { timeZone, refresh: refreshBookings, clients } = useBookingData();
   const params = useScreenParams<{ id?: string }>();
@@ -376,7 +379,7 @@ export default function ClientProfileScreen() {
               </TouchableOpacity>
             ))}
           </View>
-          <TouchableOpacity testID="client-book" onPress={() => router.push({ pathname: '/booking', params: { clientId: String(client.id), phone: client.primaryPhone ?? '' } })} style={[styles.bookButton, { backgroundColor: colors.primary }]}>
+          <TouchableOpacity testID="client-book" onPress={() => openBooking({ clientId: String(client.id), phone: client.primaryPhone ?? '' })} style={[styles.bookButton, { backgroundColor: colors.primary }]}>
             <Feather name="calendar" size={19} color={colors.primaryForeground} /><Text style={[styles.buttonText, { color: colors.primaryForeground }]}>Book appointment</Text>
           </TouchableOpacity>
           {/* Send booking link (owner, 2026-11-09): texts the client a link to the pro's own site (<slug>.certxa.com) that

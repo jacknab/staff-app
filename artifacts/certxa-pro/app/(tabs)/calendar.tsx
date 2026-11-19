@@ -19,6 +19,7 @@ import { SectionHeader } from '@/components/look/SectionHeader';
 import { APP_MAX_WIDTH } from '@/components/TabletFrame';
 import { useIsTablet } from '@/components/TabletLauncher';
 import { look } from '@/components/look/tokens';
+import { useOpenBooking } from '@/lib/openBooking';
 type TimeBlock = { id: number; startsAt: string; endsAt: string; allDay: boolean; note: string | null };
 
 type ViewMode = 'Month' | 'Week' | 'Day';
@@ -282,7 +283,9 @@ export default function CalendarScreen() {
     if (isTablet) rootRef.current?.measureInWindow((x, _y, width) => setSheetSpot({ x, width }));
     setAddOpen(true);
   };
-  const goAdd = (pathname: '/booking' | '/block-time') => { setAddOpen(false); router.push({ pathname, params: { day: selectedKey } }); };
+  // New booking: the New booking screen on a phone, the POS's booking on a tablet (lib/openBooking.ts).
+  const openBooking = useOpenBooking();
+  const goAdd = (pathname: '/booking' | '/block-time') => { setAddOpen(false); if (pathname === '/booking') openBooking({ day: selectedKey }); else router.push({ pathname, params: { day: selectedKey } }); };
   const pickView = (mode: ViewMode) => { setAddOpen(false); setViewMode(mode); setMonthDay(null); };
   // Month view (owner, 2026-11-19): the month grid with the month's bookings listed as the Week view lists them; a tapped
   // day narrows the list to that day, tapping it again shows the whole month. Side by side when the calendar is wide

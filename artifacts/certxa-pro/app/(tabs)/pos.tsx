@@ -9,7 +9,7 @@
 import { useMemo, useState } from 'react';
 import { Feather } from '@expo/vector-icons';
 import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { useBookingData } from '@/contexts/BookingContext';
@@ -21,7 +21,7 @@ import { ClientAvatar } from '@/components/ClientAvatar';
 import { AppBackground } from '@/components/look/AppBackground';
 import { look, cardShadow } from '@/components/look/tokens';
 import { useIsTablet } from '@/components/TabletLauncher';
-import { TabletPos } from '@/components/pos/TabletPos';
+import { TabletPos, type BookRequest } from '@/components/pos/TabletPos';
 const MAX_CENTS = 10_000_000; // $100,000
 const MIN_CENTS = 50; // Stripe's smallest card payment
 
@@ -34,7 +34,9 @@ type Picked = { customerId: number; name: string; phone: string; email: string }
 
 // Tablets get the full POS (owner, 2026-11-19; components/pos/TabletPos.tsx); phones keep this quick sale.
 export default function PosScreen() {
-  return useIsTablet() ? <TabletPos /> : <PhonePos />;
+  // On a tablet every New booking opens here (lib/openBooking.ts).
+  const params = useLocalSearchParams<BookRequest>();
+  return useIsTablet() ? <TabletPos bookRequest={params.book ? params : null} /> : <PhonePos />;
 }
 
 function PhonePos() {
