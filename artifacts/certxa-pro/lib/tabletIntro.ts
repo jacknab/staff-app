@@ -20,17 +20,17 @@ export const TABLET_INTRO: Record<string, TabletIntro> = {
   packages: {
     intro: 'Prepaid visits clients buy on your booking site, like 6 services for $150 or a monthly wellness package.',
     cards: [
-      { icon: 'gift', title: 'What is a package?', text: 'A bundle of the same service or a group of services sold at a special price.' },
+      { icon: 'gift', title: 'What is a package?', text: 'Several visits of one service, sold together at a special price.' },
       { icon: 'settings', title: 'How it works', text: 'Create a package, set the price, number of visits, and description, then publish it to your booking site.' },
       { icon: 'shopping-cart', title: 'Client experience', text: 'Clients can purchase a package online, and their visits automatically track in their account.' },
     ],
     examples: ['6 Services Package', '10-Visit Package', 'Monthly Membership', 'Wellness Package'],
   },
   memberships: {
-    intro: 'Offer recurring plans (monthly, yearly, or custom) that give clients ongoing value and exclusive benefits.',
+    intro: 'Offer monthly or yearly plans that give clients ongoing value and exclusive benefits.',
     cards: [
       { icon: 'calendar', title: 'What is a membership?', text: 'A recurring plan that gives clients access to services, discounts, or special perks.' },
-      { icon: 'settings', title: 'How it works', text: 'Create a plan, set the price and billing cycle (monthly, yearly, or custom), add the included benefits, and publish it.' },
+      { icon: 'settings', title: 'How it works', text: 'Create a plan, set the price and whether it renews monthly or yearly, and add the included visits or a member discount.' },
       { icon: 'users', title: 'Client benefits', text: 'Clients get consistent value, exclusive offers, and an easy way to manage their plan in their account.' },
     ],
     examples: ['Monthly Wellness Plan', 'Self-Care Membership', 'VIP Membership', 'Annual Membership'],
@@ -48,7 +48,7 @@ export const TABLET_INTRO: Record<string, TabletIntro> = {
     intro: 'Run targeted marketing campaigns to attract new clients, fill open time, and boost repeat visits.',
     cards: [
       { icon: { mci: 'bullhorn-outline' }, title: 'What is a campaign?', text: 'A marketing message (e.g., promotion, announcement, or reminder) sent to your clients.' },
-      { icon: 'settings', title: 'How it works', text: 'Choose your audience, write your message, and send it by text (SMS) or email.' },
+      { icon: 'settings', title: 'How it works', text: 'Choose who gets it, write your message, and send it as a text message.' },
       { icon: 'trending-up', title: 'Client benefits', text: 'Get updates, special offers, and timely reminders for the services they love.' },
     ],
     examples: ['Seasonal Promotion', 'New Service Launch', 'Last-Minute Openings', 'Loyalty Offer'],
@@ -57,7 +57,7 @@ export const TABLET_INTRO: Record<string, TabletIntro> = {
     intro: 'Offer gift cards for any amount and let clients purchase them online or in person.',
     cards: [
       { icon: 'gift', title: 'What is a gift card?', text: 'A prepaid card with a set value that clients can use toward your services or products.' },
-      { icon: 'settings', title: 'How it works', text: 'Create a gift card, set the amount (or custom amount), add a description, and publish it to your booking site and in-store checkout.' },
+      { icon: 'settings', title: 'How it works', text: 'Turn on Sell on my website so clients can buy online, or sell one in person: take the payment, enter the amount, and give the client the code.' },
       { icon: 'users', title: 'Client benefits', text: 'A fast, easy way to give a thoughtful gift that your clients can use at their convenience.' },
     ],
     examples: ['$25 Gift Card', '$100 Gift Card', '$50 Gift Card', 'Custom Amount'],
