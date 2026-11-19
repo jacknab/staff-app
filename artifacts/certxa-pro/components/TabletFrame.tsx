@@ -5,6 +5,8 @@ import { look } from '@/components/look/tokens';
 import { Text } from '@/components/AppText';
 import { HELP } from '@/lib/help';
 import { HelpContent, helpIdForPath } from '@/components/HelpTitle';
+import { TABLET_INTRO } from '@/lib/tabletIntro';
+import { PageIntro } from '@/components/PageIntro';
 
 /**
  * Tablets (owner, 2026-11-19: pros use phones and tablets): every screen sits in a centered column no wider than a
@@ -18,7 +20,7 @@ import { HelpContent, helpIdForPath } from '@/components/HelpTitle';
  */
 export const APP_MAX_WIDTH = 720;
 /** The tablet width from which a one-column screen gets its help beside it. */
-const HELP_PANEL_MIN_WIDTH = 1000;
+export const HELP_PANEL_MIN_WIDTH = 1000;
 
 export function TabletFrame({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -34,7 +36,7 @@ export function TabletFrame({ children }: { children: ReactNode }) {
         <View style={styles.helpPanel} testID="tablet-help-panel">
           <Text style={styles.helpLabel}>Help</Text>
           <ScrollView contentContainerStyle={styles.helpContent}>
-            <HelpContent page={help} tip={false} />
+            {helpId && TABLET_INTRO[helpId] ? <PageIntro title={help.title} intro={TABLET_INTRO[helpId]} /> : <HelpContent page={help} tip={false} />}
           </ScrollView>
         </View>
       </View>
@@ -54,6 +56,6 @@ const styles = StyleSheet.create({
   split: { flexDirection: 'row', alignItems: 'stretch' },
   page: { flex: 1, maxWidth: APP_MAX_WIDTH, overflow: 'hidden' },
   helpPanel: { flex: 1, minWidth: 340, margin: 16, marginLeft: 0, borderRadius: 22, backgroundColor: look.card, borderWidth: 1, borderColor: look.cardBorder, overflow: 'hidden' },
-  helpLabel: { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: look.subtle, paddingHorizontal: 22, paddingTop: 18 },
-  helpContent: { paddingHorizontal: 22, paddingTop: 6, paddingBottom: 40 },
+  helpLabel: { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: look.violet, paddingHorizontal: 32, paddingTop: 30 },
+  helpContent: { paddingHorizontal: 32, paddingTop: 6, paddingBottom: 40 },
 });

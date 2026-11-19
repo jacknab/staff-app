@@ -5,7 +5,7 @@
  */
 import { useCallback, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { ActivityIndicator, Platform, RefreshControl, ScrollView, StyleSheet, Switch, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Platform, RefreshControl, ScrollView, StyleSheet, Switch, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { Text, TextInput } from '@/components/AppText';
 import { Alert } from '@/lib/appAlert';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,6 +14,10 @@ import { useColors } from '@/hooks/useColors';
 import { useBookingData } from '@/contexts/BookingContext';
 import { SelectField } from '@/components/SelectField';
 import { HelpTitle } from '@/components/HelpTitle';
+import { EmptyHero } from '@/components/EmptyHero';
+import { PageIntro } from '@/components/PageIntro';
+import { HELP_PANEL_MIN_WIDTH } from '@/components/TabletFrame';
+import { TABLET_INTRO } from '@/lib/tabletIntro';
 import { api, ApiError } from '@/lib/live-api';
 
 import { AppBackground } from '@/components/look/AppBackground';
@@ -38,6 +42,9 @@ export default function PackagesScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const { width } = useWindowDimensions();
+  // Wide enough for the intro panel beside the page (components/TabletFrame.tsx); otherwise it goes under the empty page.
+  const sidePanel = width >= HELP_PANEL_MIN_WIDTH;
 
   const load = useCallback(async () => {
     try { setShop(await api.get<Shop>('/api/pro/shop')); } catch { setShop((s) => s ?? { giftCardsOn: false, cardsReady: false, packages: [], sold: [] }); }
@@ -92,9 +99,17 @@ export default function PackagesScreen() {
           </>
         ) : shop == null ? <ActivityIndicator style={{ marginTop: 60 }} color={colors.mutedForeground} /> : (
           <>
-            <Text style={[styles.muted, { color: colors.mutedForeground }]}>Prepaid visits clients buy on your website. They show there when they're on sale.</Text>
+            {/* Nothing made yet (owner's mock-up, 2026-11-20, phones too): the big intro with Create a Package. */}
+            {shop.packages.length === 0 ? null : <Text style={[styles.muted, { color: colors.mutedForeground }]}>Prepaid visits clients buy on your website. They show there when they're on sale.</Text>}
             {!shop.cardsReady ? <Text style={[styles.muted, { color: colors.destructive }]}>Set up card payments first (More › Payments) so clients can buy.</Text> : null}
-            {shop.packages.length === 0 ? <Text style={[styles.muted, { color: colors.mutedForeground, textAlign: 'center', marginTop: 30 }]}>No packages yet. Tap + to make one.</Text> : (
+            {shop.packages.length === 0 ? (
+              <>
+                <EmptyHero testID="packages-empty" compact={width < 600} icons={['tag', 'gift', 'percent']} title="Create Service Packages"
+                  text="Bundle services, set special pricing, and offer them to your clients online."
+                  button="Create a Package" onPress={() => setAdding(true)} note="No packages yet. Tap + to make one." />
+                {!sidePanel ? <PageIntro compact={width < 600} intro={TABLET_INTRO.packages} /> : null}
+              </>
+            ) : (
               <View style={[styles.list, box]}>
                 {shop.packages.map((p, i) => (
                   <View key={p.id} style={[styles.row, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}>
