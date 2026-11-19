@@ -4,7 +4,8 @@
  * confirmation, so there is no pop-up after it.
  */
 import { useEffect, useState } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/AppText';
 
 const HOLD_MS = 2000;
 

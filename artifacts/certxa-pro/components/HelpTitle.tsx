@@ -5,7 +5,8 @@
  *   <HelpHost />                                                  once, in app/_layout.tsx
  */
 import { useEffect, useRef, useSyncExternalStore, type ReactNode } from 'react';
-import { Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View, type StyleProp, type TextStyle } from 'react-native';
+import { Modal, Platform, ScrollView, StyleSheet, TouchableOpacity, View, type StyleProp, type TextStyle } from 'react-native';
+import { Text } from '@/components/AppText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';

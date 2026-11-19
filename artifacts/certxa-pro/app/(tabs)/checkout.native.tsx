@@ -3,17 +3,16 @@ import { PaymentsSetupBanner } from '@/components/PaymentsSetupBanner';
 import type { ComponentProps } from 'react';
 import { Feather } from '@expo/vector-icons';
 import {
-  Alert,
   Platform,
   ScrollView,
   StatusBar,
   StyleSheet,
   Switch,
-  Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Text, TextInput } from '@/components/AppText';
+import { Alert } from '@/lib/appAlert';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useInPane, usePaneClose, useScreenParams } from '@/components/TabletSplit';
@@ -51,7 +50,7 @@ import { useOpenBooking } from '@/lib/openBooking';
 // Stripe M2 does not require that Apple entitlement.
 const TAP_TO_PAY_ENABLED = true;
 // Shown on the payment screen so a tester can tell which build is installed.
-const BUILD_LABEL = 'Build Nov 20 · F';
+const BUILD_LABEL = 'Build Nov 20 · G';
 const EXPO_GO_PREVIEW = process.env.EXPO_PUBLIC_EXPO_GO_PREVIEW === '1';
 
 type PaymentStep = 'idle' | 'tap_intro' | 'initializing' | 'discovering' | 'connecting' | 'ready' | 'processing' | 'capture_pending' | 'success' | 'error';

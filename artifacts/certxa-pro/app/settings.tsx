@@ -22,7 +22,9 @@ import { useCallback, useEffect, useState, type ComponentProps, type ReactNode }
 import { Feather } from '@expo/vector-icons';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useFocusEffect, useLocalSearchParams, useRouter, type Href } from 'expo-router';
-import { ActivityIndicator, Alert, Linking, ScrollView, Share, StatusBar, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Linking, ScrollView, Share, StatusBar, StyleSheet, Switch, TouchableOpacity, View } from 'react-native';
+import { Text, TextInput } from '@/components/AppText';
+import { Alert } from '@/lib/appAlert';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
 import { useColors } from '@/hooks/useColors';
@@ -40,7 +42,8 @@ import { SectionHeader, SectionTitle } from '@/components/look/SectionHeader';
 import { usePaymentsReady } from '@/lib/usePaymentsReady';
 import { look, cardShadow } from '@/components/look/tokens';
 import { useIsTablet } from '@/components/TabletLauncher';
-type Screen = 'menu' | 'business' | 'location' | 'places' | 'hours' | 'rules' | 'approval' | 'policy' | 'blocked' | 'phone' | 'website' | 'stripe' | 'readers' | 'deposits' | 'tax' | 'account';
+import { APP_LANGS, setLang, useLang, type AppLang } from '@/lib/i18n';
+type Screen = 'menu' | 'business' | 'location' | 'places' | 'hours' | 'rules' | 'approval' | 'policy' | 'blocked' | 'phone' | 'website' | 'stripe' | 'readers' | 'deposits' | 'tax' | 'account' | 'language';
 type Store = { id: number; name?: string | null; phone?: string | null; email?: string | null; category?: string | null; address?: string | null; city?: string | null; state?: string | null; postcode?: string | null; bookingSlug?: string | null; timezone?: string | null };
 type Hours = { dayOfWeek: number; openTime: string; closeTime: string; isClosed: boolean };
 type FeatherName = ComponentProps<typeof Feather>['name'];
@@ -49,7 +52,7 @@ const BUSINESS_TYPES = ['Nail Salon', 'Hair Salon', 'Barbershop', 'Lash and Brow
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const TITLES: Record<Screen, string> = {
   menu: 'Settings', business: 'Business details', location: 'Location', places: 'Where you see clients', hours: 'Hours', rules: 'Online booking', policy: 'Cancellation policy',
-  approval: 'Booking approval', blocked: 'Blocked clients', phone: 'Business Phone', website: 'Website', stripe: 'Stripe account', readers: 'Connect card reader', deposits: 'Deposits', tax: 'Card reader & Checkout', account: 'Account',
+  approval: 'Booking approval', blocked: 'Blocked clients', phone: 'Business Phone', website: 'Website', stripe: 'Stripe account', readers: 'Connect card reader', deposits: 'Deposits', tax: 'Card reader & Checkout', account: 'Account', language: 'Language',
 };
 
 /** The POS discount buttons on the Card reader & Checkout draft ("10, 20"), saved with the rest (Edit's back restores them). */
@@ -86,6 +89,7 @@ export default function SettingsScreen() {
   const { setTimeZone, refresh: refreshCalendar, clients } = useBookingData();
   const [screen, setScreen] = useState<Screen>('menu');
   const isTablet = useIsTablet();
+  const lang = useLang();
   const [store, setStore] = useState<Store | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -477,6 +481,8 @@ export default function SettingsScreen() {
         </Group>
         <Group title="Account">
           <Row icon="user" title="Account" hint={user?.email ?? 'Password, sign out, delete account'} to="account" />
+          {/* The app's language (owner, 2026-11-19; lib/i18n.ts): English or Vietnamese, kept on this device. */}
+          <Row icon="globe" title="Language" hint={APP_LANGS.find((l) => l.value === lang)?.label ?? 'English'} to="language" />
           {/* The website's billing page, already signed in through a one-time link (owner, 2026-11-05). */}
           <TouchableOpacity testID="settings-billing" disabled={openingBilling} onPress={() => void openBilling()} style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={[styles.rowIcon, { backgroundColor: colors.secondary }]}><Feather name="file-text" size={26} color={colors.primary} /></View>
@@ -809,6 +815,11 @@ export default function SettingsScreen() {
         {valueRow('discounts', 'POS discount buttons', String(draft.discounts ?? '').split(/[\s,%]+/).filter(Boolean).map((n) => `${n}%`).join(', ') || 'None')}
       </>);
     }
+    if (screen === 'language') return (<>
+      <Label>Language</Label>
+      <SelectField testID="settings-language-choice" title="Language" value={lang} options={APP_LANGS} onChange={(v) => setLang(v as AppLang)} />
+      <Help>The app's words change at once. Names, services and anything you typed stay as they are. Kept on this device.</Help>
+    </>);
     return (<>
       <View style={[styles.toggleRow, { backgroundColor: colors.card, borderColor: colors.border }]}><View style={{ flex: 1 }}><Text style={[styles.rowHint, { color: colors.mutedForeground, marginTop: 0 }]}>Signed in as</Text><Text style={[styles.rowTitle, { color: colors.foreground }]}>{user?.email ?? 'Your Certxa account'}</Text></View></View>
       <Label>Mobile number</Label>

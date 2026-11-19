@@ -4,7 +4,8 @@
  * business has no referral program and the client has no credit.
  */
 import { useCallback, useState } from 'react';
-import { Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Share, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Text } from '@/components/AppText';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { useColors } from '@/hooks/useColors';

@@ -4,7 +4,9 @@
  * file now, or send the client the link to join and pay on their phone.
  */
 import { useCallback, useState } from 'react';
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Text } from '@/components/AppText';
+import { Alert } from '@/lib/appAlert';
 import { useFocusEffect } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { api } from '@/lib/live-api';

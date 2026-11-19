@@ -5,7 +5,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Text } from '@/components/AppText';
+import { Alert } from '@/lib/appAlert';
 import { CatalogScreen, Empty, ErrorLine, Field, Label, List, Loading, PhotoField, QuietButton, Row, SaveButton, Toggle, errorText, pickImageDataUri } from '@/components/catalog/CatalogKit';
 import { useColors } from '@/hooks/useColors';
 import { api } from '@/lib/live-api';

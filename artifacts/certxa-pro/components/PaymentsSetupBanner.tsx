@@ -4,7 +4,8 @@
  */
 import { useCallback, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Text } from '@/components/AppText';
 import { useColors } from '@/hooks/useColors';
 import { canTakeCards, getPaymentStatus } from '@/lib/payments-setup';
 

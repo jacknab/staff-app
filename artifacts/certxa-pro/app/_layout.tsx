@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { AlarmScreen } from '@/components/AlarmScreen';
@@ -22,6 +22,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { BookingProvider, useBookingData } from '@/contexts/BookingContext';
 import { TabletFrame } from '@/components/TabletFrame';
 import { setScreenTurning, setTabletFullScreen } from '@/lib/orientation';
+import { loadLang } from '@/lib/i18n';
 import { onBookingPush, registerForBookingPushes } from '@/lib/push';
 import { setInboxLive } from '@/lib/inboxLive';
 import { prepareVoice, registerBusinessPhone } from '@/lib/voice';
@@ -191,6 +192,9 @@ setScreenTurning();
 setTabletFullScreen();
 
 export default function RootLayout() {
+  // The saved language (Settings › Language) is read before the first screen shows (lib/i18n.ts).
+  const [langReady, setLangReady] = useState(false);
+  useEffect(() => { void loadLang().finally(() => setLangReady(true)); }, []);
   const [fontsLoaded, fontError] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
@@ -199,12 +203,12 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    if (fontsLoaded || fontError) {
+    if ((fontsLoaded || fontError) && langReady) {
       SplashScreen.hideAsync();
     }
-  }, [fontsLoaded, fontError]);
+  }, [fontsLoaded, fontError, langReady]);
 
-  if (!fontsLoaded && !fontError) return null;
+  if ((!fontsLoaded && !fontError) || !langReady) return null;
 
   return (
     <SafeAreaProvider>

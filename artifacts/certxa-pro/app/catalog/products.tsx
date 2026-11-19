@@ -4,7 +4,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { Alert } from 'react-native';
+import { Alert } from '@/lib/appAlert';
 import { CatalogScreen, Empty, ErrorLine, Field, List, Loading, Pair, QuietButton, Row, SaveButton, errorText, money } from '@/components/catalog/CatalogKit';
 import { api } from '@/lib/live-api';
 

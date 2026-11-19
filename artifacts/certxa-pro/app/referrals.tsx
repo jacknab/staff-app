@@ -5,7 +5,8 @@
  *   GET /api/pro/referrals · PUT /api/pro/referrals/program
  */
 import { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, Text } from 'react-native';
+import { StyleSheet } from 'react-native';
+import { Text } from '@/components/AppText';
 import { useRouter } from 'expo-router';
 import { CatalogScreen, Empty, ErrorLine, Field, List, Loading, Pair, Row, SaveButton, SectionTitle, Toggle, errorText, money } from '@/components/catalog/CatalogKit';
 import { useColors } from '@/hooks/useColors';

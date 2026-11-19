@@ -5,7 +5,8 @@
  * when card payments aren't set up or no reader is near; CARD can still find one then.
  */
 import { useEffect, useRef } from 'react';
-import { Alert, Linking, Platform } from 'react-native';
+import { Linking, Platform } from 'react-native';
+import { Alert } from '@/lib/appAlert';
 import { requestNeededAndroidPermissions, useStripeTerminal, type Reader } from '@stripe/stripe-terminal-react-native';
 import { getStoredToken, getTerminalLocation } from '@/lib/certxa-api';
 

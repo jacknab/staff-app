@@ -5,7 +5,8 @@
  */
 import { useState, type ComponentProps } from 'react';
 import { Feather } from '@expo/vector-icons';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Text } from '@/components/AppText';
 import { look } from '@/components/look/tokens';
 import {
   POS_FN_LABELS, POS_GRID_MAIN, POS_GRID_ROWS, ROW_BANDS, placeKeys, posGridColumns,

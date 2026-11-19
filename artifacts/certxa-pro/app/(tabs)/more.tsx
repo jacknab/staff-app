@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState, type ComponentType } from 'react';
 import Constants from 'expo-constants';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
-import { ActivityIndicator, Alert, Image, Platform, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, Platform, ScrollView, StyleSheet, Switch, TouchableOpacity, View } from 'react-native';
+import { Text } from '@/components/AppText';
+import { Alert } from '@/lib/appAlert';
 import * as WebBrowser from 'expo-web-browser';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

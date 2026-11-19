@@ -4,7 +4,8 @@
  * The value is "HH:MM" on the 24-hour clock.
  */
 import { useEffect, useRef } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import { ScrollView, StyleSheet, TouchableOpacity, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import { Text } from '@/components/AppText';
 
 const ROW = 44;
 const VISIBLE = 5; // rows shown; the middle one is the choice

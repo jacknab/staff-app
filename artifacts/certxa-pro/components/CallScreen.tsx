@@ -8,7 +8,8 @@
  * aside (a green bar at the top brings it back) and opens the client's profile while the call goes on.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { Modal, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Modal, StatusBar, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Text } from '@/components/AppText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';

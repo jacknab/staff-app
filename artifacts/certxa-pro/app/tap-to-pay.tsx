@@ -1,5 +1,6 @@
 // Tap to Pay exists only in the iPhone app (app/tap-to-pay.native.tsx). This is the stand-in for other platforms.
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
+import { Text } from '@/components/AppText';
 import { useColors } from '@/hooks/useColors';
 import { HelpTitle } from '@/components/HelpTitle';
 

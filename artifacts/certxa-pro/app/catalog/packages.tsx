@@ -4,7 +4,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { Alert } from 'react-native';
+import { Alert } from '@/lib/appAlert';
 import { CatalogScreen, Checklist, Empty, ErrorLine, Field, Label, List, Loading, PhotoField, QuietButton, Row, SaveButton, Toggle, errorText, minutesLabel, money, pickImageDataUri } from '@/components/catalog/CatalogKit';
 import { useBookingData } from '@/contexts/BookingContext';
 import { api } from '@/lib/live-api';

@@ -10,6 +10,7 @@ import { usePaymentsReady } from '@/lib/usePaymentsReady';
 import { ReviewAsk } from '@/components/ReviewAsk';
 import { TabletLauncher, useIsTablet } from '@/components/TabletLauncher';
 
+import { tr, useLang } from '@/lib/i18n';
 function ClassicTabLayout() {
   const colors = useColors();
   const colorScheme = useColorScheme();
@@ -22,6 +23,8 @@ function ClassicTabLayout() {
   const paymentsReady = usePaymentsReady();
   // Tablets (owner, 2026-11-19): no tab bar; the launcher button opens the app icons (components/TabletLauncher.tsx).
   const isTablet = useIsTablet();
+  // The tab names in the chosen language (Settings › Language; lib/i18n.ts).
+  const lang = useLang();
 
   return (
     <>
@@ -51,19 +54,19 @@ function ClassicTabLayout() {
     >
       {/* Home (owner, 2026-11-03): today at a glance; the screen the app opens on. */}
       <Tabs.Screen name="index" options={{
-        title: 'Home',
+        title: tr('Home', lang),
         tabBarIcon: ({ color }) => isIOS
           ? <SymbolView name="house" tintColor={color} size={23} />
           : <Feather name="home" size={21} color={color} />,
       }} />
       <Tabs.Screen name="calendar" options={{
-        title: 'Calendar',
+        title: tr('Calendar', lang),
         tabBarIcon: ({ color }) => isIOS
           ? <SymbolView name="calendar" tintColor={color} size={23} />
           : <Feather name="calendar" size={21} color={color} />,
       }} />
       <Tabs.Screen name="clients" options={{
-        title: 'Clients',
+        title: tr('Clients', lang),
         tabBarIcon: ({ color }) => isIOS
           ? <SymbolView name="person.2" tintColor={color} size={23} />
           : <Feather name="users" size={21} color={color} />,
@@ -72,7 +75,7 @@ function ClassicTabLayout() {
       <Tabs.Screen name="pos" listeners={{
         tabPress: (e) => { if (paymentsReady === false) { e.preventDefault(); router.push('/payments-pos' as Href); } },
       }} options={{
-        title: 'POS',
+        title: tr('POS', lang),
         tabBarIcon: ({ color }) => isIOS
           ? <SymbolView name="creditcard" tintColor={color} size={23} />
           : <Feather name="credit-card" size={21} color={color} />,
@@ -80,7 +83,7 @@ function ClassicTabLayout() {
       {/* Checkout has no tab of its own: it is opened from an appointment's Check Out or from the POS. */}
       <Tabs.Screen name="checkout" options={{ title: 'Checkout', href: null }} />
       <Tabs.Screen name="more" options={{
-        title: 'More',
+        title: tr('More', lang),
         tabBarIcon: ({ color }) => isIOS
           ? <SymbolView name="square.grid.2x2" tintColor={color} size={23} />
           : <Feather name="grid" size={21} color={color} />,

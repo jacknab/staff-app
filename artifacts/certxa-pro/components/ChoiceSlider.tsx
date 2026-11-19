@@ -1,6 +1,7 @@
 import { useMemo, useRef } from 'react';
 import { Feather } from '@expo/vector-icons';
-import { Animated, PanResponder, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, PanResponder, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Text } from '@/components/AppText';
 import { useColors } from '@/hooks/useColors';
 
 /** Which side the handle sits on: left (the first choice) or right. */

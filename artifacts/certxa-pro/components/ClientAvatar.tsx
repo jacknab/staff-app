@@ -3,7 +3,8 @@
  * Inside a row it takes the tap for itself, so the row can still choose the client. No link for a visit whose client
  * record is gone (id 0) or a client not saved yet.
  */
-import { Image, Text, TouchableOpacity, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
+import { Image, TouchableOpacity, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
+import { Text } from '@/components/AppText';
 import { useRouter } from 'expo-router';
 
 export function ClientAvatar({ clientId, avatarUrl, initials, style, textStyle, onOpen, testID }: {

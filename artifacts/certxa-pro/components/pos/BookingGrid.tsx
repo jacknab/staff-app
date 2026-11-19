@@ -8,7 +8,8 @@
  * first service and its whole length, only the pro's own times.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/AppText';
 import { api } from '@/lib/live-api';
 import { businessToday, zonedTimeLabel } from '@/lib/businessTime';
 import { look } from '@/components/look/tokens';

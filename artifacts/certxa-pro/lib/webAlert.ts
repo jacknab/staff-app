@@ -4,7 +4,8 @@
  * On the web only, it is answered with the browser's own boxes: one button → a message; a "cancel" button and one
  * other → OK/Cancel; more choices → a numbered list to type the number of. The iPhone app is unchanged.
  */
-import { Alert, Platform, type AlertButton } from 'react-native';
+import { Platform, type AlertButton } from 'react-native';
+import { Alert } from '@/lib/appAlert';
 
 export function installWebAlert(): void {
   if (Platform.OS !== 'web' || typeof window === 'undefined') return;

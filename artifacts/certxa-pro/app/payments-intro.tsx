@@ -9,7 +9,9 @@
  */
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, Alert, Image, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Image, StyleSheet, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { Text } from '@/components/AppText';
+import { Alert } from '@/lib/appAlert';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { api } from '@/lib/live-api';

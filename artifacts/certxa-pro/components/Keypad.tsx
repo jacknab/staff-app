@@ -2,7 +2,8 @@
  * A phone keypad drawn like the iPhone's: round keys, the digit with its letters underneath, system font.
  * Light on the Business Phone dialer, dark (frosted keys) during a call.
  */
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Text } from '@/components/AppText';
 
 const ROWS = [
   [['1', ''], ['2', 'A B C'], ['3', 'D E F']],

@@ -6,7 +6,9 @@
  */
 import { useMemo, useState } from 'react';
 import { Feather } from '@expo/vector-icons';
-import { Alert, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Modal, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Text, TextInput } from '@/components/AppText';
+import { Alert } from '@/lib/appAlert';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SelectField } from '@/components/SelectField';
 import { look, cardShadow } from '@/components/look/tokens';

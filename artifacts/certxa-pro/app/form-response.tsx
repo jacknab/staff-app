@@ -4,7 +4,8 @@
  *   GET /api/pro/forms/responses/:id
  */
 import { useEffect, useState } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/AppText';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { CatalogScreen, ErrorLine, Loading } from '@/components/catalog/CatalogKit';
 import { useColors } from '@/hooks/useColors';

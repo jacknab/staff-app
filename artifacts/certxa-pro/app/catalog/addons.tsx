@@ -5,7 +5,8 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { Alert, Text } from 'react-native';
+import { Text } from '@/components/AppText';
+import { Alert } from '@/lib/appAlert';
 import { CatalogScreen, Checklist, Empty, ErrorLine, Field, Label, List, Loading, Pair, QuietButton, Row, SaveButton, Toggle, errorText, minutesLabel, money } from '@/components/catalog/CatalogKit';
 import { useBookingData } from '@/contexts/BookingContext';
 import { useColors } from '@/hooks/useColors';

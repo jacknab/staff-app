@@ -6,7 +6,8 @@
  */
 import { useMemo, useState } from 'react';
 import { Feather } from '@expo/vector-icons';
-import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Modal, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Text } from '@/components/AppText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { look } from '@/components/look/tokens';
 

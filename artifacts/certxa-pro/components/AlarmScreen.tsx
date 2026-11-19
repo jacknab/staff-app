@@ -3,7 +3,8 @@
  * Got it (stops it and opens the booking) and Snooze 5 min. Drawn over every screen, like the call screen.
  */
 import { useEffect, useRef } from 'react';
-import { Animated, Easing, Modal, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, Easing, Modal, StatusBar, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Text } from '@/components/AppText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';

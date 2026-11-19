@@ -5,7 +5,8 @@
  */
 import { useState } from 'react';
 import { Feather } from '@expo/vector-icons';
-import { Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Text } from '@/components/AppText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { clockLabel, TimeWheel } from '@/components/TimeWheel';

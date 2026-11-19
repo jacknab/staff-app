@@ -6,7 +6,8 @@
  * opened from them have their Back button.
  */
 import { useState, type ComponentProps } from 'react';
-import { Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { Modal, Platform, ScrollView, StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { Text } from '@/components/AppText';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { usePathname, useRouter, type Href } from 'expo-router';

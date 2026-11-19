@@ -5,7 +5,9 @@
  * Fill in here opens the client's page on this phone, so the client can fill it in at the chair.
  */
 import { useCallback, useState } from 'react';
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Text } from '@/components/AppText';
+import { Alert } from '@/lib/appAlert';
 import { useFocusEffect, router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useColors } from '@/hooks/useColors';
