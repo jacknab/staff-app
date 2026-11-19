@@ -4,6 +4,7 @@ import type { ComponentProps } from 'react';
 import { Feather } from '@expo/vector-icons';
 import {
   Alert,
+  Platform,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -18,7 +19,7 @@ import { router } from 'expo-router';
 import { useInPane, usePaneClose, useScreenParams } from '@/components/TabletSplit';
 import { useIsTablet } from '@/components/TabletLauncher';
 import { usePosPayBridge } from '@/lib/posPayBridge';
-import { useStripeTerminal } from '@stripe/stripe-terminal-react-native';
+import { requestNeededAndroidPermissions, useStripeTerminal } from '@stripe/stripe-terminal-react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { useColors } from '@/hooks/useColors';
 import { TipCheckout } from '@/components/TipCheckout';
@@ -49,7 +50,7 @@ import { look, cardShadow } from '@/components/look/tokens';
 // Stripe M2 does not require that Apple entitlement.
 const TAP_TO_PAY_ENABLED = true;
 // Shown on the payment screen so a tester can tell which build is installed.
-const BUILD_LABEL = 'Build Nov 19 · Z';
+const BUILD_LABEL = 'Build Nov 20 · A';
 const EXPO_GO_PREVIEW = process.env.EXPO_PUBLIC_EXPO_GO_PREVIEW === '1';
 
 type PaymentStep = 'idle' | 'tap_intro' | 'initializing' | 'discovering' | 'connecting' | 'ready' | 'processing' | 'capture_pending' | 'success' | 'error';
@@ -489,6 +490,13 @@ export default function CheckoutScreen() {
       }
     }
     setReaderMode(mode);
+    // The M2 is still connected from the last card payment: it is ready, no new search (a search only ever looks for a
+    // reader not yet connected, so it would wait forever).
+    if (mode === 'm2' && connectedReader && !EXPO_GO_PREVIEW) {
+      setStep('ready');
+      setStatusText('Stripe M2 reader is ready.');
+      return;
+    }
     setStep('initializing');
     setStatusText(mode === 'm2' ? 'Preparing Stripe M2…' : 'Preparing Tap to Pay…');
 
@@ -499,6 +507,13 @@ export default function CheckoutScreen() {
     }
 
     try {
+      // Android asks the person for location and Bluetooth before the reader search can run (Stripe Terminal's rule).
+      if (Platform.OS === 'android') {
+        const allowed = await requestNeededAndroidPermissions({ accessFineLocation: {
+          title: 'Location for card payments', message: 'Stripe needs your location to take card payments with the card reader.', buttonPositive: 'Allow',
+        } });
+        if (allowed.error) throw new Error('Allow Location and Nearby devices for Certxa Pro, then try the card reader again.');
+      }
       const initialized = await initialize();
       if (initialized.error) throw new Error(initialized.error.message);
 
