@@ -5,7 +5,7 @@
  *
  * The key grid is /nail's (components/pos/PosGrid.tsx, lib/posGrid.ts): a fixed 2 × 6 (or 3 × 6) of keys — the catalog's
  * categories, then Packages, Products and Add-ons, each opening its own grid with Back — or the manager's own
- * arrangement from the key grid editor (the gear on the ticket; GET · PUT /api/pro/pos-grid).
+ * arrangement from the key grid editor (the gear under the grid, on the left; GET · PUT /api/pro/pos-grid).
  *
  * The keypad is /barber's: 7 8 9 ⌫ · 4 5 6 ↶ · 1 2 3 X (quantity) · 00 0 ENTER, then Quick Ticket, Retail, Gift Card,
  * Tip Adjust and Discount (/barber's Combine, No Sale and Split Ticket need things the app doesn't have; owner's choice
@@ -17,6 +17,7 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { Feather } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { ActivityIndicator, Alert, FlatList, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { router, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -266,20 +267,14 @@ export function TabletPos() {
 
   const ticket = (
     <View style={[styles.panel, styles.ticket]} testID="tablet-pos-ticket">
-      <View style={styles.clientRow}>
-        <TouchableOpacity testID="tablet-pos-client" onPress={() => setPicking(true)} style={styles.clientPickRow}>
-          <View style={styles.clientIcon}><Feather name="user" size={22} color={look.violetDeep} /></View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.clientName} numberOfLines={1}>{client ? client.name : 'Choose a client'}</Text>
-            <Text style={styles.subtle} numberOfLines={1}>{client ? client.phone || client.email || 'Client' : 'Tap to pick or add one'}</Text>
-          </View>
-          <Feather name="chevron-right" size={22} color={look.subtle} />
-        </TouchableOpacity>
-        {/* The key grid editor (as /nail's POS settings gear on the ticket). */}
-        <TouchableOpacity testID="tablet-pos-grid-settings" accessibilityLabel="Key grid" onPress={() => setEditingGrid(true)} style={styles.gear}>
-          <Feather name="settings" size={21} color={look.subtle} />
-        </TouchableOpacity>
-      </View>
+      <TouchableOpacity testID="tablet-pos-client" onPress={() => setPicking(true)} style={styles.clientRow}>
+        <View style={styles.clientIcon}><Feather name="user" size={22} color={look.violetDeep} /></View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.clientName} numberOfLines={1}>{client ? client.name : 'Choose a client'}</Text>
+          <Text style={styles.subtle} numberOfLines={1}>{client ? client.phone || client.email || 'Client' : 'Tap to pick or add one'}</Text>
+        </View>
+        <Feather name="chevron-right" size={22} color={look.subtle} />
+      </TouchableOpacity>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingVertical: 6 }}>
         {grouped.length === 0 ? <Text style={[styles.subtle, styles.empty]}>Tap a service or product, or key in an amount.</Text> : null}
         {grouped.map((g) => (
@@ -376,10 +371,18 @@ export function TabletPos() {
   };
 
   const catalog = (
-    <View style={[styles.panel, styles.catalog]} testID="tablet-pos-catalog">
-      {loading ? <ActivityIndicator color={look.violet} style={{ marginTop: 30 }} />
-        : groups.length === 0 ? <Text style={[styles.subtle, styles.empty]}>No services yet. Add them in Services.</Text>
-        : <PosGrid key={JSON.stringify(gridConfig)} layout={gridConfig} groups={groups} addons={addons} onService={pickKey} onAddon={pickAddon} onFn={gridFn} />}
+    <View style={styles.catalogColumn}>
+      <View style={[styles.panel, styles.catalog]} testID="tablet-pos-catalog">
+        {loading ? <ActivityIndicator color={look.violet} style={{ marginTop: 30 }} />
+          : groups.length === 0 ? <Text style={[styles.subtle, styles.empty]}>No services yet. Add them in Services.</Text>
+          : <PosGrid key={JSON.stringify(gridConfig)} layout={gridConfig} groups={groups} addons={addons} onService={pickKey} onAddon={pickAddon} onFn={gridFn} />}
+      </View>
+      {/* The key grid editor: under the grid on the left, in the app-icons button's style (the app-icons button is on the right). */}
+      <TouchableOpacity testID="tablet-pos-grid-settings" accessibilityLabel="Key grid" onPress={() => setEditingGrid(true)} activeOpacity={0.85} style={styles.gearShadow}>
+        <LinearGradient colors={['#8B5CF6', '#6D28D9']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.gear}>
+          <Feather name="settings" size={28} color="#FFFFFF" />
+        </LinearGradient>
+      </TouchableOpacity>
     </View>
   );
 
@@ -434,11 +437,13 @@ const styles = StyleSheet.create({
   ticket: { flex: 1, minHeight: 0 },
   keypad: { width: 390 },
   keypadUnder: { width: 'auto' },
-  // Ends above the app-icons button (bottom right, components/TabletLauncher.tsx), so the grid's last key — Back — is never under it.
-  catalog: { flex: 1, minHeight: 0, marginBottom: 74 },
-  clientRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: look.cardBorder },
-  clientPickRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  gear: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: look.pageBottom },
+  // The grid ends above the app-icons button (bottom right, components/TabletLauncher.tsx), so its last key — Back — is
+  // never under it; the gear sits in that row on the left.
+  catalogColumn: { flex: 1, minHeight: 0, gap: 12, paddingBottom: 4 },
+  catalog: { flex: 1, minHeight: 0 },
+  gearShadow: { alignSelf: 'flex-start', borderRadius: 22, shadowColor: '#4C1D95', shadowOpacity: 0.35, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 8 },
+  gear: { width: 62, height: 62, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  clientRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: look.cardBorder },
   clientIcon: { width: 48, height: 48, borderRadius: 14, backgroundColor: look.tile, alignItems: 'center', justifyContent: 'center' },
   clientName: { fontSize: 20, fontFamily: 'Inter_700Bold', color: look.heading },
   subtle: { fontSize: 15, fontFamily: 'Inter_400Regular', color: look.subtle },
