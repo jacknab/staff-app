@@ -24,6 +24,9 @@ import { look, cardShadow } from '@/components/look/tokens';
 type GiftCard = { id: number; code: string; originalAmount: string; remainingBalance: string; issuedToName: string | null; isActive: boolean; createdAt: string };
 const money = (v: string | number) => `$${Number(v).toFixed(2)}`;
 
+/** A card number in groups of four, as printed: 8408 5115 0520 (owner, 2026-11-20: numbers only). */
+const cardNumber = (code: string) => (/^\d{12}$/.test(code) ? code.replace(/(\d{4})(?=\d)/g, '$1 ') : code);
+
 export default function GiftCardsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -62,8 +65,8 @@ export default function GiftCardsScreen() {
       const card = await api.post<GiftCard>('/api/gift-cards', { amount: value, issuedToName: name.trim() || null });
       await load();
       reset('list');
-      Alert.alert('Gift card ready', `Code ${card.code} · ${money(card.originalAmount)}`, [
-        { text: 'Share the code', onPress: () => void Share.share({ message: `Your gift card code: ${card.code} (${money(card.originalAmount)})` }) },
+      Alert.alert('Gift card ready', `Code ${cardNumber(card.code)} · ${money(card.originalAmount)}`, [
+        { text: 'Share the code', onPress: () => void Share.share({ message: `Your gift card code: ${cardNumber(card.code)} (${money(card.originalAmount)})` }) },
         { text: 'Done' },
       ]);
     } catch (cause) { setError(cause instanceof ApiError ? cause.message : 'The gift card could not be made.'); }
@@ -118,11 +121,11 @@ export default function GiftCardsScreen() {
           </>
         ) : mode === 'redeem' ? (
           <>
-            <TextInput value={code} onChangeText={(v) => { setCode(v); setFound(null); }} placeholder="Gift card code" autoCapitalize="characters" placeholderTextColor={colors.mutedForeground} style={input} testID="gift-code" onSubmitEditing={() => void lookUp()} />
+            <TextInput value={code} onChangeText={(v) => { setCode(v); setFound(null); }} placeholder="Gift card number" keyboardType="number-pad" placeholderTextColor={colors.mutedForeground} style={input} testID="gift-code" onSubmitEditing={() => void lookUp()} />
             {!found ? button('Check the code', () => void lookUp(), 'gift-check', !code.trim()) : (
               <>
                 <View style={[styles.card, { borderColor: colors.border, backgroundColor: colors.card }]}>
-                  <Text style={[styles.muted, { color: colors.mutedForeground }]}>{found.issuedToName ? `For ${found.issuedToName}` : 'Gift card'} · {found.code}</Text>
+                  <Text style={[styles.muted, { color: colors.mutedForeground }]}>{found.issuedToName ? `For ${found.issuedToName}` : 'Gift card'} · {cardNumber(found.code)}</Text>
                   <Text style={[styles.big, { color: colors.foreground }]}>{money(found.remainingBalance)} left</Text>
                 </View>
                 {Number(found.remainingBalance) > 0 ? (
@@ -170,7 +173,7 @@ export default function GiftCardsScreen() {
                   {cards.map((c, i) => (
                     <View key={c.id} style={[styles.row, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}>
                       <View style={{ flex: 1 }}>
-                        <Text style={[styles.rowTitle, { color: colors.foreground }]}>{c.code}</Text>
+                        <Text style={[styles.rowTitle, { color: colors.foreground }]}>{cardNumber(c.code)}</Text>
                         <Text style={[styles.muted, { color: colors.mutedForeground }]}>{c.issuedToName || 'Gift card'} · {money(c.originalAmount)}</Text>
                       </View>
                       <Text style={[styles.rowTitle, { color: Number(c.remainingBalance) > 0 ? colors.foreground : colors.mutedForeground }]}>{money(c.remainingBalance)}</Text>

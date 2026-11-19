@@ -18,13 +18,13 @@ export type TabletIntro = {
 
 export const TABLET_INTRO: Record<string, TabletIntro> = {
   packages: {
-    intro: 'Prepaid visits clients buy on your booking site, like 6 services for $150 or a monthly wellness package.',
+    intro: 'Prepaid visits clients buy on your booking site, like 4 Haircuts for $60.',
     cards: [
       { icon: 'gift', title: 'What is a package?', text: 'Several visits of one service, sold together at a special price.' },
       { icon: 'settings', title: 'How it works', text: 'Create a package, set the price, number of visits, and description, then publish it to your booking site.' },
       { icon: 'shopping-cart', title: 'Client experience', text: 'Clients can purchase a package online, and their visits automatically track in their account.' },
     ],
-    examples: ['6 Services Package', '10-Visit Package', 'Monthly Membership', 'Wellness Package'],
+    examples: ['4 Haircuts for $60', '10-Visit Package', '5 Gel Manicures', '6 Pedicures'],
   },
   memberships: {
     intro: 'Offer monthly or yearly plans that give clients ongoing value and exclusive benefits.',

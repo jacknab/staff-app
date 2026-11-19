@@ -516,7 +516,7 @@ export const HELP: Record<string, HelpPage> = {
   },
   packages: {
     title: 'Packages',
-    intro: 'Prepaid visits clients buy on your website, like 6 Gel Manicures for $150.',
+    intro: 'Prepaid visits clients buy on your website, like 4 Haircuts for $60.',
     sections: [{ heading: 'How it works', points: [
       'New package: a name, the service, how many visits (2 to 50), the price and a description. Save package adds it.',
       'The switch puts a package on sale on your website or takes it off. Card payments must be set up so clients can buy.',

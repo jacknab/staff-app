@@ -1,5 +1,5 @@
 /**
- * Packages (owner, 2026-11-04): prepaid visits sold on the pro's Solo website, like 6 Gel Manicures for $150. Each is one
+ * Packages (owner, 2026-11-04): prepaid visits sold on the pro's Solo website, like 4 Haircuts for $60. Each is one
  * service, a number of visits and a price. A client buys online and the visits are saved on their client record; at
  * checkout the booking offers "Use a package visit" (server: routes/siteShop.ts).
  */
@@ -105,7 +105,7 @@ export default function PackagesScreen() {
             {shop.packages.length === 0 ? (
               <>
                 <EmptyHero testID="packages-empty" compact={width < 600} icons={['tag', 'gift', 'percent']} title="Create Service Packages"
-                  text="Bundle services, set special pricing, and offer them to your clients online."
+                  text="Bundle visits of a service, set a special price, and offer them to your clients online."
                   button="Create a Package" onPress={() => setAdding(true)} note="No packages yet. Tap + to make one." />
                 {!sidePanel ? <PageIntro compact={width < 600} intro={TABLET_INTRO.packages} /> : null}
               </>
