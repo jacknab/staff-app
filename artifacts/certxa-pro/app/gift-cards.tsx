@@ -13,6 +13,11 @@ import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { api, ApiError } from '@/lib/live-api';
 import { HelpTitle } from '@/components/HelpTitle';
+import { useWindowDimensions } from 'react-native';
+import { EmptyHero } from '@/components/EmptyHero';
+import { PageIntro } from '@/components/PageIntro';
+import { useIntroBeside } from '@/components/TabletFrame';
+import { TABLET_INTRO } from '@/lib/tabletIntro';
 
 import { AppBackground } from '@/components/look/AppBackground';
 import { look, cardShadow } from '@/components/look/tokens';
@@ -33,6 +38,8 @@ export default function GiftCardsScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const { width } = useWindowDimensions();
+  const introBeside = useIntroBeside();
 
   const load = useCallback(async () => {
     try { setCards(await api.get<GiftCard[]>('/api/gift-cards')); } catch { setCards([]); }
@@ -96,7 +103,8 @@ export default function GiftCardsScreen() {
       <View style={styles.nav}>
         <TouchableOpacity onPress={() => (mode === 'list' ? router.back() : reset('list'))} style={styles.navSide} accessibilityLabel="Back"><Feather name="arrow-left" size={24} color={colors.foreground} /></TouchableOpacity>
         <HelpTitle help="gift-cards" style={[styles.navTitle, { color: colors.foreground }]}>{mode === 'sell' ? 'Sell a gift card' : mode === 'redeem' ? 'Use a gift card' : 'Gift cards'}</HelpTitle>
-        <View style={styles.navSide} />
+        {/* + sells a gift card (owner's mock-up, 2026-11-20): that's how a card is made. */}
+        {mode === 'list' ? <TouchableOpacity onPress={() => reset('sell')} style={[styles.navSide, { alignItems: 'flex-end' }]} accessibilityLabel="Sell a gift card" testID="gift-add"><Feather name="plus" size={24} color={colors.primary} /></TouchableOpacity> : <View style={styles.navSide} />}
       </View>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled"
         refreshControl={mode === 'list' ? <RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} /> : undefined}>
@@ -138,16 +146,25 @@ export default function GiftCardsScreen() {
                 <Switch testID="gift-sell-online" value={site.giftCardsOn} disabled={!site.cardsReady} onValueChange={(v) => void setSellOnline(v)} trackColor={{ true: colors.primary, false: colors.border }} />
               </View>
             ) : null}
-            <View style={styles.actions}>
+            {cards?.length === 0 ? null : <View style={styles.actions}>
               <TouchableOpacity onPress={() => reset('sell')} style={[styles.action, { borderColor: colors.border, backgroundColor: colors.card }]} testID="gift-open-sell">
                 <Feather name="gift" size={20} color={colors.primary} /><Text style={[styles.actionText, { color: colors.foreground }]}>Sell</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => reset('redeem')} style={[styles.action, { borderColor: colors.border, backgroundColor: colors.card }]} testID="gift-open-redeem">
                 <Feather name="check-circle" size={20} color={colors.primary} /><Text style={[styles.actionText, { color: colors.foreground }]}>Use a card</Text>
               </TouchableOpacity>
-            </View>
+            </View>}
             {cards == null ? <ActivityIndicator style={{ marginTop: 40 }} color={colors.mutedForeground} />
-              : cards.length === 0 ? <Text style={[styles.muted, { color: colors.mutedForeground, textAlign: 'center', marginTop: 30 }]}>No gift cards yet.</Text>
+              : cards.length === 0 ? (
+                // None yet (owner's mock-up, 2026-11-20): the big intro with Create a Gift Card (it opens Sell); the intro
+                // panel's rows go under it on a phone, an upright tablet or in More's pane.
+                <>
+                  <EmptyHero testID="gift-cards-empty" compact={width < 600} icons={['credit-card', 'gift', 'credit-card']} title="Create Gift Cards"
+                    text="Sell digital or in-store gift cards, set custom amounts, and let clients share the gift of your services."
+                    button="Create a Gift Card" onPress={() => reset('sell')} note="No gift cards yet. Tap + to make one." />
+                  {!introBeside ? <PageIntro compact={width < 600} intro={TABLET_INTRO['gift-cards']} /> : null}
+                </>
+              )
               : (
                 <View style={[styles.list, { borderColor: colors.border, backgroundColor: colors.card }]}>
                   {cards.map((c, i) => (

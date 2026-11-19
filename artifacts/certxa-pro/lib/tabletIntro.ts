@@ -53,4 +53,13 @@ export const TABLET_INTRO: Record<string, TabletIntro> = {
     ],
     examples: ['Seasonal Promotion', 'New Service Launch', 'Last-Minute Openings', 'Loyalty Offer'],
   },
+  'gift-cards': {
+    intro: 'Offer gift cards for any amount and let clients purchase them online or in person.',
+    cards: [
+      { icon: 'gift', title: 'What is a gift card?', text: 'A prepaid card with a set value that clients can use toward your services or products.' },
+      { icon: 'settings', title: 'How it works', text: 'Create a gift card, set the amount (or custom amount), add a description, and publish it to your booking site and in-store checkout.' },
+      { icon: 'users', title: 'Client benefits', text: 'A fast, easy way to give a thoughtful gift that your clients can use at their convenience.' },
+    ],
+    examples: ['$25 Gift Card', '$100 Gift Card', '$50 Gift Card', 'Custom Amount'],
+  },
 };
