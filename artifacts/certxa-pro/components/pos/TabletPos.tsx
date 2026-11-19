@@ -408,16 +408,18 @@ export function TabletPos({ bookRequest }: { bookRequest?: BookRequest | null } 
   ];
   // Square keys (owner, 2026-11-19), as big as the keypad's width allows.
   const [keySize, setKeySize] = useState(0);
+  const [displayHeight, setDisplayHeight] = useState(0);
   const keypad = (
     <View style={[styles.panel, styles.keypad, !wide && styles.keypadUnder]} testID="tablet-pos-keypad">
       <View style={[styles.status, status?.tone === 'error' && styles.statusError, status?.tone === 'ok' && styles.statusOk, prompt != null && styles.statusPrompt]} testID="tablet-pos-status">
         <Text style={[styles.statusText, prompt != null && { color: '#FFFFFF' }]} numberOfLines={2}>{prompt ?? status?.text ?? ' '}</Text>
       </View>
-      <View style={styles.display}>
+      {/* The digits fill most of the box's height (owner, 2026-11-19), however tall the box is on this tablet. */}
+      <View style={styles.display} onLayout={(e) => setDisplayHeight(e.nativeEvent.layout.height)}>
         {qtyDigits !== null ? <Text style={styles.displayQty}>QTY {qtyDigits || '_'} ×</Text> : qty > 1 ? <Text style={styles.displayQty}>{qty} ×</Text> : null}
         {/* Just the number, no $ (as /barber). */}
         {/* A gift card number shows as typed; an amount as dollars and cents. */}
-        <Text testID="tablet-pos-display" style={styles.displayText} numberOfLines={1} adjustsFontSizeToFit>{!cents ? '' : paying && payState?.keypad === 'gift' ? String(cents) : (cents / 100).toFixed(2)}</Text>
+        <Text testID="tablet-pos-display" style={[styles.displayText, displayHeight > 0 && { fontSize: Math.round(displayHeight * 0.7), lineHeight: Math.round(displayHeight * 0.84) }]} numberOfLines={1} adjustsFontSizeToFit>{!cents ? '' : paying && payState?.keypad === 'gift' ? String(cents) : (cents / 100).toFixed(2)}</Text>
       </View>
       <View style={styles.keys} onLayout={(e) => setKeySize(Math.floor((e.nativeEvent.layout.width - 3 * KEY_GAP) / 4))}>
         {KEYS.map((k) => (
@@ -434,7 +436,7 @@ export function TabletPos({ bookRequest }: { bookRequest?: BookRequest | null } 
           {row.map((fn) => (
             <TouchableOpacity key={fn.id} testID={`tablet-pos-fn-${fn.id}`} onPress={() => runFn(fn.id)} style={[styles.fnButton, fn.id === 'quick' && guided !== null && styles.fnActive]}>
               <Feather name={fn.icon} size={22} color={look.violetDeep} />
-              <Text style={styles.fnText} numberOfLines={1}>{fn.label}</Text>
+              <Text style={styles.fnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{fn.label}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -602,12 +604,20 @@ export function TabletPos({ bookRequest }: { bookRequest?: BookRequest | null } 
           : groups.length === 0 ? <Text style={[styles.subtle, styles.empty]}>No services yet. Add them in Services.</Text>
           : <PosGrid key={JSON.stringify(gridConfig)} layout={gridConfig} groups={groups} addons={addons} addonGroups={addonGroups.map((g) => g.group)} onService={pickKey} onAddon={pickAddon} onFn={gridFn} />}
       </View>
-      {/* The key grid editor: under the grid on the left, in the app-icons button's style (the app-icons button is on the right). */}
-      <TouchableOpacity testID="tablet-pos-grid-settings" accessibilityLabel="Key grid" onPress={() => setEditingGrid(true)} activeOpacity={0.85} style={styles.gearShadow}>
-        <LinearGradient colors={['#8B5CF6', '#6D28D9']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.gear}>
-          <Feather name="settings" size={28} color="#FFFFFF" />
-        </LinearGradient>
-      </TouchableOpacity>
+      {/* Under the grid on the left, in the app-icons button's style: the key grid editor, and Home — the way out of the
+          POS, which has no app-icons button (owner, 2026-11-19). */}
+      <View style={styles.underGrid}>
+        <TouchableOpacity testID="tablet-pos-grid-settings" accessibilityLabel="Key grid" onPress={() => setEditingGrid(true)} activeOpacity={0.85} style={styles.gearShadow}>
+          <LinearGradient colors={['#8B5CF6', '#6D28D9']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.gear}>
+            <Feather name="settings" size={28} color="#FFFFFF" />
+          </LinearGradient>
+        </TouchableOpacity>
+        <TouchableOpacity testID="tablet-pos-home" accessibilityLabel="Home" onPress={() => router.navigate('/' as Href)} activeOpacity={0.85} style={styles.gearShadow}>
+          <LinearGradient colors={['#8B5CF6', '#6D28D9']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.gear}>
+            <Feather name="home" size={28} color="#FFFFFF" />
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 
@@ -653,6 +663,7 @@ const styles = StyleSheet.create({
   balanceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderRadius: 12, backgroundColor: look.tile, paddingHorizontal: 12, paddingVertical: 10, marginTop: 6 },
   balancePaid: { backgroundColor: '#E7F6EC' },
   balanceText: { fontSize: 18, fontFamily: 'Inter_700Bold', color: look.heading },
+  underGrid: { flexDirection: 'row', gap: 12 },
   gearShadow: { alignSelf: 'flex-start', borderRadius: 22, shadowColor: '#4C1D95', shadowOpacity: 0.35, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 8 },
   gear: { width: 62, height: 62, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   bookedRow: { borderRadius: 12, backgroundColor: look.tile, paddingHorizontal: 12, paddingVertical: 10, marginTop: 10 },
