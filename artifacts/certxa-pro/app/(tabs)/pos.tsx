@@ -22,7 +22,7 @@ import { ClientAvatar } from '@/components/ClientAvatar';
 import { AppBackground } from '@/components/look/AppBackground';
 import { look, cardShadow } from '@/components/look/tokens';
 import { useIsTablet } from '@/components/TabletLauncher';
-import { TabletPos, type BookRequest } from '@/components/pos/TabletPos';
+import { TabletPos, type BookRequest, type CheckoutRequest } from '@/components/pos/TabletPos';
 const MAX_CENTS = 10_000_000; // $100,000
 const MIN_CENTS = 50; // Stripe's smallest card payment
 
@@ -36,8 +36,9 @@ type Picked = { customerId: number; name: string; phone: string; email: string }
 // Tablets get the full POS (owner, 2026-11-19; components/pos/TabletPos.tsx); phones keep this quick sale.
 export default function PosScreen() {
   // On a tablet every New booking opens here (lib/openBooking.ts).
-  const params = useLocalSearchParams<BookRequest>();
-  return useIsTablet() ? <TabletPos bookRequest={params.book ? params : null} /> : <PhonePos />;
+  const params = useLocalSearchParams<BookRequest & CheckoutRequest>();
+  // …and a booking's CHECKOUT opens it on the ticket (owner, 2026-11-20).
+  return useIsTablet() ? <TabletPos bookRequest={params.book ? params : null} checkoutRequest={params.checkout ? params : null} /> : <PhonePos />;
 }
 
 function PhonePos() {

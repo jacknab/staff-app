@@ -48,10 +48,19 @@ import { look, cardShadow } from '@/components/look/tokens';
 
 type Service = { id: number; name: string; priceCents: number; duration: number; categoryId: number | null; category: string };
 type Product = { id: number; name: string; priceCents: number; stock: number | null };
-type Line = { key: string; label: string; priceCents: number; kind: 'service' | 'amount' | 'product' | 'addon' | 'package' | 'giftcard' | 'packageSale';
+type Line = { key: string; label: string; priceCents: number; kind: 'service' | 'amount' | 'product' | 'addon' | 'package' | 'giftcard' | 'packageSale' | 'booking';
   serviceId?: number; productId?: number; packageId?: number; addonId?: number; minutes?: number };
 /** A New booking from elsewhere in the app (lib/openBooking.ts): who, which services, which day ("2026-10-20", month from 0). */
 export type BookRequest = { book?: string; clientId?: string; phone?: string; serviceIds?: string; day?: string };
+/**
+ * A booking's CHECKOUT on a tablet (owner, 2026-11-20; app/appointment/[id].tsx): the booking opens on the POS ticket —
+ * its client, its booked services as one line that stays, the products already on it. More services, add-ons, keyed
+ * amounts and products can be added; PAY puts them on the booking (custom charges, its products) and opens its payment.
+ * EXIT before any payment takes them off again.
+ */
+export type CheckoutRequest = { checkout?: string; clientName?: string; serviceName?: string; amountCents?: string; depositCents?: string;
+  phone?: string; email?: string; clientId?: string; serviceIds?: string };
+type Visit = { id: number; amountCents: number; depositCents: number; clientName: string; serviceName: string; phone: string; email: string; clientId: string; serviceIds: string };
 type Plan = { id: number; name: string; priceCents: number; interval: string; isActive: boolean };
 type ShopPackage = { id: number; name: string; visits: number; priceCents: number; isActive: boolean };
 type Client = { customerId: number; name: string; phone: string; email: string };
@@ -68,7 +77,7 @@ const digitsOnly = (value: string) => value.replace(/\D/g, '');
  *  /nail); a product is PRODUCT_KEY minus its id. */
 const PRODUCT_KEY = -1_000_000_000;
 
-export function TabletPos({ bookRequest }: { bookRequest?: BookRequest | null } = {}) {
+export function TabletPos({ bookRequest, checkoutRequest }: { bookRequest?: BookRequest | null; checkoutRequest?: CheckoutRequest | null } = {}) {
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const wide = width > height;
@@ -191,14 +200,22 @@ export function TabletPos({ bookRequest }: { bookRequest?: BookRequest | null } 
   // X: how many of the next item.
   const [qty, setQty] = useState(1);
   const [qtyDigits, setQtyDigits] = useState<string | null>(null);
+  // A booking being checked out (CheckoutRequest), what PAY put on it, and its products before (to put back on EXIT).
+  const [visit, setVisit] = useState<Visit | null>(null);
+  const visitCharges = useRef<number[]>([]);
+  const visitProducts = useRef<{ productId: number; quantity: number }[]>([]);
   const add = (line: Omit<Line, 'key'>) => {
     setError('');
+    if (visit && (line.kind === 'giftcard' || line.kind === 'packageSale')) { say('SELL GIFT CARDS AND PACKAGES ON A NEW TICKET, AFTER THIS BOOKING', 'error'); return; }
     const n = qty;
     setLines((cur) => [...cur, ...Array.from({ length: n }, (_, i) => ({ ...line, key: `${Date.now()}-${cur.length + i}` }))]);
     setQty(1);
     say(`${n > 1 ? `${n} × ` : ''}${line.label.toUpperCase()} ADDED · ${money(line.priceCents * n)}`, 'ok');
   };
-  const removeOne = (key: string) => setLines((cur) => cur.filter((l) => l.key !== key));
+  const removeOne = (key: string) => {
+    if (lines.find((l) => l.key === key)?.kind === 'booking') { say('THE BOOKED SERVICES STAY · CHANGE THEM ON THE BOOKING', 'error'); return; }
+    setLines((cur) => cur.filter((l) => l.key !== key));
+  };
   // Same item twice shows once with its count (as /barber does); × takes one off.
   const grouped = useMemo(() => {
     const groups: { id: string; line: Line; count: number; lastKey: string }[] = [];
@@ -216,11 +233,13 @@ export function TabletPos({ bookRequest }: { bookRequest?: BookRequest | null } 
   // A gift card sold is money held for the client, not a sale: no tax on it.
   const giftCardCents = lines.filter((l) => l.kind === 'giftcard').reduce((n, l) => n + l.priceCents, 0);
   const taxCents = (taxRates.services && taxRates.rate > 0 ? Math.round(Math.max(0, servicesCents - giftCardCents - discount) * taxRates.rate) : 0) + Math.round(productsCents * taxRates.retail);
-  const totalCents = servicesCents - discount + productsCents + taxCents;
+  // A booking's deposit already paid comes off what's due (as its checkout does).
+  const depositCents = visit ? Math.min(visit.depositCents, servicesCents - discount + productsCents + taxCents) : 0;
+  const totalCents = servicesCents - discount + productsCents + taxCents - depositCents;
   const percent = (r: number) => `${(r * 100).toFixed(3).replace(/\.?0+$/, '')}%`;
   const taxLabel = taxRates.services && taxRates.rate > 0 && productsCents > 0 && taxRates.retail > 0 && taxRates.retail !== taxRates.rate ? 'Tax'
     : `Tax (${percent(taxRates.services && taxRates.rate > 0 ? taxRates.rate : taxRates.retail)})`;
-  const clear = () => { setLines([]); setClient(null); setCents(0); setError(''); setDiscountCents(0); setDiscountPct(null); setQty(1); setQtyDigits(null); setGuided(null); setStatus(null); };
+  const clear = () => { setVisit(null); setLines([]); setClient(null); setCents(0); setError(''); setDiscountCents(0); setDiscountPct(null); setQty(1); setQtyDigits(null); setGuided(null); setStatus(null); };
 
   // ── The keypad (/barber's keys) ──
   const [cents, setCents] = useState(0);
@@ -260,7 +279,10 @@ export function TabletPos({ bookRequest }: { bookRequest?: BookRequest | null } 
     if (key === '↶') {
       if (guided !== null) { setGuided(null); setCents(0); say('QUICK TICKET EXITED'); return; }
       if (cents || qty !== 1) { setCents(0); setQty(1); return; }
-      setLines((cur) => { if (!cur.length) { say('NOTHING TO UNDO'); return cur; } say(`UNDID · ${cur[cur.length - 1].label.toUpperCase()}`); return cur.slice(0, -1); });
+      setLines((cur) => {
+        if (!cur.length || cur[cur.length - 1].kind === 'booking') { say('NOTHING TO UNDO'); return cur; }
+        say(`UNDID · ${cur[cur.length - 1].label.toUpperCase()}`); return cur.slice(0, -1);
+      });
       return;
     }
     if (key === 'ENTER') {
@@ -329,10 +351,46 @@ export function TabletPos({ bookRequest }: { bookRequest?: BookRequest | null } 
     return () => sub.remove();
   }, [paying]);
 
+  // A booking's PAY: what was added goes on the booking, then its payment opens (the booking's own checkout).
+  const payVisit = async (v: Visit) => {
+    const extras = lines.filter((l) => l.kind !== 'booking' && l.kind !== 'product');
+    const extrasCents = extras.reduce((n, l) => n + l.priceCents, 0);
+    const counts = new Map<number, number>();
+    for (const l of lines) if (l.productId) counts.set(l.productId, (counts.get(l.productId) ?? 0) + 1);
+    setBusy(true); setError('');
+    const pushed: number[] = [];
+    try {
+      for (const l of extras) {
+        const r = await api.post<{ index: number }>(`/api/pro/appointments/${v.id}/custom-charge`, { label: l.label, price: l.priceCents / 100 });
+        pushed.push(Number(r.index));
+      }
+      await api.put(`/api/pro/appointments/${v.id}/products`, { items: [...counts].map(([productId, quantity]) => ({ productId, quantity })) });
+      visitCharges.current = pushed;
+      setPaying({
+        appointmentId: String(v.id), amountCents: String(v.amountCents + extrasCents), depositCents: String(v.depositCents),
+        clientName: v.clientName, serviceName: extras.length ? `${v.serviceName} + ${extras.length} more` : v.serviceName,
+        phone: v.phone, email: v.email, clientId: v.clientId, serviceIds: v.serviceIds,
+        ...(discount > 0 ? { discountCents: String(discount) } : {}),
+      });
+    } catch (cause) {
+      visitCharges.current = pushed;
+      await undoVisitExtras(v);
+      setError(cause instanceof Error ? cause.message : 'Could not start the payment. Please try again.');
+    } finally { setBusy(false); }
+  };
+  /** EXIT from a booking's payment before anything was paid: what PAY added comes off the booking again. */
+  const undoVisitExtras = async (v: Visit) => {
+    const pushed = [...visitCharges.current].sort((a, b) => b - a);
+    visitCharges.current = [];
+    for (const index of pushed) await api.del(`/api/pro/appointments/${v.id}/custom-charge/${index}`).catch(() => undefined);
+    await api.put(`/api/pro/appointments/${v.id}/products`, { items: visitProducts.current }).catch(() => undefined);
+  };
+
   // ── PAY ──
   // PAY (owner, 2026-11-20): from adding items to taking payment. The ticket is closed to new items from here.
   const charge = async () => {
     if (!lines.length || busy) return;
+    if (visit) { await payVisit(visit); return; }
     if (!client) { setPicking(true); return; }
     if (servicesCents > 0 && servicesCents < 50) { setError('A sale must be at least $0.50.'); return; }
     setBusy(true); setError('');
@@ -359,13 +417,13 @@ export function TabletPos({ bookRequest }: { bookRequest?: BookRequest | null } 
 
   const ticket = (
     <View pointerEvents={paying ? 'none' : 'auto'} style={[styles.panel, styles.ticket, wide && styles.ticketWide, bookMode && styles.panelBook]} testID="tablet-pos-ticket">
-      <TouchableOpacity testID="tablet-pos-client" onPress={() => setPicking(true)} style={styles.clientRow}>
+      <TouchableOpacity testID="tablet-pos-client" onPress={() => (visit ? say(`THIS IS ${visit.clientName.toUpperCase()}'S BOOKING`) : setPicking(true))} style={styles.clientRow}>
         <View style={[styles.clientIcon, bookMode && { backgroundColor: BOOK.tint }]}><Feather name="user" size={22} color={bookMode ? BOOK.deep : look.violetDeep} /></View>
         <View style={{ flex: 1 }}>
           <Text style={styles.clientName} numberOfLines={1}>{client ? client.name : 'Choose a client'}</Text>
           <Text style={styles.subtle} numberOfLines={1}>{client ? client.phone || client.email || 'Client' : 'Tap to pick or add one'}</Text>
         </View>
-        <Feather name="chevron-right" size={22} color={look.subtle} />
+        {visit ? null : <Feather name="chevron-right" size={22} color={look.subtle} />}
       </TouchableOpacity>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingVertical: 6 }}>
         {grouped.length === 0 ? <Text style={[styles.subtle, styles.empty]}>Tap a service or product, or key in an amount.</Text> : null}
@@ -374,12 +432,14 @@ export function TabletPos({ bookRequest }: { bookRequest?: BookRequest | null } 
             <View style={{ flex: 1 }}>
               <Text style={styles.lineTitle} numberOfLines={2}>{g.count > 1 ? `${g.count} × ` : ''}{g.line.label}</Text>
               <Text style={styles.subtle}>{g.line.kind === 'product' ? 'Product' : g.line.kind === 'amount' ? 'Keyed in' : g.line.kind === 'addon' ? 'Add-on' : g.line.kind === 'package' ? 'Package'
-                : g.line.kind === 'giftcard' ? 'Gift card · code given when paid' : g.line.kind === 'packageSale' ? 'Prepaid package' : 'Service'}</Text>
+                : g.line.kind === 'giftcard' ? 'Gift card · code given when paid' : g.line.kind === 'packageSale' ? 'Prepaid package' : g.line.kind === 'booking' ? 'Booked' : 'Service'}</Text>
             </View>
             <Text style={styles.linePrice}>{money(g.line.priceCents * g.count)}</Text>
-            <TouchableOpacity accessibilityLabel={g.count > 1 ? `Remove one ${g.line.label}` : `Remove ${g.line.label}`} onPress={() => removeOne(g.lastKey)} style={styles.remove}>
-              <Feather name="x" size={18} color={look.subtle} />
-            </TouchableOpacity>
+            {g.line.kind === 'booking' ? <View style={styles.remove} /> : (
+              <TouchableOpacity accessibilityLabel={g.count > 1 ? `Remove one ${g.line.label}` : `Remove ${g.line.label}`} onPress={() => removeOne(g.lastKey)} style={styles.remove}>
+                <Feather name="x" size={18} color={look.subtle} />
+              </TouchableOpacity>
+            )}
           </View>
         ))}
       </ScrollView>
@@ -388,6 +448,7 @@ export function TabletPos({ bookRequest }: { bookRequest?: BookRequest | null } 
         {discount > 0 ? <View style={styles.totalRow}><Text style={styles.subtle}>{discountPct != null ? `Discount (${discountPct}%)` : 'Discount'}</Text><View style={styles.adjust}><Text style={styles.subtle}>−{money(discount)}</Text>
           <TouchableOpacity testID="tablet-pos-remove-discount" accessibilityLabel="Remove discount" onPress={() => { setDiscountCents(0); setDiscountPct(null); }} style={styles.removeSmall}><Feather name="x" size={16} color={look.subtle} /></TouchableOpacity></View></View> : null}
         {taxCents > 0 ? <View style={styles.totalRow}><Text style={styles.subtle}>{taxLabel}</Text><Text testID="tablet-pos-tax" style={styles.subtle}>{money(taxCents)}</Text></View> : null}
+        {depositCents > 0 ? <View style={styles.totalRow}><Text style={styles.subtle}>Deposit paid</Text><Text testID="tablet-pos-deposit" style={styles.subtle}>−{money(depositCents)}</Text></View> : null}
         <View style={styles.totalRow}><Text style={styles.totalLabel}>Total</Text><Text testID="tablet-pos-total" style={styles.totalValue}>{money(totalCents)}</Text></View>
         {/* Paying: what is paid so far and what is left, as /nail's cart shows it. */}
         {paying && payState ? <>
@@ -415,7 +476,7 @@ export function TabletPos({ bookRequest }: { bookRequest?: BookRequest | null } 
       </> : <>
       <View style={styles.actionRow}>
         <TouchableOpacity testID="tablet-pos-clear" onPress={clear} style={[styles.secondaryButton, { flex: 1 }]}><Text style={styles.secondaryText}>CLEAR</Text></TouchableOpacity>
-        <TouchableOpacity testID="tablet-pos-book" disabled={!!paying} onPress={() => { setBookMode(true); startBooking(); }} style={[styles.secondaryButton, { flex: 1 }]}><Text style={styles.secondaryText}>BOOK</Text></TouchableOpacity>
+        <TouchableOpacity testID="tablet-pos-book" disabled={!!paying || !!visit} onPress={() => { setBookMode(true); startBooking(); }} style={[styles.secondaryButton, { flex: 1 }, visit && { opacity: 0.45 }]}><Text style={styles.secondaryText}>BOOK</Text></TouchableOpacity>
       </View>
       <View style={[styles.actionRow, { marginTop: 10 }]}>
         <TouchableOpacity testID="tablet-pos-charge" disabled={!lines.length || busy} onPress={() => void charge()} style={[styles.chargeButton, (!lines.length || busy) && { opacity: 0.5 }]}>
@@ -583,6 +644,29 @@ export function TabletPos({ bookRequest }: { bookRequest?: BookRequest | null } 
       setBooking((b) => (b ? { ...b, slot: null } : b));
     } finally { setBookBusy(false); }
   };
+  // A booking's CHECKOUT (CheckoutRequest): the booking on the ticket, with the products already on it.
+  useEffect(() => {
+    const id = Number(checkoutRequest?.checkout);
+    if (!id) return;
+    const v: Visit = {
+      id, amountCents: Math.max(0, Math.round(Number(checkoutRequest?.amountCents) || 0)), depositCents: Math.max(0, Math.round(Number(checkoutRequest?.depositCents) || 0)),
+      clientName: String(checkoutRequest?.clientName ?? ''), serviceName: String(checkoutRequest?.serviceName || 'Booking'),
+      phone: String(checkoutRequest?.phone ?? ''), email: String(checkoutRequest?.email ?? ''), clientId: String(checkoutRequest?.clientId ?? ''), serviceIds: String(checkoutRequest?.serviceIds ?? ''),
+    };
+    setPaying(null); setPanel(null); setBooking(null); setBookMode(false); setPicking(false);
+    setCents(0); setError(''); setDiscountCents(0); setDiscountPct(null); setQty(1); setQtyDigits(null); setGuided(null);
+    setVisit(v); visitCharges.current = []; visitProducts.current = [];
+    setClient({ customerId: Number(v.clientId) || 0, name: v.clientName, phone: v.phone, email: v.email });
+    setLines([{ key: `visit-${id}`, label: v.serviceName, priceCents: v.amountCents, kind: 'booking' }]);
+    say(`CHECKING OUT ${v.clientName.toUpperCase()} · ADD ITEMS OR TAP PAY`);
+    api.get<{ products?: { productId: number; name: string; priceCents: number; quantity: number }[] }>(`/api/pro/appointments/${id}/checkout`).then((r) => {
+      const products = Array.isArray(r?.products) ? r.products : [];
+      visitProducts.current = products.map((p) => ({ productId: p.productId, quantity: p.quantity }));
+      if (products.length) setLines((cur) => [...cur, ...products.flatMap((p) => Array.from({ length: p.quantity }, (_, i) => ({
+        key: `visit-${id}-p${p.productId}-${i}`, label: p.name, priceCents: p.priceCents, kind: 'product' as const, productId: p.productId })))]);
+    }).catch(() => undefined);
+  }, [checkoutRequest?.checkout]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // A New booking from elsewhere in the app: its client, services and day.
   useEffect(() => {
     if (!bookRequest?.book) return;
@@ -620,7 +704,11 @@ export function TabletPos({ bookRequest }: { bookRequest?: BookRequest | null } 
       <View style={[styles.panel, styles.catalog, styles.payPanel]} testID="tablet-pos-checkout">
         <PosPayBridgeContext.Provider value={bridge}>
           <PaneHost pane={{ key: paying.appointmentId, Screen: CheckoutScreen, params: paying }}
-            onClose={(done) => { setPaying(null); setPayState(null); if (done) clear(); }} />
+            onClose={(done) => {
+              setPaying(null); setPayState(null);
+              if (done) clear();
+              else if (visit) void undoVisitExtras(visit);
+            }} />
         </PosPayBridgeContext.Provider>
       </View>
     </View>

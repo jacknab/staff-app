@@ -162,6 +162,7 @@ export default function AppointmentDetailScreen() {
 
 function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
   const colors = useColors();
+  const isTablet = useIsTablet();
   const inPane = useInPane();
   const closePane = usePaneClose();
   const setScreenParams = usePaneSetParams();
@@ -615,10 +616,16 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
   // Payments not set up: Check Out opens its Stripe page instead (owner, 2026-11-11; app/payments-checkout.tsx).
   const paymentsReady = usePaymentsReady();
   // Checkout always opens (owner, 2026-11-15): cash and gift cards need no Stripe; only its card buttons do.
-  const checkout = () => router.push({
-    pathname: '/(tabs)/checkout',
-    params: { appointmentId: String(appointmentId), clientName, serviceName, amountCents: String(amountCents), depositCents: String(depositPaidCents), phone: params.phone ?? '', email: params.email ?? '', clientId: params.customerId ?? '', serviceIds: rebookServiceIds },
-  });
+  // On a tablet the booking opens in the POS (owner, 2026-11-20): its ticket, more items if wanted, then PAY.
+  const checkout = () => isTablet
+    ? router.navigate({
+      pathname: '/(tabs)/pos',
+      params: { checkout: String(appointmentId), clientName, serviceName, amountCents: String(amountCents), depositCents: String(depositPaidCents), phone: params.phone ?? '', email: params.email ?? '', clientId: params.customerId ?? '', serviceIds: rebookServiceIds },
+    })
+    : router.push({
+      pathname: '/(tabs)/checkout',
+      params: { appointmentId: String(appointmentId), clientName, serviceName, amountCents: String(amountCents), depositCents: String(depositPaidCents), phone: params.phone ?? '', email: params.email ?? '', clientId: params.customerId ?? '', serviceIds: rebookServiceIds },
+    });
 
   const openContact = async (type: 'text' | 'call' | 'email') => {
     const value = type === 'email' ? params.email : params.phone;
