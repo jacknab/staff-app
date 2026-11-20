@@ -14,6 +14,7 @@ export const CATALOG_TYPE: Record<string, { type: string; only?: string }> = {
   'Nail Salon': { type: 'Nails' }, 'Hair Salon': { type: 'Hair' }, Barbershop: { type: 'Barber' }, 'Lash and Brows': { type: 'Lash & Brow' },
   Esthetician: { type: 'Esthetics' }, Makeup: { type: 'Esthetics', only: 'Makeup' }, Massage: { type: 'Massage' }, Wax: { type: 'Waxing' },
   'Med Spa': { type: 'Med Spa' }, Wellness: { type: 'Wellness' },
+  'Tattoo and Piercing': { type: 'Tattoo & Piercing' }, 'Pet Grooming': { type: 'Pet Grooming' },
 };
 
 /** A business type's categories with their common services, in the order they're asked. */
