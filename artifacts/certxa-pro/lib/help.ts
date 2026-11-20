@@ -574,11 +574,23 @@ export const HELP: Record<string, HelpPage> = {
   },
 
   // ── Catalog ───────────────────────────────────────────────────────────────────────────────────────────────────────
+  'add-from-list': {
+    title: 'Add from list',
+    intro: 'Add common services for your type of business without typing their names.',
+    sections: [{ heading: 'How it works', points: [
+      'What do you offer?: tap every kind of service you do, then Next. Services already on your menu aren’t shown, and a kind with none left isn’t offered.',
+      'If your type of business has no list, choose one under Which list?.',
+      'Then one service at a time: type the price in whole dollars and tap ENTER, then the minutes (the usual length is filled in; ENTER keeps it). Tap ENTER with no price to skip a service you don’t do.',
+      'PREV goes back, NEXT CATEGORY skips the rest of a kind, EXIT stops and adds what you’ve priced so far.',
+      'The services go on your menu in their kind (a new category is made when you don’t have it yet) and on your calendar, ready to book.',
+    ] }],
+  },
   services: {
     title: 'Services',
     intro: 'What you offer, how long it takes and the price.',
     sections: [{ heading: 'How it works', points: [
       'Tap + to add a service, or tap one to edit it.',
+      'Add from list: pick from the common services for your type of business and price them one at a time (see that page’s help).',
       'Name, Minutes and Price: the length decides which times are offered for it.',
       'Category: where it’s listed on your website.',
       'Clients choose how many: for anything priced per item; clients see − 1 + on your website, up to 10.',

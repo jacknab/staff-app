@@ -132,6 +132,7 @@ function RootLayoutNav() {
       <Stack.Screen name="settings" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="reviews" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="services" options={{ headerShown: false, presentation: 'card' }} />
+      <Stack.Screen name="add-from-list" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="notifications" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="tap-to-pay" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="payments-intro" options={{ headerShown: false, presentation: 'card' }} />

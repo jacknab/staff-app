@@ -312,6 +312,12 @@ export default function ServicesScreen() {
         ) : (
           <>
             {error ? <Text style={[styles.error, { color: colors.destructive, marginBottom: 12 }]}>{error}</Text> : null}
+            {/* Add from list (owner, 2026-11-20): the common services for the business type, priced on a keypad. */}
+            <TouchableOpacity testID="services-add-from-list" onPress={() => router.push('/add-from-list' as never)} style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border, marginBottom: 6 }]}>
+              <Feather name="list" size={20} color={colors.primary} />
+              <Text style={[styles.rowTitle, { color: colors.foreground, flex: 1 }]}>Add from list</Text>
+              <Feather name="chevron-right" size={20} color={colors.mutedForeground} />
+            </TouchableOpacity>
             {services.length === 0 && !error ? <Text style={[styles.empty, { color: colors.mutedForeground }]}>You have no services yet. Tap + to add the first one.</Text> : null}
             {groups.map((group) => (
             <View key={group.id} style={styles.group}>

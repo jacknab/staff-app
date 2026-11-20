@@ -18,6 +18,7 @@
  *
  * Tablets (owner, 2026-11-19): the menu stays on the left and the chosen setting opens on the right.
  */
+import { BUSINESS_TYPES } from '@/lib/serviceCatalog';
 import { useCallback, useEffect, useState, type ComponentProps, type ReactNode } from 'react';
 import { Feather } from '@expo/vector-icons';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
@@ -48,7 +49,7 @@ type Store = { id: number; name?: string | null; phone?: string | null; email?: 
 type Hours = { dayOfWeek: number; openTime: string; closeTime: string; isClosed: boolean };
 type FeatherName = ComponentProps<typeof Feather>['name'];
 
-const BUSINESS_TYPES = ['Nail Salon', 'Hair Salon', 'Barbershop', 'Lash and Brows', 'Esthetician', 'Makeup', 'Massage', 'Wax', 'Tattoo and Piercing', 'Pet Grooming', 'Other'];
+// The same list as sign-up (lib/serviceCatalog.ts).
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const TITLES: Record<Screen, string> = {
   menu: 'Settings', business: 'Business details', location: 'Location', places: 'Where you see clients', hours: 'Hours', rules: 'Online booking', policy: 'Cancellation policy',

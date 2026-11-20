@@ -8,8 +8,10 @@ import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollV
 import { useColors } from '@/hooks/useColors';
 import { SelectField } from '@/components/SelectField';
 import { useAuth } from '@/contexts/AuthContext';
-import { CertxaApiError, certxaRequest, sendSignupPhoneCode, verifySignupPhoneCode } from '@/lib/certxa-api';
+import { CertxaApiError, sendSignupPhoneCode, verifySignupPhoneCode } from '@/lib/certxa-api';
 import { CatalogBuilder, entryKey, type CatalogCategory, type CatalogEntries } from '@/components/signup/CatalogBuilder';
+import { CategoryTiles } from '@/components/signup/CategoryTiles';
+import { BUSINESS_TYPES, CATALOG_TYPE, loadCatalog } from '@/lib/serviceCatalog';
 import { api } from '@/lib/live-api';
 import { BusinessHoursEditor, DAY_NAMES, type DayHours } from '@/components/BusinessHoursEditor';
 
@@ -18,14 +20,6 @@ import { look, cardShadow } from '@/components/look/tokens';
 import { HelpTitle } from '@/components/HelpTitle';
 import { WhyWeAsk } from '@/components/WhyWeAsk';
 import { BUSINESS_STRUCTURES, WHY, dateOfBirthIso, isCompany } from '@/lib/stripe-details';
-// The same list as Settings > Business details. Certxa loads a starter list of services for the types it has one for.
-const BUSINESS_TYPES = ['Nail Salon', 'Hair Salon', 'Barbershop', 'Lash and Brows', 'Esthetician', 'Makeup', 'Massage', 'Wax', 'Tattoo and Piercing', 'Pet Grooming', 'Other'];
-// Each business type's list in the service catalog (GET /api/public/service-catalog/:type); Makeup is the Esthetics
-// list's Makeup category. Types without one skip the two catalog steps.
-const CATALOG_TYPE: Record<string, { type: string; only?: string }> = {
-  'Nail Salon': { type: 'Nails' }, 'Hair Salon': { type: 'Hair' }, Barbershop: { type: 'Barber' }, 'Lash and Brows': { type: 'Lash & Brow' },
-  Esthetician: { type: 'Esthetics' }, Makeup: { type: 'Esthetics', only: 'Makeup' }, Massage: { type: 'Massage' }, Wax: { type: 'Waxing' },
-};
 type StepId = 'business' | 'categories' | 'prices' | 'place' | 'hours' | 'stripe' | 'login' | 'phone';
 const ALL_STEPS: StepId[] = ['business', 'categories', 'prices', 'place', 'hours', 'stripe', 'login', 'phone'];
 
@@ -64,8 +58,8 @@ export default function SignupScreen() {
     setCatalog(null); setChosenCats([]); setEntries({});
     if (!catalogType) return;
     let cancelled = false;
-    certxaRequest<{ categories: CatalogCategory[] }>(`/api/public/service-catalog/${encodeURIComponent(catalogType.type)}`)
-      .then((r) => { if (!cancelled) setCatalog((r?.categories ?? []).filter((c) => !catalogType.only || c.name === catalogType.only)); })
+    loadCatalog(businessType)
+      .then((cats) => { if (!cancelled) setCatalog(cats); })
       .catch(() => { if (!cancelled) setCatalog([]); });
     return () => { cancelled = true; };
   }, [businessType]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -273,19 +267,7 @@ export default function SignupScreen() {
           <>
             <HelpTitle help="signup" style={[styles.title, { color: colors.foreground }]}>What do you offer?</HelpTitle>
             <Text style={[styles.optionHint, { color: colors.mutedForeground, marginTop: 12 }]}>Tap every kind of service you do. Next, you'll price each one.</Text>
-            <View style={styles.tiles}>
-              {(catalog ?? []).map((c) => {
-                const on = chosenCats.includes(c.name);
-                return (
-                  <TouchableOpacity key={c.name} accessibilityRole="checkbox" accessibilityState={{ checked: on }} testID={`signup-cat-${c.name}`}
-                    onPress={() => setChosenCats((cur) => (on ? cur.filter((n) => n !== c.name) : [...cur, c.name]))}
-                    style={[styles.tile, on && styles.tileOn]}>
-                    <Text style={[styles.tileText, on && styles.tileTextOn]}>{c.name}</Text>
-                    {on ? <Feather name="check" size={20} color="#FFFFFF" /> : null}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+            <CategoryTiles names={(catalog ?? []).map((c) => c.name)} chosen={chosenCats} onChange={setChosenCats} />
             <TouchableOpacity onPress={() => { setChosenCats([]); goTo('place'); }} style={{ alignSelf: 'center', minHeight: 44, justifyContent: 'center', marginTop: 18 }} testID="signup-catalog-skip">
               <Text style={[styles.link, { color: colors.foreground }]}>I'll add my services later</Text>
             </TouchableOpacity>
@@ -458,12 +440,6 @@ const styles = StyleSheet.create({
   sectionLabel: { fontSize: 17, fontFamily: 'Inter_600SemiBold', marginTop: 12 },
   input: { borderWidth: 1, borderRadius: 14, height: 56, paddingHorizontal: 16, fontSize: 18, fontFamily: 'Inter_400Regular' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 24 },
-  tile: { flexGrow: 1, flexBasis: '45%', minHeight: 72, borderRadius: 16, borderWidth: 1, borderColor: look.cardBorder, backgroundColor: look.card,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingHorizontal: 16, ...cardShadow },
-  tileOn: { backgroundColor: look.violet, borderColor: look.violet },
-  tileText: { flex: 1, fontSize: 18, fontFamily: 'Inter_600SemiBold', color: look.heading },
-  tileTextOn: { color: '#FFFFFF' },
   chip: { borderWidth: 1, borderRadius: 22, paddingHorizontal: 16, minHeight: 42, justifyContent: 'center' },
   chipText: { fontSize: 17, fontFamily: 'Inter_500Medium' },
   optionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 64, marginTop: 22 },
