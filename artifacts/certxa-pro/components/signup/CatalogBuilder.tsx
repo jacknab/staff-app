@@ -3,12 +3,11 @@
  * whole-dollar price and taps ENTER (ENTER on an empty price = they don't offer it, so on to the next service), then
  * the minutes, already filled in with the usual length (ENTER keeps it, typing replaces it). PREV goes back one screen,
  * NEXT CATEGORY skips the rest of a category, EXIT keeps what was entered and moves on with the sign-up. The services
- * are each category's common ones (GET /api/public/service-catalog/:type). On a tablet the category's list fills in
- * beside the keypad.
+ * are each category's common ones (GET /api/public/service-catalog/:type). The keypad alone, on phones and tablets.
  */
 import { useState } from 'react';
 import { Feather } from '@expo/vector-icons';
-import { ScrollView, StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { Text } from '@/components/AppText';
 import { look } from '@/components/look/tokens';
 
@@ -124,25 +123,8 @@ export function CatalogBuilder({ categories, entries, onChange, onDone, onBack }
       </View>
     </View>
   );
-  if (!wide) return keypad;
-  // Tablet: the category's services with what was entered, beside the keypad.
-  return (
-    <View style={styles.wide}>
-      <ScrollView style={styles.list} contentContainerStyle={{ padding: 18, gap: 4 }}>
-        <Text style={styles.listTitle}>{category.name}</Text>
-        {category.services.map((s, i) => {
-          const e = entries[entryKey(category.name, s.name)];
-          return (
-            <TouchableOpacity key={s.name} onPress={() => show(cat, i, 'price')} style={[styles.listRow, i === svc && styles.listRowOn]}>
-              <Text style={styles.listName} numberOfLines={1}>{s.name}</Text>
-              <Text style={styles.listValue}>{e ? `$${e.price} · ${e.duration} min` : '—'}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
-      {keypad}
-    </View>
-  );
+  // Just the keypad, on phones and tablets alike (owner, 2026-11-20: no list of the category's services beside it).
+  return keypad;
 }
 
 const styles = StyleSheet.create({
@@ -163,11 +145,4 @@ const styles = StyleSheet.create({
   keyActionText: { fontSize: 15, color: look.violetDeep, letterSpacing: 0.4 },
   keyEnter: { backgroundColor: look.violet, borderColor: look.violet, borderBottomColor: look.violetDeep },
   keyEnterText: { fontSize: 22, color: '#FFFFFF', letterSpacing: 0.6 },
-  wide: { flex: 1, flexDirection: 'row', gap: 20 },
-  list: { flex: 1, backgroundColor: look.card, borderRadius: 18, borderWidth: 1, borderColor: look.cardBorder },
-  listTitle: { fontSize: 20, fontFamily: 'Inter_700Bold', color: look.heading, marginBottom: 8 },
-  listRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, minHeight: 48, paddingHorizontal: 12, borderRadius: 12 },
-  listRowOn: { backgroundColor: look.tile },
-  listName: { flex: 1, fontSize: 17, fontFamily: 'Inter_500Medium', color: look.heading },
-  listValue: { fontSize: 16, fontFamily: 'Inter_600SemiBold', color: look.violetDeep },
 });
