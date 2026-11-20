@@ -287,10 +287,11 @@ export default function SettingsScreen() {
       const service = percent('service', 30, 'service sales tax');
       const retail = percent('retail', 30, 'retail sales tax');
       const tips = (draft.tips as string[] | undefined ?? []).map((t) => t.trim()).filter(Boolean).map(Number);
-      if (tips.length === 0) throw new Error('Enter at least one tip option.');
+      // The client's tip page shows exactly three tips, as whole dollars (owner, 2026-11-20); a tap pays, so none is
+      // picked in advance.
+      if (tips.length !== 3) throw new Error('Enter all three tips.');
       if (tips.some((t) => !Number.isInteger(t) || t < 1 || t > 100)) throw new Error('Tip options are whole percentages from 1 to 100.');
-      const defaultTip = Number(draft.defaultTip) || 0;
-      if (defaultTip && !tips.includes(defaultTip)) throw new Error('The tip selected by default must be one of your tips.');
+      if (new Set(tips).size !== 3) throw new Error('Enter three different tips.');
       // Each tax is charged only when it is above 0%.
       const tax = await api.patch<Record<string, any>>(`/api/pos-settings/${store.id}`, {
         clientFeeRate: (fee / 100).toFixed(4),
@@ -299,7 +300,7 @@ export default function SettingsScreen() {
       });
       const percents = String(draft.discounts ?? '').split(/[\s,%]+/).filter(Boolean).map(Number);
       if (!percents.length || percents.length > 8 || percents.some((n) => !Number.isInteger(n) || n < 1 || n > 100)) throw new Error('POS discounts are 1 to 8 whole percents from 1 to 100, like 10, 20.');
-      const saved = await api.put<{ presets: number[]; defaultPreset?: number | null }>('/api/tip-presets', { presets: tips, defaultPreset: defaultTip || null });
+      const saved = await api.put<{ presets: number[]; defaultPreset?: number | null }>('/api/tip-presets', { presets: tips, defaultPreset: null });
       const discounts = await api.put<{ percents: number[] }>('/api/pro/pos-discounts', { percents });
       setDraft(withDiscounts(checkoutDraft({ ...tax, clientFeeRate: fee / 100, salesTaxRate: service / 100, taxServicesTaxable: service > 0, retailTaxRate: retail / 100, taxProductsTaxable: retail > 0 }, saved), discounts.percents));
     });
@@ -807,18 +808,15 @@ export default function SettingsScreen() {
         {saveButton()}
       </>);
       if (draft.editing === 'tips') {
-        const filled = tips.map((t) => Number(t.trim())).filter((t) => Number.isInteger(t) && t > 0);
         return (<>
           {tips.map((value, i) => (
             <View key={i}>
               <Label>{`Tip ${i + 1} (%)`}</Label>
               <TextInput testID={`settings-tip-${i}`} value={value} onChangeText={(v) => set('tips', tips.map((t, j) => (j === i ? v.replace(/[^0-9]/g, '').slice(0, 3) : t)))}
-                placeholder={i === 0 ? '20' : 'Optional'} placeholderTextColor={colors.mutedForeground} keyboardType="number-pad"
+                placeholder={['18', '20', '25'][i] ?? ''} placeholderTextColor={colors.mutedForeground} keyboardType="number-pad"
                 style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
             </View>
           ))}
-          <Label>Tip selected by default</Label>
-          {choices('defaultTip', [{ value: 0, label: 'None' }, ...Array.from(new Set(filled)).map((t) => ({ value: t, label: `${t}%` }))])}
           {saveButton()}
         </>);
       }
@@ -826,7 +824,7 @@ export default function SettingsScreen() {
         {valueRow('fee', 'Platform fee rate', pct(draft.fee))}
         {valueRow('service', 'Service sales tax', pct(draft.service))}
         {valueRow('retail', 'Retail sales tax', pct(draft.retail))}
-        {valueRow('tips', 'Tip customized options', Number(draft.defaultTip) ? `${tipList} · ${draft.defaultTip}% selected by default` : tipList)}
+        {valueRow('tips', 'Tip customized options', tipList)}
         {valueRow('discounts', 'POS discount buttons', String(draft.discounts ?? '').split(/[\s,%]+/).filter(Boolean).map((n) => `${n}%`).join(', ') || 'None')}
       </>);
     }

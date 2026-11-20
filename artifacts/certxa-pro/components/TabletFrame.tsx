@@ -38,7 +38,8 @@ export function TabletFrame({ children }: { children: ReactNode }) {
   const fullWidth = ['/', '/index', '/settings', '/clients', '/more', '/catalog', '/past-bookings', '/pos'].includes(pathname)
     || pathname.startsWith('/appointment/');
   const { width } = useWindowDimensions();
-  const helpId = !fullWidth && width >= HELP_PANEL_MIN_WIDTH ? helpIdForPath(pathname) : null;
+  // Not beside checkout: its tip page is turned to the client (owner, 2026-11-20).
+  const helpId = !fullWidth && width >= HELP_PANEL_MIN_WIDTH && pathname !== '/checkout' ? helpIdForPath(pathname) : null;
   const help = helpId ? HELP[helpId] : null;
   if (help) {
     return (

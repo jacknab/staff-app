@@ -1,214 +1,149 @@
-import { useEffect, useMemo, useState } from 'react';
+/**
+ * The client's tip page (owner's design, 2026-11-20): "Say thanks to <pro> with a tip", the pro's three tips as whole
+ * dollar amounts (never the percentage, and never a "Popular" label), each with its face under the card. Tapping a
+ * tip — or Skip for none — starts the card payment at once; Custom tip types an amount and confirms it.
+ *
+ * A tip is the percentage of the visit rounded to whole dollars, the beauty-business way: 50¢ and under rounds down,
+ * 51¢ and up rounds up ($11.26 → $11, $11.51 → $12). On a tablet this fills the screen for the client, in one centered
+ * column the phone's width.
+ */
+import { useEffect, useState } from 'react';
 import { Feather } from '@expo/vector-icons';
 import { Platform, StatusBar, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text } from '@/components/AppText';
 import { useNavigation } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
+import { useAuth } from '@/contexts/AuthContext';
 
-import { cardShadow } from '@/components/look/tokens';
 type TipCheckoutProps = {
   baseCents: number;
   serviceName?: string;
-  /** The business's tip percentages (Certxa POS settings); Certxa's defaults until they load. */
+  /** The business's three tip percentages (Settings › Card reader & Checkout); 18, 20 and 25 until they load. */
   presets?: number[];
-  /** The tip picked before the client chooses (Settings › Card reader & Checkout); null = none. */
+  /** Kept for callers; no tip is picked in advance now that a tap pays. */
   defaultPercent?: number | null;
   onConfirmTip: (tipCents: number) => void;
   /** Back out of checkout (to the appointment it was opened from). */
   onBack?: () => void;
 };
 
-const DEFAULT_PRESETS = [15, 18, 20, 25];
+const DEFAULT_PRESETS = [18, 20, 25];
+/** The faces under the three tips, smallest to largest. */
+const FACES = ['😊', '😘', '❤️'];
+const INK = '#111111';
 
-function dollars(cents: number) {
-  return `$${(Math.max(0, cents) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+/** The tip in whole dollars, in cents: 50¢ and under rounds down, 51¢ and up rounds up. */
+export function roundedTipCents(baseCents: number, percent: number): number {
+  const exact = Math.round(Math.max(0, baseCents) * percent / 100);
+  const whole = Math.floor(exact / 100);
+  return (exact % 100 > 50 ? whole + 1 : whole) * 100;
 }
 
-export function TipCheckout({ baseCents, serviceName, presets, defaultPercent, onConfirmTip, onBack }: TipCheckoutProps) {
-  const tipOptions = (presets && presets.length > 0 ? presets : DEFAULT_PRESETS).slice(0, 4).map((percent) => ({ label: `${percent}%`, percent }));
+const wholeDollars = (cents: number) => `$${Math.round(Math.max(0, cents) / 100).toLocaleString('en-US')}`;
+const dollars = (cents: number) => `$${(Math.max(0, cents) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+export function TipCheckout({ baseCents, presets, onConfirmTip, onBack }: TipCheckoutProps) {
+  const percents = (presets && presets.length > 0 ? presets : DEFAULT_PRESETS).slice(0, 3);
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
+  const { user } = useAuth();
+  const proName = String((user as { firstName?: unknown } | null)?.firstName ?? '').trim();
   const [screen, setScreen] = useState<'select' | 'custom'>('select');
-  const [selectedPercent, setSelectedPercent] = useState<number | null>(null);
-  // The settings load after this opens: pick the default tip once it arrives, unless the client already chose.
-  useEffect(() => {
-    if (defaultPercent && tipOptions.some((o) => o.percent === defaultPercent)) setSelectedPercent((current) => current ?? defaultPercent);
-  }, [defaultPercent, presets]); // eslint-disable-line react-hooks/exhaustive-deps
   const [customDigits, setCustomDigits] = useState('0');
   const safeBaseCents = Math.max(0, Math.round(baseCents || 0));
-  const selectedTipCents = selectedPercent === null ? null : Math.round(safeBaseCents * selectedPercent / 100);
   const customTipCents = Number(customDigits) || 0;
-  const tipCents = screen === 'custom' ? customTipCents : selectedTipCents ?? 0;
-  const topInset = Platform.OS === 'web' ? 67 : insets.top;
-  const displayService = serviceName?.trim() || 'Appointment';
+  const topInset = Platform.OS === 'web' ? 24 : insets.top;
 
   useEffect(() => {
     navigation.setOptions({ tabBarStyle: { display: 'none' } });
     return () => navigation.setOptions({ tabBarStyle: undefined });
   }, [navigation]);
 
-  // A tip button is the go-ahead (owner, 2026-11-20): it starts the card payment at once with that tip. Custom tip types
-  // the amount first and confirms it.
-  const choosePercent = (percent: number) => {
-    setSelectedPercent(percent);
-    setScreen('select');
-    onConfirmTip(Math.round(safeBaseCents * percent / 100));
-  };
-
   const pressKey = (key: string) => {
-    if (key === 'backspace') {
-      setCustomDigits((current) => current.length > 1 ? current.slice(0, -1) : '0');
-      return;
-    }
-    setCustomDigits((current) => current === '0' ? key : `${current}${key}`);
+    if (key === 'clear') { setCustomDigits('0'); return; }
+    if (key === 'backspace') { setCustomDigits((current) => (current.length > 1 ? current.slice(0, -1) : '0')); return; }
+    setCustomDigits((current) => (current === '0' ? key : `${current}${key}`).slice(0, 7));
   };
-
-  const confirm = () => {
-    if (screen === 'custom' && customTipCents <= 0) return;
-    if (screen === 'select' && selectedPercent === null) return;
-    onConfirmTip(tipCents);
-  };
-
-  const summary = useMemo(() => (
-    <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      <View style={styles.summaryRow}>
-        <Text style={[styles.summaryLabel, { color: colors.mutedForeground }]}>{displayService}</Text>
-        <Text style={[styles.summaryValue, { color: colors.foreground }]}>{dollars(safeBaseCents)}</Text>
-      </View>
-      <View style={styles.summaryRow}>
-        <Text style={[styles.summaryLabel, { color: colors.mutedForeground }]}>Tip</Text>
-        <Text style={[styles.summaryValue, { color: colors.foreground }]}>{dollars(tipCents)}</Text>
-      </View>
-      <View style={[styles.totalRow, { borderTopColor: colors.border }]}>
-        <Text style={[styles.totalLabel, { color: colors.foreground }]}>Total</Text>
-        <Text style={[styles.totalValue, { color: colors.foreground }]}>{dollars(safeBaseCents + tipCents)}</Text>
-      </View>
-    </View>
-  ), [colors, displayService, safeBaseCents, tipCents]);
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.background, paddingTop: topInset }]}>
+    <View style={[styles.root, { paddingTop: topInset }]}>
       <StatusBar barStyle="dark-content" />
       <View style={styles.header}>
-        {/* Back: from the custom tip to the tip choices; from the tip choices to the appointment (user, 2026-10-24:
-            the checkout pages had no easy way back). */}
         {screen === 'custom' || onBack ? (
-          <TouchableOpacity testID="tip-back" onPress={() => (screen === 'custom' ? setScreen('select') : onBack?.())} style={styles.backButton}
-            accessibilityRole="button" accessibilityLabel="Back">
-            <Feather name="arrow-left" size={20} color={colors.foreground} />
-            <Text style={[styles.backText, { color: colors.foreground }]}>Back</Text>
+          <TouchableOpacity testID="tip-back" onPress={() => (screen === 'custom' ? setScreen('select') : onBack?.())} style={styles.headerSide} accessibilityRole="button" accessibilityLabel="Back">
+            <Feather name="chevron-left" size={30} color={INK} />
           </TouchableOpacity>
-        ) : <View style={styles.backButton} />}
-        <Text style={[styles.eyebrow, { color: colors.mutedForeground }]}>CHECKOUT</Text>
-        <View style={styles.backButton} />
-      </View>
-
-      <View style={styles.content}>
-        <Text style={[styles.eyebrow, { color: colors.primary }]}>FINISHING UP</Text>
-        <Text style={[styles.title, { color: colors.foreground }]}>{screen === 'custom' ? 'Add a custom tip' : 'Add a tip?'}</Text>
-        {screen === 'custom' ? <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Enter the tip amount for this appointment.</Text> : null}
-
+        ) : <View style={styles.headerSide} />}
         {screen === 'select' ? (
-          <>
-            {summary}
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Choose a tip</Text>
-            <View style={styles.tipGrid}>
-              {tipOptions.map(({ label, percent }) => {
-                const selected = selectedPercent === percent;
-                return (
-                  <TouchableOpacity
-                    key={label}
-                    testID={`tip-${percent}`}
-                    onPress={() => choosePercent(percent)}
-                    style={[styles.tipOption, { backgroundColor: selected ? colors.secondary : colors.card, borderColor: selected ? colors.primary : colors.border }]}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected }}
-                  >
-                    <Text style={[styles.tipPercent, { color: selected ? colors.primary : colors.foreground }]}>{label}</Text>
-                    <Text style={[styles.tipAmount, { color: colors.mutedForeground }]}>{dollars(Math.round(safeBaseCents * percent / 100))}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-            {/* Skip (no tip) on the left, Custom tip on the right, one row (owner, 2026-11-17; "Skip" 2026-11-20). */}
-            <View style={styles.choiceRow}>
-              <TouchableOpacity testID="tip-no-tip" onPress={() => choosePercent(0)} accessibilityRole="button" accessibilityState={{ selected: selectedPercent === 0 }} style={[styles.customButton, styles.choiceHalf, { backgroundColor: selectedPercent === 0 ? colors.secondary : colors.card, borderColor: selectedPercent === 0 ? colors.primary : colors.border }]}>
-                <Text numberOfLines={1} style={[styles.customButtonText, { color: selectedPercent === 0 ? colors.primary : colors.foreground }]}>Skip</Text>
-              </TouchableOpacity>
-              <TouchableOpacity testID="custom-tip" onPress={() => setScreen('custom')} accessibilityRole="button" style={[styles.customButton, styles.choiceHalf, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <Feather name="edit-3" size={18} color={colors.primary} />
-                <Text numberOfLines={1} style={[styles.customButtonText, { color: colors.foreground }]}>Custom tip</Text>
-              </TouchableOpacity>
-            </View>
-          </>
-        ) : (
-          <>
-            <View style={[styles.customAmountCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Text style={[styles.amountCaption, { color: colors.mutedForeground }]}>CUSTOM TIP</Text>
-              <Text testID="custom-tip-amount" style={[styles.customAmount, { color: colors.foreground }]}>{dollars(customTipCents)}</Text>
-            </View>
-            <View style={styles.keypad}>
-              {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'clear', '0', 'backspace'].map((key) => (
-                <TouchableOpacity
-                  key={key}
-                  testID={`tip-key-${key}`}
-                  onPress={() => key === 'clear' ? setCustomDigits('0') : pressKey(key)}
-                  style={[styles.key, { backgroundColor: key === 'clear' || key === 'backspace' ? colors.muted : colors.card, borderColor: colors.border }]}
-                >
-                  {key === 'backspace' ? <Feather name="delete" size={19} color={colors.foreground} /> : <Text style={[styles.keyText, { color: colors.foreground }]}>{key === 'clear' ? 'C' : key}</Text>}
-                </TouchableOpacity>
-              ))}
-            </View>
-          </>
-        )}
+          <TouchableOpacity testID="custom-tip" onPress={() => setScreen('custom')} style={[styles.headerSide, { alignItems: 'flex-end' }]} accessibilityRole="button">
+            <Text style={styles.customLink}>Custom tip</Text>
+          </TouchableOpacity>
+        ) : <View style={styles.headerSide} />}
       </View>
 
-      {screen === 'custom' ? <View style={[styles.footer, { paddingBottom: insets.bottom + 84 }]}>
-        <TouchableOpacity testID="confirm-tip" disabled={customTipCents <= 0} onPress={confirm} style={[styles.confirmButton, { backgroundColor: customTipCents > 0 ? colors.primary : colors.muted }]}>
-          <Text style={[styles.confirmText, { color: customTipCents > 0 ? colors.primaryForeground : colors.mutedForeground }]}>Confirm tip</Text>
-          <Feather name="arrow-right" size={19} color={customTipCents > 0 ? colors.primaryForeground : colors.mutedForeground} />
-        </TouchableOpacity>
-      </View> : null}
+      {screen === 'select' ? (
+        <View style={styles.body}>
+          <Text style={styles.title}>{proName ? `Say thanks to ${proName} with a tip` : 'Say thanks with a tip'}</Text>
+          <View style={styles.cards}>
+            {percents.map((percent, i) => {
+              const tip = roundedTipCents(safeBaseCents, percent);
+              return (
+                <View key={percent} style={styles.cardSlot}>
+                  <TouchableOpacity testID={`tip-${percent}`} onPress={() => onConfirmTip(tip)} activeOpacity={0.7} style={styles.card}
+                    accessibilityRole="button" accessibilityLabel={`Tip ${wholeDollars(tip)}`}>
+                    <Text style={styles.cardAmount}>{wholeDollars(tip)}</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.face}>{FACES[i] ?? FACES[FACES.length - 1]}</Text>
+                </View>
+              );
+            })}
+          </View>
+          <TouchableOpacity testID="tip-no-tip" onPress={() => onConfirmTip(0)} style={styles.skip} accessibilityRole="button">
+            <Text style={styles.skipText}>Skip</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View style={styles.body}>
+          <Text style={styles.title}>Add a custom tip</Text>
+          <Text testID="custom-tip-amount" style={styles.customAmount}>{dollars(customTipCents)}</Text>
+          <View style={styles.keypad}>
+            {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'clear', '0', 'backspace'].map((key) => (
+              <TouchableOpacity key={key} testID={`tip-key-${key}`} onPress={() => pressKey(key)} style={[styles.key, (key === 'clear' || key === 'backspace') && styles.keyQuiet]}>
+                {key === 'backspace' ? <Feather name="delete" size={22} color={INK} /> : <Text style={styles.keyText}>{key === 'clear' ? 'C' : key}</Text>}
+              </TouchableOpacity>
+            ))}
+          </View>
+          <TouchableOpacity testID="confirm-tip" disabled={customTipCents <= 0} onPress={() => onConfirmTip(customTipCents)}
+            style={[styles.confirm, { backgroundColor: customTipCents > 0 ? INK : colors.muted }]}>
+            <Text style={[styles.confirmText, { color: customTipCents > 0 ? '#FFFFFF' : colors.mutedForeground }]}>Confirm tip</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
-  // A tablet shows this full screen to the client: one centered column, the phone's width (owner, 2026-11-20).
-  header: { width: '100%', maxWidth: 640, alignSelf: 'center', height: 55, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  headerButton: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
-  backButton: { minWidth: 84, height: 42, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  backText: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
-  eyebrow: { fontSize: 13, letterSpacing: 1.4, fontFamily: 'Inter_700Bold' },
-  content: { flex: 1, width: '100%', maxWidth: 640, alignSelf: 'center', paddingHorizontal: 20, paddingTop: 16 },
-  title: { fontSize: 29, letterSpacing: -0.8, fontFamily: 'Inter_600SemiBold', marginTop: 5 },
-  subtitle: { fontSize: 15, lineHeight: 22, fontFamily: 'Inter_400Regular', marginTop: 6, maxWidth: 320 },
-  summaryCard: { borderWidth: 1, borderRadius: 18, padding: 15, marginTop: 25, gap: 10, ...cardShadow },
-  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  summaryLabel: { fontSize: 15, fontFamily: 'Inter_400Regular' },
-  summaryValue: { fontSize: 15, fontFamily: 'Inter_500Medium' },
-  totalRow: { borderTopWidth: 1, paddingTop: 11, marginTop: 2, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  totalLabel: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
-  totalValue: { fontSize: 20, fontFamily: 'Inter_600SemiBold' },
-  sectionTitle: { fontSize: 18, fontFamily: 'Inter_600SemiBold', marginTop: 25, marginBottom: 10 },
-  tipGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
-  tipOption: { width: '48%', minHeight: 72, borderWidth: 1, borderRadius: 15, padding: 12, justifyContent: 'center' },
-  tipPercent: { fontSize: 21, fontFamily: 'Inter_600SemiBold' },
-  tipAmount: { fontSize: 14, fontFamily: 'Inter_400Regular', marginTop: 3 },
-  customButton: { minHeight: 52, borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 9, marginTop: 10 },
-  customButtonText: { flex: 1, fontSize: 16, fontFamily: 'Inter_500Medium' },
-  choiceRow: { flexDirection: 'row', gap: 9, marginTop: 10 },
-  choiceHalf: { flex: 1, marginTop: 0 },
-  customAmountCard: { borderWidth: 1, borderRadius: 18, alignItems: 'center', paddingVertical: 19, marginTop: 26, ...cardShadow },
-  amountCaption: { fontSize: 12, letterSpacing: 1.4, fontFamily: 'Inter_600SemiBold' },
-  customAmount: { fontSize: 38, letterSpacing: -1, fontFamily: 'Inter_500Medium', marginTop: 7 },
-  keypad: { flexDirection: 'row', flexWrap: 'wrap', gap: 9, marginTop: 17 },
-  key: { width: '31.5%', height: 51, borderWidth: 1, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-  keyText: { fontSize: 21, fontFamily: 'Inter_500Medium' },
-  footer: { width: '100%', maxWidth: 640, alignSelf: 'center', paddingHorizontal: 20, paddingBottom: 22 },
-  confirmButton: { height: 53, borderRadius: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
-  confirmText: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
+  root: { flex: 1, backgroundColor: '#FFFFFF' },
+  header: { width: '100%', maxWidth: 640, alignSelf: 'center', height: 56, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  headerSide: { minWidth: 96, height: 48, justifyContent: 'center' },
+  customLink: { fontSize: 15, fontFamily: 'Inter_500Medium', color: INK },
+  body: { flex: 1, width: '100%', maxWidth: 640, alignSelf: 'center', paddingHorizontal: 20, justifyContent: 'center', paddingBottom: 60 },
+  title: { fontSize: 36, lineHeight: 42, letterSpacing: -0.8, fontFamily: 'Inter_700Bold', color: INK, textAlign: 'center' },
+  cards: { flexDirection: 'row', gap: 12, marginTop: 34 },
+  cardSlot: { flex: 1, alignItems: 'center' },
+  card: { width: '100%', aspectRatio: 0.95, borderRadius: 22, borderWidth: 1, borderColor: '#E3E3E6', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  cardAmount: { fontSize: 26, fontFamily: 'Inter_600SemiBold', color: INK },
+  face: { fontSize: 30, marginTop: -20, lineHeight: 38 },
+  skip: { alignSelf: 'center', marginTop: 34, minHeight: 48, minWidth: 140, paddingHorizontal: 28, borderRadius: 24, borderWidth: 1, borderColor: '#E3E3E6', alignItems: 'center', justifyContent: 'center' },
+  skipText: { fontSize: 17, fontFamily: 'Inter_600SemiBold', color: INK },
+  customAmount: { fontSize: 46, letterSpacing: -1, fontFamily: 'Inter_600SemiBold', color: INK, textAlign: 'center', marginTop: 18 },
+  keypad: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 22 },
+  key: { width: '31.5%', height: 58, borderRadius: 16, borderWidth: 1, borderColor: '#E3E3E6', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  keyQuiet: { backgroundColor: '#F4F4F5' },
+  keyText: { fontSize: 24, fontFamily: 'Inter_500Medium', color: INK },
+  confirm: { height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center', marginTop: 22 },
+  confirmText: { fontSize: 18, fontFamily: 'Inter_600SemiBold' },
 });
