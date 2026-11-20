@@ -474,4 +474,8 @@ export const VI_3: Record<string, string> = {
   "SKIP": "BỎ QUA",
   "Amount Owed before tip:": "Số tiền phải trả trước tip:",
   "Say thanks\nwith a tip": "Gửi lời cảm ơn\nbằng tiền tip",
+  "Going back to Home…": "Đang quay về Trang chủ…",
+  "Starting a new ticket…": "Đang mở phiếu mới…",
+  "Back to Home": "Về Trang chủ",
+  "New ticket": "Phiếu mới",
 };

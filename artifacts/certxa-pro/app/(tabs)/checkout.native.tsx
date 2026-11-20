@@ -52,7 +52,7 @@ import { useOpenBooking } from '@/lib/openBooking';
 // Stripe M2 does not require that Apple entitlement.
 const TAP_TO_PAY_ENABLED = true;
 // Shown on the payment screen so a tester can tell which build is installed.
-const BUILD_LABEL = 'Build Nov 21 · G';
+const BUILD_LABEL = 'Build Nov 21 · H';
 const EXPO_GO_PREVIEW = process.env.EXPO_PUBLIC_EXPO_GO_PREVIEW === '1';
 
 type PaymentStep = 'idle' | 'tap_intro' | 'initializing' | 'discovering' | 'connecting' | 'ready' | 'processing' | 'capture_pending' | 'success' | 'error';
@@ -442,6 +442,8 @@ export default function CheckoutScreen() {
   const [receiptEmail, setReceiptEmail] = useState(String(params.email ?? ''));
   const [receiptNote, setReceiptNote] = useState('');
   const [sendingReceipt, setSendingReceipt] = useState<'' | 'text' | 'email'>('');
+  // "Receipt sent" (owner, 2026-11-20): shown for a moment, then back to Home on its own.
+  const [receiptSent, setReceiptSent] = useState('');
   const sendReceipt = async (kind: 'text' | 'email') => {
     const visit = String(params.serviceName || 'Appointment');
     // The receipt after any payment (card, cash, gift card, or a split), with the products sold (owner, 2026-11-15).
@@ -454,14 +456,12 @@ export default function CheckoutScreen() {
       if (kind === 'text') {
         await api.post('/api/pos/sms-receipt', { phone: receiptPhone, clientName, appointmentId: Number(appointmentId) || undefined, paymentMethod: paymentMethod === 'card' && !paidSummary ? 'card' : method,
           items: lines.map((l) => ({ label: l.name, price: l.price })), ...totals });
-        setReceiptNote(`Receipt texted to ${receiptPhone}.`);
-        goHome();
+        setReceiptSent(`Texted to (${receiptPhone.slice(0, 3)}) ${receiptPhone.slice(3, 6)}-${receiptPhone.slice(6)}`);
         return;
       } else {
         await api.post('/api/pos/email-receipt', { storeId: storeId ?? undefined, email: receiptEmail.trim(), clientName: clientName.trim().split(/\s+/)[0] || 'there',
           items: lines, subtotal: lines.reduce((n, l) => n + l.price, 0), paymentMethod: method, transactionId: paymentIntentId ?? '', ...totals });
-        setReceiptNote(`Receipt e-mailed to ${receiptEmail.trim()}.`);
-        goHome();
+        setReceiptSent(`E-mailed to ${receiptEmail.trim()}`);
         return;
       }
     } catch (cause) {
@@ -966,11 +966,6 @@ export default function CheckoutScreen() {
   // Choose another time: New booking on a phone, the POS's booking on a tablet (lib/openBooking.ts).
   const openBooking = useOpenBooking();
   const isTablet = useIsTablet();
-  const resetCheckout = () => {
-    clearCheckout();
-    // Paid: the tablet POS takes its grid back and starts a new ticket.
-    if (isQuickSale) { if (inPane) closePane(true); else router.replace('/(tabs)/pos'); }
-  };
   // Back from the ways to pay: out of the checkout. An unpaid quick sale's ticket is removed (refused by the server once
   // anything was paid).
   const leaveCheckout = () => {
@@ -1008,11 +1003,17 @@ export default function CheckoutScreen() {
   };
   // A receipt sent from "Payment successful" finishes the checkout: back to Home (owner, 2026-11-15).
   const goHome = () => {
+    setReceiptSent('');
     clearCheckout();
     // In the tablet POS: the grid comes back with a new ticket.
     if (inPane) { closePane(true); return; }
     router.replace('/(tabs)');
   };
+  useEffect(() => {
+    if (!receiptSent) return;
+    const t = setTimeout(goHome, 2000);
+    return () => clearTimeout(t);
+  }, [receiptSent]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Tap to Pay or Card reader chosen: the tip, then that payment starts. In the tablet POS the tip is shown full screen,
   // for the client (owner, 2026-11-20): a tip or Skip starts the Stripe M2's search, connect and charge.
@@ -1070,7 +1071,14 @@ export default function CheckoutScreen() {
           <Text style={[styles.eyebrow, { color: colors.mutedForeground }]}>IN-PERSON CHECKOUT</Text>
           <View style={{ width: 84 }} />
         </View>}
-        {isSuccess ? (
+        {isSuccess && receiptSent ? (
+          <View style={styles.successContent} testID="receipt-sent">
+            <View style={[styles.successBadge, { backgroundColor: colors.secondary }]}><Feather name="send" size={30} color={colors.primary} /></View>
+            <Text style={[styles.successTitle, { color: colors.foreground }]}>Receipt sent</Text>
+            <Text style={[styles.successNote, { color: colors.mutedForeground }]}>{receiptSent}</Text>
+            <Text style={[styles.successNote, { color: colors.mutedForeground }]}>{inPane ? 'Starting a new ticket…' : 'Going back to Home…'}</Text>
+          </View>
+        ) : isSuccess ? (
           <View style={styles.successContent}>
             <View style={[styles.successBadge, { backgroundColor: colors.secondary }]}><Feather name="check" size={32} color={colors.primary} /></View>
             <Text style={[styles.successTitle, { color: colors.foreground }]}>Payment successful</Text>
@@ -1104,7 +1112,8 @@ export default function CheckoutScreen() {
               </> : null}
               {rebookNote ? <Text testID="rebook-note" style={[styles.setupText, { color: colors.primary }]}>{rebookNote}</Text> : null}
             </View> : null}
-            <TouchableOpacity testID="new-checkout" onPress={resetCheckout} style={[styles.primaryButton, { backgroundColor: colors.primary }]}><Text style={[styles.primaryButtonText, { color: colors.primaryForeground }]}>{isQuickSale ? 'New sale' : 'New checkout'}</Text></TouchableOpacity>
+            {/* No receipt: straight back (owner, 2026-11-20). In the tablet POS that's a new ticket. */}
+            <TouchableOpacity testID="new-checkout" onPress={goHome} style={[styles.primaryButton, { backgroundColor: colors.primary }]}><Feather name={inPane ? 'plus' : 'home'} size={19} color={colors.primaryForeground} /><Text style={[styles.primaryButtonText, { color: colors.primaryForeground }]}>{inPane ? 'New ticket' : 'Back to Home'}</Text></TouchableOpacity>
           </View>
         ) : (
           <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.tapContent, { flexGrow: 1, paddingBottom: inPane ? 16 : insets.bottom + 84 }, inPane && { paddingTop: 18, paddingHorizontal: 18 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>

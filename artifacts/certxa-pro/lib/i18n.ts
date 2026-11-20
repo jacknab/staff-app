@@ -64,6 +64,8 @@ export const useTextKey = () => useSyncExternalStore(subscribe, getTextKey, getT
 
 /** Sentences with a number or name in them: the English pattern and its Vietnamese ($1, $2… are kept). */
 const PATTERNS_VI: [RegExp, string][] = [
+  [/^Texted to (.+)$/, 'Đã nhắn tin tới $1'],
+  [/^E-mailed to (.+)$/, 'Đã gửi e-mail tới $1'],
   [/^Say thanks to (.+) with a tip$/, 'Gửi lời cảm ơn $1 bằng tiền tip'],
   [/^Say thanks to\n(.+)\nwith a tip$/, 'Gửi lời cảm ơn\n$1\nbằng tiền tip'],
   [/^(\d+) appointments?$/, '$1 lịch hẹn'],
