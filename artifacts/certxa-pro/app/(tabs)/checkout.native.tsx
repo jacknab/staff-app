@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { Text, TextInput } from '@/components/AppText';
 import { Alert } from '@/lib/appAlert';
+import { setCardMethod, setTapToPaySupported, useCardMethod } from '@/lib/cardMethod';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useInPane, usePaneClose, useScreenParams } from '@/components/TabletSplit';
@@ -146,6 +147,7 @@ export default function CheckoutScreen() {
 
   const {
     initialize,
+    supportsReadersOfType,
     discoverReaders,
     cancelDiscovering,
     cancelCollectPaymentMethod,
@@ -518,6 +520,15 @@ export default function CheckoutScreen() {
       }
       const initialized = await initialize();
       if (initialized.error) throw new Error(initialized.error.message);
+      // Tap to Pay needs a phone that can do it (Android: NFC). One that can't is switched off as an option (owner,
+      // 2026-11-20; Settings › Card payments).
+      if (mode === 'tap_to_pay') {
+        const support = await supportsReadersOfType({ deviceType: 'tapToPay', discoveryMethod: 'tapToPay', simulated: false });
+        if (!support.error && !support.readerSupportResult) {
+          setTapToPaySupported(false);
+          throw new Error('This phone can’t take Tap to Pay (it has no NFC). Take cards with the Stripe M2 card reader: Settings › Card payments.');
+        }
+      }
 
       const token = await getStoredToken();
       if (!token) throw new Error('Your Certxa session has expired. Please sign in again.');
@@ -979,6 +990,21 @@ export default function CheckoutScreen() {
     if (presetTip != null) { startCard(mode); return; }
     setTipFor(mode);
   };
+  // Card (owner, 2026-11-20): the way this device takes cards (Settings › Card payments; a tablet always the M2). Not
+  // chosen yet: asked once here, and kept.
+  const [cardMethod, tapSupported] = useCardMethod();
+  const tapLabel = Platform.OS === 'ios' ? 'Tap to Pay on iPhone' : 'Tap to Pay on this phone';
+  // A tablet, or a phone that can't do Tap to Pay, has only the card reader.
+  const deviceCardMethod: ReaderMode | null = isTablet || tapSupported === false ? 'm2' : cardMethod;
+  const payByCard = () => {
+    if (cardsOff) return;
+    if (deviceCardMethod) { chooseCard(deviceCardMethod); return; }
+    Alert.alert('Take card payments with', 'Choose how this phone takes cards. You can change it in Settings › Card payments.', [
+      ...(tapSupported === false ? [] : [{ text: tapLabel, onPress: () => { setCardMethod('tap_to_pay'); chooseCard('tap_to_pay'); } }]),
+      { text: 'Stripe M2 card reader', onPress: () => { setCardMethod('m2'); chooseCard('m2'); } },
+      { text: 'Cancel', style: 'cancel' as const },
+    ]);
+  };
   // A receipt sent from "Payment successful" finishes the checkout: back to Home (owner, 2026-11-15).
   const goHome = () => {
     clearCheckout();
@@ -1168,7 +1194,7 @@ export default function CheckoutScreen() {
                <View testID="pos-pay-tiles" style={{ width: '100%', gap: 12 }}>
                  <View style={styles.tileRow}>
                    <PayTile testID="pos-pay-cash" icon="dollar-sign" label="CASH" on={!giftOpen && !otherOpen} colors={colors} onPress={() => { setGiftOpen(false); setOtherOpen(false); setError(''); setStatusText(''); }} />
-                   <PayTile testID="pos-pay-card" icon="credit-card" label="CARD" disabled={isBusy || cardsOff || !!charging} colors={colors} onPress={() => chooseCard('m2')} />
+                   <PayTile testID="pos-pay-card" icon="credit-card" label="CARD" disabled={isBusy || cardsOff || !!charging} colors={colors} onPress={payByCard} />
                  </View>
                  <View style={styles.tileRow}>
                    <PayTile testID="pos-pay-gift" icon="gift" label="GIFT CARD" on={giftOpen} disabled={recording || isBusy} colors={colors} onPress={() => { setError(''); setStatusText(''); setGiftCardCode(''); setGiftOpen((o) => !o); setOtherOpen(false); }} />
@@ -1194,9 +1220,13 @@ export default function CheckoutScreen() {
                </View>
              ) : null}
              {isTapIntro && !inPane ? <View testID="payment-methods" style={[styles.payList, { backgroundColor: colors.card, borderColor: colors.border }]}>
-               {/* Tablets take cards with the Stripe card reader only (owner, 2026-11-19). */}
-               {isTablet ? null : <MethodRow testID="start-tap-to-pay" icon="smartphone" title="Tap to Pay on iPhone" sub={cardsOff ? 'Set up card payments first' : 'Hold the card near this phone'} disabled={isBusy || cardsOff || !!charging} onPress={() => chooseCard('tap_to_pay')} colors={colors} />}
-               <MethodRow testID="start-stripe-m2" icon="credit-card" title="Card reader" sub={connectedReader && readerMode === 'm2' ? `Connected${typeof (connectedReader as any).batteryLevel === 'number' ? ` · ${Math.round((connectedReader as any).batteryLevel * 100)}% battery` : ''}` : 'Stripe M2'} disabled={isBusy || cardsOff || !!charging} onPress={() => chooseCard('m2')} colors={colors} />
+               {/* One Card (owner, 2026-11-20): the tip comes next, and choosing it starts this device's way of taking
+                   cards — Tap to Pay or the Stripe M2 (Settings › Card payments; tablets: the M2). */}
+               <MethodRow testID="pay-card" icon={deviceCardMethod === 'tap_to_pay' ? 'smartphone' : 'credit-card'} title="Card"
+                 sub={cardsOff ? 'Set up card payments first' : deviceCardMethod === 'tap_to_pay' ? tapLabel
+                   : deviceCardMethod === 'm2' ? (connectedReader && readerMode === 'm2' ? `Stripe M2 · connected${typeof (connectedReader as any).batteryLevel === 'number' ? ` · ${Math.round((connectedReader as any).batteryLevel * 100)}% battery` : ''}` : 'Stripe M2 card reader')
+                   : 'Choose Tap to Pay or the card reader'}
+                 disabled={isBusy || cardsOff || !!charging} onPress={payByCard} colors={colors} />
                {savedCard ? <MethodRow testID="pay-card-on-file" icon="credit-card" title={`Card on file${savedCard.last4 ? ` (${savedCard.last4})` : ''}`} sub={charging === 'saved' ? 'Charging…' : undefined} disabled={isBusy || cardsOff || !!charging} onPress={payWithSavedCard} colors={colors} /> : null}
                {Number(appointmentId) > 0 ? <MethodRow testID="pay-new-card" icon="edit-3" title="Enter new card" sub={charging === 'keyed' ? 'Waiting for the card…' : undefined} disabled={isBusy || cardsOff || !!charging} onPress={() => void payWithoutReader('keyed')} colors={colors} /> : null}
                {Number(appointmentId) > 0 && creditBalanceCents > 0 && creditPaidCents === 0 && offlineDueCents > 0 ? <MethodRow testID="pay-credit" icon="award" title="Client credit" sub={recording ? 'Recording…' : dollars(String(Math.min(creditBalanceCents, offlineDueCents)))} disabled={recording || isBusy || !!charging} onPress={() => void recordOfflinePayment('credit')} colors={colors} /> : null}

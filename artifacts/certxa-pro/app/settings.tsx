@@ -22,7 +22,7 @@ import { useCallback, useEffect, useState, type ComponentProps, type ReactNode }
 import { Feather } from '@expo/vector-icons';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useFocusEffect, useLocalSearchParams, useRouter, type Href } from 'expo-router';
-import { ActivityIndicator, Linking, ScrollView, Share, StatusBar, StyleSheet, Switch, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Linking, Platform, ScrollView, Share, StatusBar, StyleSheet, Switch, TouchableOpacity, View } from 'react-native';
 import { Text, TextInput } from '@/components/AppText';
 import { Alert } from '@/lib/appAlert';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -42,6 +42,8 @@ import { SectionHeader, SectionTitle } from '@/components/look/SectionHeader';
 import { usePaymentsReady } from '@/lib/usePaymentsReady';
 import { look, cardShadow } from '@/components/look/tokens';
 import { useIsTablet } from '@/components/TabletLauncher';
+import { setCardMethod, useCardMethod } from '@/lib/cardMethod';
+import { useTapToPaySupport } from '@/lib/tapToPaySupport';
 import { APP_LANGS, setLang, useLang, type AppLang } from '@/lib/i18n';
 type Screen = 'menu' | 'business' | 'location' | 'places' | 'hours' | 'rules' | 'approval' | 'policy' | 'blocked' | 'phone' | 'website' | 'stripe' | 'readers' | 'deposits' | 'tax' | 'account' | 'language';
 type Store = { id: number; name?: string | null; phone?: string | null; email?: string | null; category?: string | null; address?: string | null; city?: string | null; state?: string | null; postcode?: string | null; bookingSlug?: string | null; timezone?: string | null };
@@ -51,7 +53,7 @@ type FeatherName = ComponentProps<typeof Feather>['name'];
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const TITLES: Record<Screen, string> = {
   menu: 'Settings', business: 'Business details', location: 'Location', places: 'Where you see clients', hours: 'Hours', rules: 'Online booking', policy: 'Cancellation policy',
-  approval: 'Booking approval', blocked: 'Blocked clients', phone: 'Business Phone', website: 'Website', stripe: 'Stripe account', readers: 'Connect card reader', deposits: 'Deposits', tax: 'Card reader & Checkout', account: 'Account', language: 'Language',
+  approval: 'Booking approval', blocked: 'Blocked clients', phone: 'Business Phone', website: 'Website', stripe: 'Stripe account', readers: 'Card payments', deposits: 'Deposits', tax: 'Card reader & Checkout', account: 'Account', language: 'Language',
 };
 
 /** The POS discount buttons on the Card reader & Checkout draft ("10, 20"), saved with the rest (Edit's back restores them). */
@@ -88,6 +90,8 @@ export default function SettingsScreen() {
   const { setTimeZone, refresh: refreshCalendar, clients } = useBookingData();
   const [screen, setScreen] = useState<Screen>('menu');
   const isTablet = useIsTablet();
+  const [cardMethod] = useCardMethod();
+  const tapSupported = useTapToPaySupport();
   const lang = useLang();
   const [store, setStore] = useState<Store | null>(null);
   const [loading, setLoading] = useState(true);
@@ -474,7 +478,7 @@ export default function SettingsScreen() {
             <View style={{ flex: 1 }}><Text style={[styles.rowTitle, { color: colors.foreground }]}>Enable Tap to Pay on iPhone</Text><Text numberOfLines={2} style={[styles.rowHint, { color: colors.mutedForeground }]}>Take cards with just this iPhone</Text></View>
             <Feather name="chevron-right" size={20} color={colors.mutedForeground} />
           </TouchableOpacity>
-          <Row icon="radio" title="Connect card reader" hint="Register and view Stripe M2 readers" to="readers" />
+          <Row icon="radio" title="Card payments" hint="Tap to Pay or the Stripe M2 reader, and your readers" to="readers" />
           <Row icon="dollar-sign" title="Deposits" hint="Ask clients for a deposit when they book" to="deposits" />
           <Row icon="percent" title="Card reader & Checkout" hint="Platform fee, sales tax and tips" to="tax" />
         </Group>
@@ -752,6 +756,17 @@ export default function SettingsScreen() {
       </>);
     }
     if (screen === 'readers') return (<>
+      {/* How this device takes cards (owner, 2026-11-20): Checkout's Card asks for the tip, then starts this one. Kept
+          on this device (lib/cardMethod.ts). Tablets use the M2; a phone without NFC can't use Tap to Pay. */}
+      <Label>Take card payments with</Label>
+      {isTablet ? <Help>This tablet takes cards with the Stripe M2 card reader.</Help> : (
+        <>
+          <SelectField testID="settings-card-method" title="Take card payments with" placeholder="Choose how you take cards" value={tapSupported === false ? 'm2' : cardMethod}
+            options={[...(tapSupported === false ? [] : [{ value: 'tap_to_pay' as const, label: Platform.OS === 'ios' ? 'Tap to Pay on iPhone' : 'Tap to Pay on this phone' }]), { value: 'm2' as const, label: 'Stripe M2 card reader' }]}
+            onChange={(v) => setCardMethod(v)} />
+          <Help>{tapSupported === false ? 'This phone can’t take Tap to Pay (it has no NFC), so cards are taken with the Stripe M2 card reader.' : 'Used on this device. At checkout, Card asks for the tip, then starts this.'}</Help>
+        </>
+      )}
       <Label>Register a new Stripe M2</Label>{field('code', 'Registration code shown on the reader', { autoCapitalize: 'none', autoCorrect: false })}
       <TouchableOpacity testID="settings-register-reader" disabled={saving || !String(draft.code ?? '').trim()} onPress={() => void registerReader()} style={[styles.save, { backgroundColor: String(draft.code ?? '').trim() ? colors.primary : colors.muted }]}><Text style={[styles.saveText, { color: String(draft.code ?? '').trim() ? colors.primaryForeground : colors.mutedForeground }]}>{saving ? 'Registering…' : 'Register reader'}</Text></TouchableOpacity>
       <Label>Your readers</Label>

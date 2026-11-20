@@ -49,9 +49,12 @@ export function TipCheckout({ baseCents, serviceName, presets, defaultPercent, o
     return () => navigation.setOptions({ tabBarStyle: undefined });
   }, [navigation]);
 
+  // A tip button is the go-ahead (owner, 2026-11-20): it starts the card payment at once with that tip. Custom tip types
+  // the amount first and confirms it.
   const choosePercent = (percent: number) => {
     setSelectedPercent(percent);
     setScreen('select');
+    onConfirmTip(Math.round(safeBaseCents * percent / 100));
   };
 
   const pressKey = (key: string) => {
@@ -162,13 +165,12 @@ export function TipCheckout({ baseCents, serviceName, presets, defaultPercent, o
         )}
       </View>
 
-      <View style={[styles.footer, { paddingBottom: insets.bottom + 84 }]}>
-        <TouchableOpacity testID="confirm-tip" disabled={(screen === 'select' && selectedPercent === null) || (screen === 'custom' && customTipCents <= 0)} onPress={confirm} style={[styles.confirmButton, { backgroundColor: ((screen === 'select' && selectedPercent !== null) || (screen === 'custom' && customTipCents > 0)) ? colors.primary : colors.muted }]}>
-          <Text style={[styles.confirmText, { color: ((screen === 'select' && selectedPercent !== null) || (screen === 'custom' && customTipCents > 0)) ? colors.primaryForeground : colors.mutedForeground }]}>{screen === 'custom' ? 'Confirm tip' : 'Continue to payment'}</Text>
-          <Feather name="arrow-right" size={19} color={((screen === 'select' && selectedPercent !== null) || (screen === 'custom' && customTipCents > 0)) ? colors.primaryForeground : colors.mutedForeground} />
+      {screen === 'custom' ? <View style={[styles.footer, { paddingBottom: insets.bottom + 84 }]}>
+        <TouchableOpacity testID="confirm-tip" disabled={customTipCents <= 0} onPress={confirm} style={[styles.confirmButton, { backgroundColor: customTipCents > 0 ? colors.primary : colors.muted }]}>
+          <Text style={[styles.confirmText, { color: customTipCents > 0 ? colors.primaryForeground : colors.mutedForeground }]}>Confirm tip</Text>
+          <Feather name="arrow-right" size={19} color={customTipCents > 0 ? colors.primaryForeground : colors.mutedForeground} />
         </TouchableOpacity>
-        <Text style={[styles.footerNote, { color: colors.mutedForeground }]}>You can review the total before payment.</Text>
-      </View>
+      </View> : null}
     </View>
   );
 }
@@ -208,5 +210,4 @@ const styles = StyleSheet.create({
   footer: { paddingHorizontal: 20, paddingBottom: 22 },
   confirmButton: { height: 53, borderRadius: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
   confirmText: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
-  footerNote: { textAlign: 'center', fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 10 },
 });

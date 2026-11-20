@@ -7,6 +7,7 @@ export function StripeTerminalProvider({ children }: { children: ReactNode }) {
 export function useStripeTerminal() {
   return {
     initialize: async () => ({}),
+    supportsReadersOfType: async (..._args: unknown[]) => ({ readerSupportResult: true }) as { readerSupportResult: boolean; error?: { message: string } },
     discoverReaders: async (..._args: unknown[]) => ({}),
     connectReader: async (..._args: unknown[]) => ({}),
     disconnectReader: async () => ({}),
