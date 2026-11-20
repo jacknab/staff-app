@@ -451,4 +451,5 @@ export const VI_3: Record<string, string> = {
   "Wellness": "Chăm sóc sức khỏe",
   "The list could not be loaded. Check your connection and try again.": "Không tải được danh sách. Kiểm tra kết nối và thử lại.",
   "The services could not be saved. Check your connection and try again.": "Không lưu được dịch vụ. Kiểm tra kết nối và thử lại.",
+  "PAY": "THANH TOÁN",
 };

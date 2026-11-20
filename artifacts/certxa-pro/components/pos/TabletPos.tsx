@@ -13,7 +13,7 @@
  * sets how many of the next item; ↶ clears what is typed, or takes the last item off.
  *
  * The ticket shows tax as a register does (the checkout's own rule and Settings › Card reader & Checkout rates).
- * CHARGE makes the sale a ticket of its own for the client (POST /api/quick-sales with its lines and products, kept off
+ * PAY (was CHARGE) makes the sale a ticket of its own for the client (POST /api/quick-sales with its lines and products, kept off
  * the calendar) and the usual checkout opens in the grid's place (cash, gift card, card; the tip is asked last, before a
  * card payment). Paid, the grid comes back with a new ticket; Back keeps the ticket to change it.
  *
@@ -24,7 +24,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, BackHandler, ScrollView, StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { Text } from '@/components/AppText';
 import { Alert } from '@/lib/appAlert';
 import { router, type Href } from 'expo-router';
@@ -167,7 +167,7 @@ export function TabletPos({ bookRequest }: { bookRequest?: BookRequest | null } 
   const [booking, setBooking] = useState<{ slot: BookingSlot | null } | null>(null);
   const [bookDay, setBookDay] = useState<Date | null>(null);
   const [bookBusy, setBookBusy] = useState(false);
-  // Creating a booking: the ticket shows CANCEL and CREATE APPOINTMENT instead of CLEAR, BOOK and CHARGE.
+  // Creating a booking: the ticket shows CANCEL and CREATE APPOINTMENT instead of CLEAR, BOOK and PAY.
   const [bookMode, setBookMode] = useState(false);
   const serviceLines = lines.filter((l) => l.kind === 'service' && l.serviceId);
   const bookMinutes = lines.filter((l) => l.kind === 'service' || l.kind === 'addon').reduce((n, l) => n + (l.minutes ?? 0), 0);
@@ -267,7 +267,7 @@ export function TabletPos({ bookRequest }: { bookRequest?: BookRequest | null } 
       if (guided !== null) {
         if (cents > 0) add({ label: steps[guided], priceCents: cents, kind: 'amount' });
         setCents(0);
-        if (guided + 1 >= steps.length) { setGuided(null); say('QUICK TICKET DONE · REVIEW AND CHARGE', 'ok'); } else setGuided(guided + 1);
+        if (guided + 1 >= steps.length) { setGuided(null); say('QUICK TICKET DONE · REVIEW AND PAY', 'ok'); } else setGuided(guided + 1);
         return;
       }
       if (cents <= 0) return needAmount();
@@ -321,7 +321,16 @@ export function TabletPos({ bookRequest }: { bookRequest?: BookRequest | null } 
     finally { setBusy(false); }
   };
 
-  // ── CHARGE ──
+  // While paying, the phone's back button doesn't leave: EXIT on the payment side is the only way back, and only before a
+  // payment is taken (owner, 2026-11-20).
+  useEffect(() => {
+    if (!paying) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => true);
+    return () => sub.remove();
+  }, [paying]);
+
+  // ── PAY ──
+  // PAY (owner, 2026-11-20): from adding items to taking payment. The ticket is closed to new items from here.
   const charge = async () => {
     if (!lines.length || busy) return;
     if (!client) { setPicking(true); return; }
@@ -392,7 +401,7 @@ export function TabletPos({ bookRequest }: { bookRequest?: BookRequest | null } 
         </> : null}
       </View>
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      {/* Creating a booking (owner, 2026-11-19/20): no CHARGE and no Cancel, just CREATE APPOINTMENT, which first opens the
+      {/* Creating a booking (owner, 2026-11-19/20): no PAY and no Cancel, just CREATE APPOINTMENT, which first opens the
           days and times in the grid, then saves the time picked. Teal, so it never looks like the checkout POS. */}
       {bookMode ? <>
         {booking?.slot ? <View style={styles.bookedRow}><Text style={styles.bookedText}>{slotLabel(booking.slot)}</Text></View> : null}
@@ -410,9 +419,7 @@ export function TabletPos({ bookRequest }: { bookRequest?: BookRequest | null } 
       </View>
       <View style={[styles.actionRow, { marginTop: 10 }]}>
         <TouchableOpacity testID="tablet-pos-charge" disabled={!lines.length || busy} onPress={() => void charge()} style={[styles.chargeButton, (!lines.length || busy) && { opacity: 0.5 }]}>
-          {/* Paying: what is still owed after the payments taken so far (owner, 2026-11-19). */}
-          {busy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.chargeText}>
-            {paying && payState ? (payState.paid ? 'PAID' : `CHARGE ${money(payState.dueCents)}`) : `CHARGE ${money(totalCents)}`}</Text>}
+          {busy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.chargeText}>PAY</Text>}
         </TouchableOpacity>
       </View>
       </>}
@@ -636,7 +643,8 @@ export function TabletPos({ bookRequest }: { bookRequest?: BookRequest | null } 
       </View>
       {/* Under the grid, in the app-icons button's style: the key grid editor on the left, and Home on the right — the way
           out of the POS, which has no app-icons button (owner, 2026-11-19). */}
-      <View style={styles.underGrid}>
+      {/* Hidden while paying: no leaving the POS or editing keys in the middle of a payment. */}
+      {paying ? null : <View style={styles.underGrid}>
         <TouchableOpacity testID="tablet-pos-grid-settings" accessibilityLabel="Key grid" onPress={() => setEditingGrid(true)} activeOpacity={0.85} style={styles.gearShadow}>
           <LinearGradient colors={bookMode ? BOOK_GRADIENT : ['#8B5CF6', '#6D28D9']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.gear}>
             <Feather name="settings" size={28} color="#FFFFFF" />
@@ -647,7 +655,7 @@ export function TabletPos({ bookRequest }: { bookRequest?: BookRequest | null } 
             <Feather name="home" size={28} color="#FFFFFF" />
           </LinearGradient>
         </TouchableOpacity>
-      </View>
+      </View>}
     </View>
   );
 

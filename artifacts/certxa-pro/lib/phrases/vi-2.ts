@@ -346,7 +346,7 @@ export const VI_2: Record<string, string> = {
   'QTY: TYPE HOW MANY, THEN TAP THE ITEM': 'SỐ LƯỢNG: NHẬP SỐ, RỒI NHẤN MỤC',
   'QUESTIONS': 'CÂU HỎI',
   'QUICK TICKET CANCELLED': 'ĐÃ HỦY PHIẾU NHANH',
-  'QUICK TICKET DONE · REVIEW AND CHARGE': 'XONG PHIẾU NHANH · KIỂM TRA VÀ THANH TOÁN',
+  'QUICK TICKET DONE · REVIEW AND PAY': 'XONG PHIẾU NHANH · KIỂM TRA VÀ THANH TOÁN',
   'QUICK TICKET EXITED': 'ĐÃ THOÁT PHIẾU NHANH',
   'Qty': 'SL',
   'Quick Notes': 'Ghi chú nhanh',

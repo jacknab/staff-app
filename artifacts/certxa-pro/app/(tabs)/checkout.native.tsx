@@ -50,7 +50,7 @@ import { useOpenBooking } from '@/lib/openBooking';
 // Stripe M2 does not require that Apple entitlement.
 const TAP_TO_PAY_ENABLED = true;
 // Shown on the payment screen so a tester can tell which build is installed.
-const BUILD_LABEL = 'Build Nov 20 · X';
+const BUILD_LABEL = 'Build Nov 20 · Y';
 const EXPO_GO_PREVIEW = process.env.EXPO_PUBLIC_EXPO_GO_PREVIEW === '1';
 
 type PaymentStep = 'idle' | 'tap_intro' | 'initializing' | 'discovering' | 'connecting' | 'ready' | 'processing' | 'capture_pending' | 'success' | 'error';
@@ -1235,7 +1235,9 @@ export default function CheckoutScreen() {
                </TouchableOpacity>
                {splitOpen ? <Text testID="split-note" style={[styles.setupText, { color: colors.mutedForeground, textAlign: 'center' }]}>Take part of the bill in cash (type the amount), or use a gift card or credit. Then choose how to pay the rest.</Text> : null}
              </> : null}
-             {inPane && isTapIntro ? (
+             {/* No way back to adding items once a payment is on the ticket (owner, 2026-11-20: it could charge the client
+                 twice). Before any payment, EXIT cancels the unpaid sale and puts the POS back. */}
+             {inPane && isTapIntro && cashPartCents + giftPaidCents + creditPaidCents === 0 ? (
                <TouchableOpacity testID="pos-pay-exit" disabled={recording || isBusy || !!charging} onPress={leaveCheckout} style={[styles.exitButton, { borderColor: colors.border, backgroundColor: colors.card }]}>
                  <Feather name="x" size={22} color={colors.foreground} />
                  <Text style={[styles.exitText, { color: colors.foreground }]}>EXIT</Text>
