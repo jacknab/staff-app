@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { SmsCreditNoticeHost } from '@/components/SmsCreditNoticeHost';
 import { AppState } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { AlarmScreen } from '@/components/AlarmScreen';
@@ -228,6 +229,7 @@ export default function RootLayout() {
                     <AlarmScreen />
                     {/* Page help: opens when a page's title is held (components/HelpTitle). */}
                     <HelpHost />
+                    <SmsCreditNoticeHost />
                   </KeyboardProvider>
                 </GestureHandlerRootView>
               </BookingProvider>

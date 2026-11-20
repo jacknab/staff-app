@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { textHeldBack } from '@/lib/smsCreditNotice';
 import { callClient } from '@/lib/voice';
 import { addressLine, appointmentParams, mapAppointment, type ApiAppointment, type HouseCallAddress } from '@/contexts/BookingContext';
 import { Feather } from '@expo/vector-icons';
@@ -486,7 +487,9 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
   const payLink = async () => {
     setSaving(true); setError('');
     try {
+      const since = Date.now();
       const r = await api.post<{ url: string; amountCents: number; sent: boolean }>(`/api/appointments/${appointmentId}/pay-link`, {});
+      if (textHeldBack(since)) return;
       if (r.sent) Alert.alert('Payment link sent', `${clientName} got a text to pay $${(r.amountCents / 100).toFixed(2)}.`);
       else Alert.alert('Payment link', 'This client has no phone number to text. Share the link another way?', [
         { text: 'Not now', style: 'cancel' },
@@ -572,7 +575,9 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
   const resendDetails = async () => {
     setResending(true);
     try {
+      const since = Date.now();
       const r = await api.post<{ text: boolean; email: boolean }>(`/api/pro/appointments/${appointmentId}/resend`, {});
+      if (textHeldBack(since) && !r.email) return;
       Alert.alert('Details sent', `${clientName} got the booking details again by ${r.text && r.email ? 'text and e-mail' : r.text ? 'text' : 'e-mail'}.`);
       setHistoryTick((n) => n + 1);
     } catch (cause) {

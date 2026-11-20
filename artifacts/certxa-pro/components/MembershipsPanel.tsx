@@ -3,6 +3,7 @@
  * Each membership: what's left this period, when it renews or ends, and Cancel. Add membership: charge the card on
  * file now, or send the client the link to join and pay on their phone.
  */
+import { textHeldBack } from '@/lib/smsCreditNotice';
 import { useCallback, useState } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text } from '@/components/AppText';
@@ -54,7 +55,9 @@ export function MembershipsPanel({ customerId, hasCard }: { customerId: number; 
     if (!plan) return;
     const price = `${money(plan.priceCents)}/${plan.interval}`;
     const sendLink = () => void run(async () => {
+      const since = Date.now();
       const r = await api.post<{ sentVia: string | null }>('/api/pro/memberships/link', { planId, customerId, send: true });
+      if (textHeldBack(since)) return;
       Alert.alert(r.sentVia ? 'Link sent' : 'Link made', r.sentVia === 'email' ? 'The client was e-mailed the link to join.' : r.sentVia === 'sms' ? 'The client was texted the link to join.' : 'The client has no e-mail or mobile number, so nothing was sent.');
     }, 'The link could not be sent.');
     Alert.alert(`Add ${plan.name}?`, hasCard ? `${price}. Charge the card on file now, or send the client a link to join and pay.` : `${price}. The client gets a link to join and pay with their card.`, [

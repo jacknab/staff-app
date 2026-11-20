@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { reportNoSmsCredits } from '@/lib/smsCreditNotice';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
@@ -97,6 +98,8 @@ export async function certxaRequest<T>(
     headers,
   });
   const payload = (await response.json().catch(() => null)) as Record<string, unknown> | null;
+  // A text this asked for wasn't sent: no SMS credits (lib/smsCreditNotice.ts).
+  reportNoSmsCredits(response.headers.get('X-Sms-No-Credits'));
 
   if (!response.ok) {
     const message =

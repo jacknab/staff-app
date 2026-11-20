@@ -7,6 +7,7 @@
  *   POST/DELETE /api/clients/:id/tags · PATCH /api/clients/:id/notes/:noteId · PUT /api/clients/:id/marketing-preferences
  *   DELETE /api/pro/clients/:id (for good, from the bottom of Edit)
  */
+import { textHeldBack } from '@/lib/smsCreditNotice';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Feather } from '@expo/vector-icons';
 import { ActivityIndicator, Image, Linking, Modal, ScrollView, StatusBar, StyleSheet, Switch, TouchableOpacity, View } from 'react-native';
@@ -160,8 +161,9 @@ export default function ClientProfileScreen() {
       { text: 'Send', onPress: async () => {
         setSendingLink(true);
         try {
+          const since = Date.now();
           await api.post(`/api/pro/clients/${client.id}/booking-link`, {});
-          Alert.alert('Sent', `${first} has been texted your booking link.`);
+          if (!textHeldBack(since)) Alert.alert('Sent', `${first} has been texted your booking link.`);
         } catch (cause) {
           Alert.alert('Not sent', cause instanceof Error ? cause.message : 'The text could not be sent. Please try again.');
         } finally { setSendingLink(false); }

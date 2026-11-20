@@ -3,6 +3,7 @@
  * texts and e-mails them a link to pay by card. Draft → Open (Past due after the due date) → Paid, or Cancelled. Paid
  * invoices can be refunded and a receipt texted. Server: /api/pro/invoices (lib/proInvoices.ts). Money › Invoices.
  */
+import { noCreditsMessage } from '@/lib/smsCreditNotice';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { ActivityIndicator, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
@@ -86,8 +87,9 @@ export default function InvoicesScreen() {
   const receipt = (inv: Invoice) => run(async () => {
     const phone = clients.find((c) => c.customerId === inv.customerId)?.phone?.replace(/\D/g, '').slice(-10) ?? '';
     if (phone.length !== 10) throw new ApiError(`${inv.client} has no mobile number to text.`, 400);
-    await api.post('/api/pos/sms-receipt', { phone, clientName: inv.client, appointmentId: inv.appointmentId, paymentMethod: inv.paymentMethod ?? 'card',
+    const sent = await api.post<{ noCredits?: boolean }>('/api/pos/sms-receipt', { phone, clientName: inv.client, appointmentId: inv.appointmentId, paymentMethod: inv.paymentMethod ?? 'card',
       items: inv.items, discountAmount: 0, taxAmount: 0, tipAmount: 0, grandTotal: (inv.paidCents ?? inv.totalCents) / 100 });
+    if (sent?.noCredits) { Alert.alert('Receipt', noCreditsMessage('the receipt link', phone), [{ text: 'OK' }]); return; }
     Alert.alert('Receipt sent', `Texted to ${inv.client}.`);
   });
 

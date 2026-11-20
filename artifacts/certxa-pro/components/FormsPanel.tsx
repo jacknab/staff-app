@@ -4,6 +4,7 @@
  * Client: every form they filled in, links still waiting, and Send a form.
  * Fill in here opens the client's page on this phone, so the client can fill it in at the chair.
  */
+import { textHeldBack } from '@/lib/smsCreditNotice';
 import { useCallback, useState } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text } from '@/components/AppText';
@@ -53,9 +54,10 @@ export function FormsPanel({ customerId, appointmentId }: { customerId: number; 
     if (busy) return;
     setBusy(`${formId}${how}`); setError('');
     try {
+      const since = Date.now();
       const r = await api.post<{ link: string; sentVia: string }>('/api/pro/forms/send', { formId, customerId, appointmentId: forVisit ?? null, via: how });
       if (how === 'in_person') { await WebBrowser.openBrowserAsync(r.link); }
-      else Alert.alert('Sent', r.sentVia === 'email' ? 'The form was e-mailed to the client.' : 'The form was texted to the client.');
+      else if (!textHeldBack(since)) Alert.alert('Sent', r.sentVia === 'email' ? 'The form was e-mailed to the client.' : 'The form was texted to the client.');
       await load();
     } catch (cause) { setError(cause instanceof Error && cause.message ? cause.message : 'The form could not be sent.'); }
     finally { setBusy(''); }

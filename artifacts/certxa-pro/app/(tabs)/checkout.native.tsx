@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { Text, TextInput } from '@/components/AppText';
 import { Alert } from '@/lib/appAlert';
+import { noCreditsMessage, phoneLabel } from '@/lib/smsCreditNotice';
 import { setCardMethod, setTapToPaySupported, useCardMethod } from '@/lib/cardMethod';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -52,7 +53,7 @@ import { useOpenBooking } from '@/lib/openBooking';
 // Stripe M2 does not require that Apple entitlement.
 const TAP_TO_PAY_ENABLED = true;
 // Shown on the payment screen so a tester can tell which build is installed.
-const BUILD_LABEL = 'Build Nov 21 · H';
+const BUILD_LABEL = 'Build Nov 21 · I';
 const EXPO_GO_PREVIEW = process.env.EXPO_PUBLIC_EXPO_GO_PREVIEW === '1';
 
 type PaymentStep = 'idle' | 'tap_intro' | 'initializing' | 'discovering' | 'connecting' | 'ready' | 'processing' | 'capture_pending' | 'success' | 'error';
@@ -442,8 +443,6 @@ export default function CheckoutScreen() {
   const [receiptEmail, setReceiptEmail] = useState(String(params.email ?? ''));
   const [receiptNote, setReceiptNote] = useState('');
   const [sendingReceipt, setSendingReceipt] = useState<'' | 'text' | 'email'>('');
-  // "Receipt sent" (owner, 2026-11-20): shown for a moment, then back to Home on its own.
-  const [receiptSent, setReceiptSent] = useState('');
   const sendReceipt = async (kind: 'text' | 'email') => {
     const visit = String(params.serviceName || 'Appointment');
     // The receipt after any payment (card, cash, gift card, or a split), with the products sold (owner, 2026-11-15).
@@ -454,14 +453,16 @@ export default function CheckoutScreen() {
     setSendingReceipt(kind); setReceiptNote('');
     try {
       if (kind === 'text') {
-        await api.post('/api/pos/sms-receipt', { phone: receiptPhone, clientName, appointmentId: Number(appointmentId) || undefined, paymentMethod: paymentMethod === 'card' && !paidSummary ? 'card' : method,
+        const sent = await api.post<{ success?: boolean; noCredits?: boolean }>('/api/pos/sms-receipt', { phone: receiptPhone, clientName, appointmentId: Number(appointmentId) || undefined, paymentMethod: paymentMethod === 'card' && !paidSummary ? 'card' : method,
           items: lines.map((l) => ({ label: l.name, price: l.price })), ...totals });
-        setReceiptSent(`Texted to (${receiptPhone.slice(0, 3)}) ${receiptPhone.slice(3, 6)}-${receiptPhone.slice(6)}`);
+        // A confirmation either way, with OK (owner, 2026-11-20): sent → Home; no SMS credits → stay, to e-mail it.
+        if (sent?.noCredits) { Alert.alert('Receipt', noCreditsMessage('the receipt link', receiptPhone), [{ text: 'OK' }]); return; }
+        Alert.alert('Receipt', `We have sent the receipt link to the client's phone, ${phoneLabel(receiptPhone)}.`, [{ text: 'OK', onPress: goHome }]);
         return;
       } else {
         await api.post('/api/pos/email-receipt', { storeId: storeId ?? undefined, email: receiptEmail.trim(), clientName: clientName.trim().split(/\s+/)[0] || 'there',
           items: lines, subtotal: lines.reduce((n, l) => n + l.price, 0), paymentMethod: method, transactionId: paymentIntentId ?? '', ...totals });
-        setReceiptSent(`E-mailed to ${receiptEmail.trim()}`);
+        Alert.alert('Receipt', `We have e-mailed the receipt to ${receiptEmail.trim()}.`, [{ text: 'OK', onPress: goHome }]);
         return;
       }
     } catch (cause) {
@@ -1003,17 +1004,11 @@ export default function CheckoutScreen() {
   };
   // A receipt sent from "Payment successful" finishes the checkout: back to Home (owner, 2026-11-15).
   const goHome = () => {
-    setReceiptSent('');
     clearCheckout();
     // In the tablet POS: the grid comes back with a new ticket.
     if (inPane) { closePane(true); return; }
     router.replace('/(tabs)');
   };
-  useEffect(() => {
-    if (!receiptSent) return;
-    const t = setTimeout(goHome, 2000);
-    return () => clearTimeout(t);
-  }, [receiptSent]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Tap to Pay or Card reader chosen: the tip, then that payment starts. In the tablet POS the tip is shown full screen,
   // for the client (owner, 2026-11-20): a tip or Skip starts the Stripe M2's search, connect and charge.
@@ -1071,14 +1066,7 @@ export default function CheckoutScreen() {
           <Text style={[styles.eyebrow, { color: colors.mutedForeground }]}>IN-PERSON CHECKOUT</Text>
           <View style={{ width: 84 }} />
         </View>}
-        {isSuccess && receiptSent ? (
-          <View style={styles.successContent} testID="receipt-sent">
-            <View style={[styles.successBadge, { backgroundColor: colors.secondary }]}><Feather name="send" size={30} color={colors.primary} /></View>
-            <Text style={[styles.successTitle, { color: colors.foreground }]}>Receipt sent</Text>
-            <Text style={[styles.successNote, { color: colors.mutedForeground }]}>{receiptSent}</Text>
-            <Text style={[styles.successNote, { color: colors.mutedForeground }]}>{inPane ? 'Starting a new ticket…' : 'Going back to Home…'}</Text>
-          </View>
-        ) : isSuccess ? (
+        {isSuccess ? (
           <View style={styles.successContent}>
             <View style={[styles.successBadge, { backgroundColor: colors.secondary }]}><Feather name="check" size={32} color={colors.primary} /></View>
             <Text style={[styles.successTitle, { color: colors.foreground }]}>Payment successful</Text>
