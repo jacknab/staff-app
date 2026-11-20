@@ -26,10 +26,10 @@ export const HELP: Record<string, HelpPage> = {
     sections: [
       { heading: 'The steps', points: [
         'What does your business specialize in?: tap your type of business (Nails, Hair, Barber…). It decides the services and add-ons you’re offered, and can’t be changed later.',
+        'Where do you offer your services?: turn on Business location (your own place) and/or House call. With a business location, enter its address; tick "This is my home studio" to keep it private, so clients see only your city until they book.',
         'Tell us about your business: your first and last name and your business name.',
         'What do you offer?: tap every kind of service you do (for example Manicure, Pedicure, Acrylic). Tap I’ll add my services later to skip.',
         'Your services, one at a time: type the price in whole dollars and tap ENTER, then the minutes (the usual length is filled in; ENTER keeps it). Tap ENTER with no price to skip a service you don’t do. PREV goes back, NEXT CATEGORY skips the rest of a category, EXIT moves on with what you’ve entered. These become your menu; you can change them later under Services.',
-        'Where do you offer your services?: turn on Business location (your own place) and/or House call. With a business location, enter its address; tick "This is my home studio" to keep it private, so clients see only your city until they book.',
         'What are your business hours?: the days and times clients can book you online.',
         'A few details for card payments: your date of birth, your home address (a home studio’s address is used as it is; otherwise tick Same as my business address or type it), and how your business is set up (Just me for a sole proprietor, or your LLC or corporation with its legal name and EIN). Stripe, who processes card payments, needs these; Certxa passes them on when you set up payments, so Stripe’s form doesn’t ask again. Tap Why we ask under any of them for the reason. Clients never see them.',
         'Create your login: the email and password you’ll sign in with (8 characters or more).',

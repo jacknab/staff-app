@@ -23,7 +23,7 @@ import { WhyWeAsk } from '@/components/WhyWeAsk';
 import { BUSINESS_STRUCTURES, WHY, dateOfBirthIso, isCompany } from '@/lib/stripe-details';
 // Step 1 is just the type of business, as cards (owner, 2026-11-20); the names come next.
 type StepId = 'business' | 'about' | 'categories' | 'prices' | 'place' | 'hours' | 'stripe' | 'login' | 'phone';
-const ALL_STEPS: StepId[] = ['business', 'about', 'categories', 'prices', 'place', 'hours', 'stripe', 'login', 'phone'];
+const ALL_STEPS: StepId[] = ['business', 'place', 'about', 'categories', 'prices', 'hours', 'stripe', 'login', 'phone'];
 
 function deviceTimezone() {
   try { return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined; } catch { return undefined; }
@@ -235,7 +235,7 @@ export default function SignupScreen() {
         {header}
         <View style={{ flex: 1, marginTop: 8 }}>
           <CatalogBuilder key={chosenCats.join('|')} categories={chosenCatalog} entries={entries} onChange={setEntries}
-            onDone={() => goTo('place')} onBack={() => goTo('categories')} />
+            onDone={() => goTo('hours')} onBack={() => goTo('categories')} />
         </View>
       </View>
     );
@@ -284,7 +284,7 @@ export default function SignupScreen() {
             <HelpTitle help="signup" style={[styles.title, { color: colors.foreground }]}>What do you offer?</HelpTitle>
             <Text style={[styles.optionHint, { color: colors.mutedForeground, marginTop: 12 }]}>Tap every kind of service you do. Next, you'll price each one.</Text>
             <CategoryTiles names={(catalog ?? []).map((c) => c.name)} chosen={chosenCats} onChange={setChosenCats} />
-            <TouchableOpacity onPress={() => { setChosenCats([]); goTo('place'); }} style={{ alignSelf: 'center', minHeight: 44, justifyContent: 'center', marginTop: 18 }} testID="signup-catalog-skip">
+            <TouchableOpacity onPress={() => { setChosenCats([]); goTo('hours'); }} style={{ alignSelf: 'center', minHeight: 44, justifyContent: 'center', marginTop: 18 }} testID="signup-catalog-skip">
               <Text style={[styles.link, { color: colors.foreground }]}>I'll add my services later</Text>
             </TouchableOpacity>
           </>
