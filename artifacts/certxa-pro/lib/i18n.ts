@@ -64,6 +64,7 @@ export const useTextKey = () => useSyncExternalStore(subscribe, getTextKey, getT
 
 /** Sentences with a number or name in them: the English pattern and its Vietnamese ($1, $2… are kept). */
 const PATTERNS_VI: [RegExp, string][] = [
+  [/^No US area code starts with (\d+)\.$/, 'Không có mã vùng Hoa Kỳ nào bắt đầu bằng $1.'],
   [/^We have sent the receipt link to the client's phone, (.+)\.$/, 'Chúng tôi đã gửi liên kết biên nhận tới điện thoại của khách, $1.'],
   [/^We have e-mailed the receipt to (.+)\.$/, 'Chúng tôi đã gửi biên nhận qua e-mail tới $1.'],
   [/^You currently do not have any SMS credits needed to send the receipt link to the client's phone, (.+)\.$/, 'Bạn hiện không còn tín dụng SMS để gửi liên kết biên nhận tới điện thoại của khách, $1.'],

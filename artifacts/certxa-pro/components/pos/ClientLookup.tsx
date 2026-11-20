@@ -8,6 +8,7 @@
  * form with the typed name and the cursor in Mobile; in the form it goes from Name to Mobile, then adds the client.
  * "Numeric keyboard" swaps the letters for a number pad laid out like the POS keypad (the Mobile box opens it by itself).
  */
+import { isValidUsPhone, refusedDigit, usPhoneProblem } from '@/lib/phoneCheck';
 import { useMemo, useState } from 'react';
 import { Feather } from '@expo/vector-icons';
 import { ActivityIndicator, Modal, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
@@ -49,10 +50,12 @@ export function ClientLookup<T extends ClientRow>({ visible, clients, busy, erro
   const [phone, setPhone] = useState('');
   const [field, setField] = useState<'name' | 'phone'>('name');
   const [numeric, setNumeric] = useState(false);
+  // Why the last digit typed in Mobile was refused (lib/phoneCheck.ts).
+  const [phoneNote, setPhoneNote] = useState('');
   const chooseField = (f: 'name' | 'phone') => { setField(f); setNumeric(f === 'phone'); };
   const results = useMemo(() => matchClients(clients, query), [clients, query]);
 
-  const reset = () => { setMode('search'); setQuery(''); setName(''); setPhone(''); setField('name'); setNumeric(false); };
+  const reset = () => { setMode('search'); setQuery(''); setName(''); setPhone(''); setField('name'); setNumeric(false); setPhoneNote(''); };
   const close = () => { reset(); onClose(); };
   const startNew = () => {
     // What was typed goes to the form: digits to Mobile, anything else to Name.
@@ -82,7 +85,13 @@ export function ClientLookup<T extends ClientRow>({ visible, clients, busy, erro
     if (field === 'phone') {
       if (key === '⌫') setPhone((v) => v.slice(0, -1));
       else if (key === 'CLEAR') setPhone('');
-      else if (/^\d$/.test(key)) setPhone((v) => (v + key).slice(0, 10));
+      // As /nail's keypads (owner, 2026-11-20): a digit that can't lead to a real US number is refused, with why.
+      else if (/^\d$/.test(key)) {
+        const next = (phone + key).slice(0, 10);
+        const refused = next === phone ? null : refusedDigit(next);
+        setPhoneNote(refused ?? '');
+        if (!refused) setPhone(next);
+      }
       return;
     }
     if (key === '⌫') setName((v) => v.slice(0, -1));
@@ -90,7 +99,7 @@ export function ClientLookup<T extends ClientRow>({ visible, clients, busy, erro
     else if (key === 'SPACE') setName((v) => (v && !v.endsWith(' ') ? `${v} ` : v));
     else setName((v) => (v + (v === '' || v.endsWith(' ') ? key.toUpperCase() : key.toLowerCase())).slice(0, 60));
   };
-  const canAdd = !busy && (name.trim().length > 0 || digitsOnly(phone).length === 10) && (phone === '' || digitsOnly(phone).length === 10);
+  const canAdd = !busy && (name.trim().length > 0 || isValidUsPhone(digitsOnly(phone))) && (phone === '' || isValidUsPhone(digitsOnly(phone)));
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={close} supportedOrientations={['portrait', 'landscape']}>
@@ -147,6 +156,7 @@ export function ClientLookup<T extends ClientRow>({ visible, clients, busy, erro
               ))}
             </View>
             <View style={{ flex: 1 }}>
+              {phoneNote || (digitsOnly(phone).length === 10 && usPhoneProblem(digitsOnly(phone))) ? <Text style={styles.error} testID="client-lookup-phone-note">{phoneNote || `${usPhoneProblem(digitsOnly(phone))}.`}</Text> : null}
               {error ? <Text style={styles.error}>{error}</Text> : null}
               <TouchableOpacity testID="tablet-pos-new-add" disabled={!canAdd} onPress={() => onAdd(name.trim(), phone)} style={[styles.addButton, styles.addWide, !canAdd && { opacity: 0.5 }]}>
                 {busy ? <ActivityIndicator color="#FFFFFF" /> : <><Feather name="user-plus" size={22} color="#FFFFFF" /><Text style={styles.addText}>ADD CLIENT</Text></>}

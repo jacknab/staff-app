@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { refusedDigit, usPhoneProblem } from '@/lib/phoneCheck';
 import { Feather } from '@expo/vector-icons';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -355,7 +356,10 @@ export default function BookingScreen() {
   // The calendar step's Continue: only for a chosen day that isn't past and has open times.
   const dayChosen = monthSlotsState === 'ready' && (daySlots[dayParam]?.length ?? 0) > 0 && selectedDate.getTime() >= startOfToday.getTime();
   const stepNumber = stage === 'client' ? 1 : stage === 'services' ? 2 : stage === 'addons' ? 3 : stage === 'calendar' ? 4 : stage === 'times' ? 5 : 6;
-  const clientCanContinue = selectedClient !== null || (phoneDigits.length === 10 && name.trim().length > 0);
+  // A new client's number must be a real US number (owner, 2026-11-20: /nail's check, lib/phoneCheck.ts).
+  const [phoneNote, setPhoneNote] = useState('');
+  const phoneProblem = phoneDigits.length === 10 ? usPhoneProblem(phoneDigits) : null;
+  const clientCanContinue = selectedClient !== null || (phoneDigits.length === 10 && !phoneProblem && name.trim().length > 0);
   const shiftMonth = (amount: number) => {
     autoPick.current = false;
     const next = new Date(monthCursor.getFullYear(), monthCursor.getMonth() + amount, 1);
@@ -364,17 +368,22 @@ export default function BookingScreen() {
 
   const pressNumber = (key: string) => {
     if (key === 'clear') {
+      setPhoneNote('');
       setPhone('');
       setSelectedClient(null);
       setName('');
       return;
     }
     if (key === 'delete') {
+      setPhoneNote('');
       setPhone((current) => current.slice(0, -1));
       setSelectedClient(null);
       return;
     }
     if (phoneDigits.length < 10) {
+      const refused = refusedDigit(`${phoneDigits}${key}`);
+      setPhoneNote(refused ?? '');
+      if (refused) return;
       setPhone((current) => `${current}${key}`);
       setSelectedClient(null);
     }
@@ -388,7 +397,7 @@ export default function BookingScreen() {
   const continueToDetails = () => {
     if (selectedClient) {
       setTicketClient(selectedClient);
-    } else if (phoneDigits.length === 10 && name.trim()) {
+    } else if (phoneDigits.length === 10 && !phoneProblem && name.trim()) {
       const cleanName = name.trim();
       const initials = cleanName.split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase() ?? '').join('');
       setTicketClient({
@@ -533,6 +542,7 @@ export default function BookingScreen() {
               <Text testID="booking-phone" style={[styles.phoneValue, { color: phoneDigits ? colors.foreground : colors.mutedForeground }]}>{phoneDigits ? formatPhone(phoneDigits) : 'Enter Phone Number'}</Text>
               {phoneDigits.length > 0 && <TouchableOpacity testID="clear-phone" onPress={() => pressNumber('clear')} style={styles.phoneClear}><Feather name="x" size={17} color={colors.mutedForeground} /></TouchableOpacity>}
             </View>
+            {phoneNote || phoneProblem ? <Text testID="booking-phone-note" style={[styles.phoneNote, { color: colors.destructive }]}>{phoneNote || `${phoneProblem}.`}</Text> : null}
             <View style={styles.keypad}>
               {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'clear', '0', 'delete'].map((key) => (
                 key === 'clear' ? (
@@ -899,4 +909,5 @@ const styles = StyleSheet.create({
   summary: { borderRadius: 13, minHeight: 48, paddingHorizontal: 13, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16 },
   summaryLabel: { fontSize: 12, letterSpacing: 1.1, fontFamily: 'Inter_700Bold' },
   summaryValue: { fontSize: 17, fontFamily: 'Inter_700Bold' },
+  phoneNote: { fontSize: 15, lineHeight: 21, fontFamily: 'Inter_500Medium', textAlign: 'center', marginTop: 8 },
 });

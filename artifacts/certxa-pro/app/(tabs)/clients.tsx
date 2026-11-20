@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { typedPhoneProblem } from '@/lib/phoneCheck';
 import { Feather } from '@expo/vector-icons';
 import { Image, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text, TextInput } from '@/components/AppText';
@@ -92,9 +93,12 @@ export default function ClientsScreen() {
     const trimmed = newName.trim();
     if (!trimmed || saving) return;
     const initials = trimmed.split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase() ?? '').join('');
+    // A real US mobile number, when one is given (owner, 2026-11-20: /nail's check, lib/phoneCheck.ts).
+    const phoneProblem = typedPhoneProblem(newPhone);
+    if (phoneProblem) { setError(phoneProblem); return; }
     setSaving(true); setError('');
     try {
-      const client = await addClient({ name: trimmed, initials: initials || 'NC', phone: newPhone.replace(/\D/g, ''), lastVisit: 'New client', service: 'No visits yet', visits: 0, spend: '$0', color: 'green' });
+      const client = await addClient({ name: trimmed, initials: initials || 'NC', phone: newPhone.replace(/\D/g, '').replace(/^1(?=\d{10}$)/, ''), lastVisit: 'New client', service: 'No visits yet', visits: 0, spend: '$0', color: 'green' });
       setNewName(''); setNewPhone(''); setAdding(false); open(client.customerId);
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not save client.'); }
     finally { setSaving(false); }

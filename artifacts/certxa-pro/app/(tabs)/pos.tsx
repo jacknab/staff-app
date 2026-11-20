@@ -6,6 +6,7 @@
  * The sale is a ticket of its own for that client, kept off the calendar: POST /api/quick-sales. If the owner
  * backs out before paying, checkout removes it again (DELETE /api/quick-sales/:id).
  */
+import { typedPhoneProblem } from '@/lib/phoneCheck';
 import { useMemo, useState } from 'react';
 import { Feather } from '@expo/vector-icons';
 import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, StatusBar, StyleSheet, TouchableOpacity, View } from 'react-native';
@@ -88,6 +89,8 @@ function PhonePos() {
 
   const begin = async () => {
     if (!canBegin) return;
+    // A new client's number must be a real US number (owner, 2026-11-20: /nail's check, lib/phoneCheck.ts).
+    if (!picked) { const phoneProblem = typedPhoneProblem(phone); if (phoneProblem) { setError(phoneProblem); return; } }
     setBusy(true); setError('');
     try {
       let client = picked;
