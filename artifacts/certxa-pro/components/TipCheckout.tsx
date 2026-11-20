@@ -7,9 +7,9 @@
  * 51¢ and up rounds up ($11.26 → $11, $11.51 → $12). On a tablet this fills the screen for the client, in one centered
  * column the phone's width.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Feather } from '@expo/vector-icons';
-import { Platform, StatusBar, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Animated, Easing, Platform, StatusBar, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text } from '@/components/AppText';
 import { useNavigation } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -38,6 +38,23 @@ export function roundedTipCents(baseCents: number, percent: number): number {
   const exact = Math.round(Math.max(0, baseCents) * percent / 100);
   const whole = Math.floor(exact / 100);
   return (exact % 100 > 50 ? whole + 1 : whole) * 100;
+}
+
+/** The heart under the third tip beats, to draw the eye to that card (owner, 2026-11-20). */
+function BeatingHeart({ children }: { children: string }) {
+  const scale = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    const beat = Animated.loop(Animated.sequence([
+      Animated.timing(scale, { toValue: 1.3, duration: 180, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      Animated.timing(scale, { toValue: 1, duration: 180, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+      Animated.timing(scale, { toValue: 1.18, duration: 160, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      Animated.timing(scale, { toValue: 1, duration: 220, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+      Animated.delay(700),
+    ]));
+    beat.start();
+    return () => beat.stop();
+  }, [scale]);
+  return <Animated.Text style={[styles.face, { transform: [{ scale }] }]}>{children}</Animated.Text>;
 }
 
 const wholeDollars = (cents: number) => `$${Math.round(Math.max(0, cents) / 100).toLocaleString('en-US')}`;
@@ -95,7 +112,7 @@ export function TipCheckout({ baseCents, presets, onConfirmTip, onBack }: TipChe
                     accessibilityRole="button" accessibilityLabel={`Tip ${wholeDollars(tip)}`}>
                     <Text style={styles.cardAmount}>{wholeDollars(tip)}</Text>
                   </TouchableOpacity>
-                  <Text style={styles.face}>{FACES[i] ?? FACES[FACES.length - 1]}</Text>
+                  {i === 2 ? <BeatingHeart>{FACES[2]}</BeatingHeart> : <Text style={styles.face}>{FACES[i] ?? FACES[FACES.length - 1]}</Text>}
                 </View>
               );
             })}
