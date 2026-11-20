@@ -176,7 +176,7 @@ export function TabletPos({ bookRequest, checkoutRequest }: { bookRequest?: Book
   const [booking, setBooking] = useState<{ slot: BookingSlot | null } | null>(null);
   const [bookDay, setBookDay] = useState<Date | null>(null);
   const [bookBusy, setBookBusy] = useState(false);
-  // Creating a booking: the ticket shows CANCEL and CREATE APPOINTMENT instead of CLEAR, BOOK and PAY.
+  // Creating a booking: the ticket shows CREATE APPOINTMENT instead of PAY.
   const [bookMode, setBookMode] = useState(false);
   const serviceLines = lines.filter((l) => l.kind === 'service' && l.serviceId);
   const bookMinutes = lines.filter((l) => l.kind === 'service' || l.kind === 'addon').reduce((n, l) => n + (l.minutes ?? 0), 0);
@@ -474,11 +474,8 @@ export function TabletPos({ bookRequest, checkoutRequest }: { bookRequest?: Book
           </TouchableOpacity>
         </View>
       </> : <>
+      {/* Just PAY (owner, 2026-11-20): no CLEAR or BOOK on the selling POS; BOOK belongs to the Create Appointment POS. */}
       <View style={styles.actionRow}>
-        <TouchableOpacity testID="tablet-pos-clear" onPress={clear} style={[styles.secondaryButton, { flex: 1 }]}><Text style={styles.secondaryText}>CLEAR</Text></TouchableOpacity>
-        <TouchableOpacity testID="tablet-pos-book" disabled={!!paying || !!visit} onPress={() => { setBookMode(true); startBooking(); }} style={[styles.secondaryButton, { flex: 1 }, visit && { opacity: 0.45 }]}><Text style={styles.secondaryText}>BOOK</Text></TouchableOpacity>
-      </View>
-      <View style={[styles.actionRow, { marginTop: 10 }]}>
         <TouchableOpacity testID="tablet-pos-charge" disabled={!lines.length || busy} onPress={() => void charge()} style={[styles.chargeButton, (!lines.length || busy) && { opacity: 0.5 }]}>
           {busy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.chargeText}>PAY</Text>}
         </TouchableOpacity>
