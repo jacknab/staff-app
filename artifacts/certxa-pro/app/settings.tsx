@@ -18,7 +18,6 @@
  *
  * Tablets (owner, 2026-11-19): the menu stays on the left and the chosen setting opens on the right.
  */
-import { BUSINESS_TYPES } from '@/lib/serviceCatalog';
 import { useCallback, useEffect, useState, type ComponentProps, type ReactNode } from 'react';
 import { Feather } from '@expo/vector-icons';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
@@ -49,7 +48,6 @@ type Store = { id: number; name?: string | null; phone?: string | null; email?: 
 type Hours = { dayOfWeek: number; openTime: string; closeTime: string; isClosed: boolean };
 type FeatherName = ComponentProps<typeof Feather>['name'];
 
-// The same list as sign-up (lib/serviceCatalog.ts).
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const TITLES: Record<Screen, string> = {
   menu: 'Settings', business: 'Business details', location: 'Location', places: 'Where you see clients', hours: 'Hours', rules: 'Online booking', policy: 'Cancellation policy',
@@ -203,7 +201,7 @@ export default function SettingsScreen() {
     if (!store) return;
     if (screen === 'business') return run(async () => {
       if (!String(draft.name).trim()) throw new Error('Enter your business name.');
-      setStore(await api.patch<Store>(`/api/stores/${store.id}`, { name: String(draft.name).trim(), phone: String(draft.phone).trim() || null, email: String(draft.email).trim() || null, category: draft.category || null }));
+      setStore(await api.patch<Store>(`/api/stores/${store.id}`, { name: String(draft.name).trim(), phone: String(draft.phone).trim() || null, email: String(draft.email).trim() || null }));
     });
     if (screen === 'places') return run(async () => {
       if (draft.ownPlace === 'none' && !draft.houseCalls) throw new Error('Choose where you see clients: your own place, house calls, or both.');
@@ -495,7 +493,8 @@ export default function SettingsScreen() {
     );
     if (screen === 'business') return (<>
       <Label>Business name</Label>{field('name', 'Your business name', { autoCapitalize: 'words' })}
-      <Label>Type of business</Label>{choices('category', (BUSINESS_TYPES.includes(draft.category) || !draft.category ? BUSINESS_TYPES : [draft.category, ...BUSINESS_TYPES]).map((value) => ({ value, label: value })))}
+      {/* Set at sign-up and never changed (owner, 2026-11-20): it decides the account's service and add-on lists. */}
+      <Label>Type of business</Label>{field('category', '—', { editable: false })}
       <Label>Business phone</Label>{field('phone', '(555) 555-5555', { keyboardType: 'phone-pad' })}
       <Label>Business e-mail</Label>{field('email', 'you@example.com', { keyboardType: 'email-address', autoCapitalize: 'none', autoCorrect: false })}
       <Help>Clients see these on your booking website and in the messages Certxa sends.</Help>{saveButton()}

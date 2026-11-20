@@ -836,7 +836,7 @@ export const HELP: Record<string, HelpPage> = {
       'Hold a section’s title for its own help.',
     ] }],
   },
-  'settings.business': { title: 'Business details', intro: 'Your business name, type, phone and e-mail.', sections: [{ heading: 'Good to know', points: ['Clients see these on your booking website and in the messages Certxa sends.', 'Tap Save to keep a change.'] }] },
+  'settings.business': { title: 'Business details', intro: 'Your business name, type, phone and e-mail.', sections: [{ heading: 'Good to know', points: ['Clients see these on your booking website and in the messages Certxa sends.', 'Type of business is set when you sign up and can’t be changed: it decides your lists of services and add-ons.', 'Tap Save to keep a change.'] }] },
   'settings.location': { title: 'Location', intro: 'Your business address.', sections: [{ heading: 'Good to know', points: ['Street address, city, state and ZIP code.', 'Certxa sets your time zone from it. House calls are measured from it.', 'Whether clients see it is set in Where you see clients.'] }] },
   'settings.places': {
     title: 'Where you see clients',
