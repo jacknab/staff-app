@@ -470,4 +470,8 @@ export const VI_3: Record<string, string> = {
   "Add a custom tip": "Thêm tip tùy chọn",
   "Enter all three tips.": "Nhập đủ ba mức tip.",
   "Enter three different tips.": "Nhập ba mức tip khác nhau.",
+  "Custom Tip": "Tip tùy chọn",
+  "SKIP": "BỎ QUA",
+  "Amount Owed before tip:": "Số tiền phải trả trước tip:",
+  "Say thanks\nwith a tip": "Gửi lời cảm ơn\nbằng tiền tip",
 };
