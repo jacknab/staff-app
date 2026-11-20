@@ -219,13 +219,13 @@ export default function ClientProfileScreen() {
   }, 'Could not delete the client.');
 
   // ── Merge duplicate profiles into this one (owner, 2026-11-18, GlossGenius): this client keeps its details; the chosen
-  // duplicates' bookings, notes and records move here and they're removed. It can't be undone. ──
+  // duplicates' appointments, notes and records move here and they're removed. It can't be undone. ──
   const [mergeSearch, setMergeSearch] = useState('');
   const [mergeIds, setMergeIds] = useState<number[]>([]);
   const mergeMatches = mergeSearch.trim().length < 2 ? [] : clients.filter((c) => c.customerId !== clientId && !mergeIds.includes(c.customerId)
     && [c.name, c.phone, c.email ?? ''].some((v) => v.toLowerCase().replace(/[^a-z0-9@.]/g, '').includes(mergeSearch.toLowerCase().replace(/[^a-z0-9@.]/g, '')))).slice(0, 8);
   const mergeNames = mergeIds.map((id) => clients.find((c) => c.customerId === id)?.name ?? `Client #${id}`);
-  const mergeClients = () => Alert.alert(`Merge into ${name}?`, `${mergeNames.join(', ')} will be merged into ${name}: their bookings, notes and records move here, and ${name}'s contact details are kept. This can't be undone.`, [
+  const mergeClients = () => Alert.alert(`Merge into ${name}?`, `${mergeNames.join(', ')} will be merged into ${name}: their appointments, notes and records move here, and ${name}'s contact details are kept. This can't be undone.`, [
     { text: 'Cancel', style: 'cancel' },
     { text: 'Merge', style: 'destructive', onPress: () => void run(async () => {
       await api.post(`/api/pro/clients/${clientId}/merge`, { loserIds: mergeIds });
@@ -343,7 +343,7 @@ export default function ClientProfileScreen() {
             {error ? <Text style={[styles.error, { color: colors.destructive }]}>{error}</Text> : null}
             <SectionTitle style={styles.section}>Merge with another client</SectionTitle>
             <View style={[styles.box, card, { padding: 14 }]} testID="client-merge">
-              <Text style={[styles.sub, { color: colors.mutedForeground, textAlign: 'left', marginBottom: 10 }]}>{`Find duplicate profiles of ${name}. Their bookings, notes and records move here, and ${name}'s contact details are kept.`}</Text>
+              <Text style={[styles.sub, { color: colors.mutedForeground, textAlign: 'left', marginBottom: 10 }]}>{`Find duplicate profiles of ${name}. Their appointments, notes and records move here, and ${name}'s contact details are kept.`}</Text>
               <TextInput testID="client-merge-search" value={mergeSearch} onChangeText={setMergeSearch} placeholder="Name, phone or e-mail" placeholderTextColor={colors.mutedForeground} autoCapitalize="none" style={[styles.input, { color: colors.foreground, borderColor: colors.border }]} />
               {mergeMatches.map((c) => (
                 <TouchableOpacity key={c.customerId} testID={`client-merge-pick-${c.customerId}`} onPress={() => { setMergeIds((ids) => [...ids, c.customerId]); setMergeSearch(''); }} style={styles.more}>

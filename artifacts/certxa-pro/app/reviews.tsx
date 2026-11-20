@@ -53,7 +53,7 @@ export default function ReviewsScreen() {
       const row = await api.get<ApiAppointment>(`/api/appointments/${appointmentId}`);
       router.push(appointmentParams(mapAppointment(row, timeZone)));
     } catch {
-      Alert.alert('Booking', 'That booking could not be opened.');
+      Alert.alert('Appointment', 'That appointment could not be opened.');
     } finally {
       setOpeningBooking(null);
     }
@@ -214,7 +214,7 @@ export default function ReviewsScreen() {
                   {review.appointmentId ? (
                     <TouchableOpacity testID={`review-booking-${review.id}`} disabled={openingBooking === review.id} onPress={() => void openBooking(review.appointmentId!)} style={styles.bookingLink}>
                       <Feather name="file-text" size={16} color={colors.primary} />
-                      <Text style={[styles.bookingLinkText, { color: colors.primary }]}>{openingBooking === review.id ? 'Opening…' : 'View booking'}</Text>
+                      <Text style={[styles.bookingLinkText, { color: colors.primary }]}>{openingBooking === review.id ? 'Opening…' : 'View appointment'}</Text>
                     </TouchableOpacity>
                   ) : null}
 

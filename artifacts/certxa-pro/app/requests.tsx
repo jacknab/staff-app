@@ -25,7 +25,7 @@ export default function RequestsScreen() {
   const load = useCallback(async () => {
     setError('');
     try { setRequests(await listBookingRequests()); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not load booking requests.'); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not load appointment requests.'); }
   }, []);
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
@@ -34,7 +34,7 @@ export default function RequestsScreen() {
       <AppBackground />
       <View style={styles.nav}>
         <TouchableOpacity accessibilityLabel="Back" onPress={() => router.back()} style={styles.back} testID="requests-back"><Feather name="arrow-left" size={20} color={colors.foreground} /></TouchableOpacity>
-        <HelpTitle help="requests" style={[styles.navTitle, { color: colors.foreground }]}>Booking requests</HelpTitle>
+        <HelpTitle help="requests" style={[styles.navTitle, { color: colors.foreground }]}>Appointment requests</HelpTitle>
         <View style={styles.back} />
       </View>
       <ScrollView
@@ -46,7 +46,7 @@ export default function RequestsScreen() {
         {requests?.length === 0 ? (
           <View style={[styles.empty, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.title, { color: colors.foreground }]}>No requests waiting</Text>
-            <Text style={[styles.sub, { color: colors.mutedForeground }]}>New online bookings show here when you review each one first.</Text>
+            <Text style={[styles.sub, { color: colors.mutedForeground }]}>New online appointments show here when you review each one first.</Text>
           </View>
         ) : null}
         {requests?.map((request) => (

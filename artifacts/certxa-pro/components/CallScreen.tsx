@@ -141,7 +141,7 @@ function ClientCard({ client, timeZone, onOpen }: { client: ClientProfile; timeZ
         </View>
       </View>
       <Row label="Last visit" value={last} />
-      <Row label="Next booking" value={next} />
+      <Row label="Next appointment" value={next} />
       {client.allergies ? <Row label="Allergies" value={client.allergies} strong /> : null}
       {client.notes ? <Text style={styles.note} numberOfLines={2}>{client.notes}</Text> : null}
       <TouchableOpacity onPress={onOpen} style={styles.open} accessibilityLabel="View full profile" testID="call-open-profile">

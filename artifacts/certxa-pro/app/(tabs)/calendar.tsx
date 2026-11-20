@@ -466,7 +466,7 @@ export default function CalendarScreen() {
         {dayAppointments.length === 0 ? (
           <View style={styles.weekEmpty}>
             <View style={[styles.weekEmptyBar, { backgroundColor: colors.border }]} />
-            <Text style={[styles.weekEmptyText, tb.weekEmptyText, { color: colors.mutedForeground }]}>No bookings</Text>
+            <Text style={[styles.weekEmptyText, tb.weekEmptyText, { color: colors.mutedForeground }]}>No appointments</Text>
           </View>
         ) : (
           <View style={styles.weekCards}>
@@ -513,12 +513,12 @@ export default function CalendarScreen() {
             <RNScrollView contentContainerStyle={{ paddingBottom: 6 }} showsVerticalScrollIndicator={false}>
               <SectionHeader title="Add" />
               <View style={styles.overlayGroup}>
-                <MenuCard testID="calendar-add-booking" icon={{ feather: 'calendar' }} title="New booking" subtitle="Book a client on this day" onPress={() => goAdd('/booking')} />
+                <MenuCard testID="calendar-add-booking" icon={{ feather: 'calendar' }} title="New appointment" subtitle="Book a client on this day" onPress={() => goAdd('/booking')} />
                 <MenuCard testID="calendar-add-block" icon={{ feather: 'slash' }} title="Block time" subtitle="Time off, breaks or personal time" onPress={() => goAdd('/block-time')} />
               </View>
               <SectionHeader title="Calendar view" />
               <View style={styles.overlayGroup}>
-                {([['Day', 'clock', 'One day, hour by hour'], ['Week', 'columns', 'Seven days, with every booking'], ['Month', 'grid', 'The whole month at a glance']] as const).map(([mode, icon, line]) => (
+                {([['Day', 'clock', 'One day, hour by hour'], ['Week', 'columns', 'Seven days, with every appointment'], ['Month', 'grid', 'The whole month at a glance']] as const).map(([mode, icon, line]) => (
                   <MenuCard key={mode} testID={`calendar-view-${mode.toLowerCase()}`} icon={{ feather: icon }} title={mode}
                     subtitle={viewMode === mode ? `Showing now · ${line}` : line} onPress={() => pickView(mode)} />
                 ))}
@@ -550,7 +550,7 @@ export default function CalendarScreen() {
         </View>
         {openRequests > 0 ? (
           <TouchableOpacity testID="calendar-requests-banner" onPress={() => router.push('/requests')} style={[styles.requestsBanner, { backgroundColor: colors.card, borderColor: colors.primary }]}>
-            <Text style={[styles.requestsText, { color: colors.foreground }]}>{openRequests === 1 ? '1 booking request is waiting for you' : `${openRequests} booking requests are waiting for you`}</Text>
+            <Text style={[styles.requestsText, { color: colors.foreground }]}>{openRequests === 1 ? '1 appointment request is waiting for you' : `${openRequests} appointment requests are waiting for you`}</Text>
             <Feather name="chevron-right" size={19} color={colors.foreground} />
           </TouchableOpacity>
         ) : null}

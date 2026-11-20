@@ -114,7 +114,7 @@ export default function WaitlistScreen() {
             </TouchableOpacity>
           </>
         ) : entries == null ? <ActivityIndicator style={{ marginTop: 60 }} color={colors.mutedForeground} />
-          : entries.length === 0 ? <Text style={[styles.muted, { color: colors.mutedForeground, textAlign: 'center', marginTop: 40 }]}>Nobody is waiting. Add a client who wants in on a full day; you'll hear when a booking that day is cancelled.</Text>
+          : entries.length === 0 ? <Text style={[styles.muted, { color: colors.mutedForeground, textAlign: 'center', marginTop: 40 }]}>Nobody is waiting. Add a client who wants in on a full day; you'll hear when an appointment that day is cancelled.</Text>
           : (
             <View style={[styles.list, box]}>
               {entries.map((e, i) => {

@@ -53,7 +53,7 @@ import { useOpenBooking } from '@/lib/openBooking';
 // Stripe M2 does not require that Apple entitlement.
 const TAP_TO_PAY_ENABLED = true;
 // Shown on the payment screen so a tester can tell which build is installed.
-const BUILD_LABEL = 'Build Nov 21 · I';
+const BUILD_LABEL = 'Build Nov 21 · J';
 const EXPO_GO_PREVIEW = process.env.EXPO_PUBLIC_EXPO_GO_PREVIEW === '1';
 
 type PaymentStep = 'idle' | 'tap_intro' | 'initializing' | 'discovering' | 'connecting' | 'ready' | 'processing' | 'capture_pending' | 'success' | 'error';
@@ -92,7 +92,7 @@ export default function CheckoutScreen() {
     setRebooking(true); setRebookNote('');
     try {
       const r = await api.post<{ label: string; clash: boolean }>(`/api/appointments/${appointmentId}/rebook`, { weeks: nextWeeks });
-      setRebookNote(r.clash ? `Booked for ${r.label}. That time overlaps another booking or blocked time, so check your calendar.` : `Booked for ${r.label}.`);
+      setRebookNote(r.clash ? `Booked for ${r.label}. That time overlaps another appointment or blocked time, so check your calendar.` : `Booked for ${r.label}.`);
       void refreshBookings();
     } catch (cause) {
       setRebookNote(errorMessage(cause));
@@ -739,7 +739,7 @@ export default function CheckoutScreen() {
     const giftCode = (override?.code ?? giftCardCode).trim();
     const otherNameNow = override?.otherName ?? otherName;
     const otherKindNow = override?.otherKind ?? otherKind;
-    if (!Number.isInteger(apptId) || apptId <= 0) { setError('This payment has no booking to record it on.'); return; }
+    if (!Number.isInteger(apptId) || apptId <= 0) { setError('This payment has no appointment to record it on.'); return; }
     if (method === 'gift_card' && !giftCode) { setError('Enter the gift card code.'); return; }
     if (offlineDueCents <= 0) { setError('There is nothing left to pay.'); return; }
     if (method === 'other' && !otherNameNow) { setError(otherKind === 'other' ? 'Type how the client paid.' : 'Choose how the client paid.'); return; }
@@ -847,7 +847,7 @@ export default function CheckoutScreen() {
   const payWithoutReader = async (method: 'card_on_file' | 'keyed') => {
     const apptId = Number(appointmentId);
     const amountCents = Number(digits);
-    if (!Number.isInteger(apptId) || apptId <= 0) { setError('This payment has no booking to record it on.'); return; }
+    if (!Number.isInteger(apptId) || apptId <= 0) { setError('This payment has no appointment to record it on.'); return; }
     if (amountCents < 50) { setError('Card payments must be at least $0.50.'); return; }
     setError(''); setCharging(method === 'card_on_file' ? 'saved' : 'keyed');
     let created: { paymentIntentId: string } | null = null;

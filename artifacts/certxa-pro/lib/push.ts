@@ -37,7 +37,7 @@ export async function registerForBookingPushes(): Promise<boolean> {
   try {
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync(CHANNEL, {
-        name: 'Bookings', importance: Notifications.AndroidImportance.HIGH, sound: SOUND, vibrationPattern: [0, 120],
+        name: 'Appointments', importance: Notifications.AndroidImportance.HIGH, sound: SOUND, vibrationPattern: [0, 120],
       });
     }
     let permission = await Notifications.getPermissionsAsync();

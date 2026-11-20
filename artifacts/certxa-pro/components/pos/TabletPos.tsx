@@ -647,7 +647,7 @@ export function TabletPos({ bookRequest, checkoutRequest }: { bookRequest?: Book
     if (!id) return;
     const v: Visit = {
       id, amountCents: Math.max(0, Math.round(Number(checkoutRequest?.amountCents) || 0)), depositCents: Math.max(0, Math.round(Number(checkoutRequest?.depositCents) || 0)),
-      clientName: String(checkoutRequest?.clientName ?? ''), serviceName: String(checkoutRequest?.serviceName || 'Booking'),
+      clientName: String(checkoutRequest?.clientName ?? ''), serviceName: String(checkoutRequest?.serviceName || 'Appointment'),
       phone: String(checkoutRequest?.phone ?? ''), email: String(checkoutRequest?.email ?? ''), clientId: String(checkoutRequest?.clientId ?? ''), serviceIds: String(checkoutRequest?.serviceIds ?? ''),
     };
     setPaying(null); setPanel(null); setBooking(null); setBookMode(false); setPicking(false);

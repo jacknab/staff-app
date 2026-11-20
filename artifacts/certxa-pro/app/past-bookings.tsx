@@ -65,7 +65,7 @@ export default function PastBookingsScreen() {
       {loading && tickets.length === 0 ? <ActivityIndicator style={{ marginTop: 24 }} color={colors.primary} />
         : error ? <Text style={[styles.rowSub, { color: colors.destructive, marginTop: 16 }]}>{error}</Text>
         : days.length === 0 ? (
-          <View style={[styles.empty, card]}><Feather name="clock" size={20} color={colors.mutedForeground} /><Text style={[styles.rowSub, { color: colors.mutedForeground }]}>No bookings in the last 30 days.</Text></View>
+          <View style={[styles.empty, card]}><Feather name="clock" size={20} color={colors.mutedForeground} /><Text style={[styles.rowSub, { color: colors.mutedForeground }]}>No appointments in the last 30 days.</Text></View>
         ) : days.map((group) => (
           <View key={group.label}>
             <Text style={[styles.dayLabel, { color: colors.mutedForeground }]}>{group.label}</Text>

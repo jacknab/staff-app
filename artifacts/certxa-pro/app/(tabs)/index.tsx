@@ -214,7 +214,7 @@ function HomeContent({ paneWidth }: { paneWidth?: number }) {
               open: () => router.push(`/appointment/${t.id}`), testID: `home-cancel-${t.id}`,
             })),
             ...requests.slice(0, 5).map((r) => ({
-              key: `r${r.id}`, title: `Booking request · ${r.clientName}`,
+              key: `r${r.id}`, title: `Appointment request · ${r.clientName}`,
               sub: `${r.serviceName} · ${zonedDateLabel(r.startsAt, timeZone)}, ${zonedTimeLabel(r.startsAt, timeZone)}`,
               open: () => router.push({ pathname: '/request/[id]', params: { id: String(r.id) } }), testID: `home-request-${r.id}`,
             })),

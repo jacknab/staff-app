@@ -61,7 +61,7 @@ export default function PromoCodesScreen() {
   const publish = (c: Code) => Alert.alert(`Publish ${c.code}?`, 'Once published, the code works at checkout and on your website, and it can’t be changed.', [
     { text: 'Cancel', style: 'cancel' }, { text: 'Publish code', onPress: () => void run(async () => { await api.post(`/api/pro/promo-codes/${c.id}/publish`, {}); setOpen(null); }) },
   ]);
-  const end = (c: Code) => Alert.alert(`End ${c.code}?`, 'It stops working at checkout and on your website. Bookings that already have it keep it.', [
+  const end = (c: Code) => Alert.alert(`End ${c.code}?`, 'It stops working at checkout and on your website. Appointments that already have it keep it.', [
     { text: 'Cancel', style: 'cancel' }, { text: 'End code', style: 'destructive', onPress: () => void run(async () => { await api.post(`/api/pro/promo-codes/${c.id}/end`, {}); setOpen(null); }) },
   ]);
   const remove = (c: Code) => Alert.alert(`Delete ${c.code}?`, 'The draft is deleted.', [

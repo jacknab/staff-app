@@ -121,7 +121,7 @@ export default function FormsScreen() {
   const hint = (f: Form) => [
     f.kind === 'waiver' ? 'Waiver' : 'Intake form',
     f.frequency === 'once' ? 'once per client' : 'every visit',
-    f.sendAuto ? (f.allServices ? 'sent for every booking' : `sent for ${f.serviceIds.length} service${f.serviceIds.length === 1 ? '' : 's'}`) : 'sent by you',
+    f.sendAuto ? (f.allServices ? 'sent for every appointment' : `sent for ${f.serviceIds.length} service${f.serviceIds.length === 1 ? '' : 's'}`) : 'sent by you',
     `${f.completed} filled in`,
   ].join(' · ');
   const back = () => {
@@ -148,7 +148,7 @@ export default function FormsScreen() {
           <Choice testID="form-kind" options={[['intake', 'Intake form (questions)'], ['waiver', 'Waiver (signed)']]} value={draft.kind} onChange={(kind) => setDraft({ ...draft, kind })} />
           <Label>Ask clients</Label>
           <Choice testID="form-frequency" options={[['once', 'Once (keep their answers)'], ['every_visit', 'Before every visit']]} value={draft.frequency} onChange={(frequency) => setDraft({ ...draft, frequency })} />
-          <Toggle testID="form-send-auto" title="Send when clients book" hint="The link is e-mailed (or texted, if there’s no e-mail) a few minutes after a booking." value={draft.sendAuto} onChange={(sendAuto) => setDraft({ ...draft, sendAuto })} />
+          <Toggle testID="form-send-auto" title="Send when clients book" hint="The link is e-mailed (or texted, if there’s no e-mail) a few minutes after an appointment." value={draft.sendAuto} onChange={(sendAuto) => setDraft({ ...draft, sendAuto })} />
           <Toggle testID="form-all-services" title="For every service" hint="Turn off to choose the services that need this form." value={draft.allServices} onChange={(allServices) => setDraft({ ...draft, allServices })} />
           {!draft.allServices ? (
             <>

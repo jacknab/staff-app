@@ -477,7 +477,7 @@ export default function BookingScreen() {
       }
       setCalendarDate(selectedDate);
       await refresh();
-      if (repeatNote) Alert.alert('Repeat booking', repeatNote);
+      if (repeatNote) Alert.alert('Repeat appointment', repeatNote);
       if (created.paymentHold && !created.paymentHold.notificationSent) Alert.alert('Payment link not sent', 'The appointment is on hold, but Certxa could not text the client. Contact the client before the hold expires.');
       else if (created.paymentHold && repeatWeeks > 0) Alert.alert('Payment request sent', 'The first appointment is on hold. Recurring dates were not added while payment is pending.');
       router.replace('/calendar');
@@ -494,8 +494,8 @@ export default function BookingScreen() {
       <View style={styles.navbar}>
         {stage === 'client' ? (
           <>
-            <View><Text style={[styles.wordmark, { color: colors.foreground }]}>Certxa<Text style={{ color: colors.primary }}>.</Text></Text><Text style={[styles.navSub, { color: colors.mutedForeground }]}>NEW BOOKING</Text></View>
-            <TouchableOpacity testID="close-booking" accessibilityLabel="Close booking" onPress={() => router.back()} style={styles.navButton}><Feather name="x" size={21} color={colors.foreground} /></TouchableOpacity>
+            <View><Text style={[styles.wordmark, { color: colors.foreground }]}>Certxa<Text style={{ color: colors.primary }}>.</Text></Text><Text style={[styles.navSub, { color: colors.mutedForeground }]}>NEW APPOINTMENT</Text></View>
+            <TouchableOpacity testID="close-booking" accessibilityLabel="Close appointment" onPress={() => router.back()} style={styles.navButton}><Feather name="x" size={21} color={colors.foreground} /></TouchableOpacity>
           </>
         ) : stage === 'payment-choice' ? (
           <>
@@ -585,7 +585,7 @@ export default function BookingScreen() {
             </>)}
           </ScrollView>
           <View style={[styles.footer, { borderTopColor: colors.border, backgroundColor: colors.background, paddingBottom: Math.max(insets.bottom, Platform.OS === 'web' ? 34 : 16) }]}>
-            <TouchableOpacity testID="continue-booking" disabled={!clientCanContinue} onPress={continueToDetails} style={[styles.primaryButton, { backgroundColor: clientCanContinue ? colors.primary : colors.muted }]}><Text style={[styles.primaryButtonText, { color: clientCanContinue ? colors.primaryForeground : colors.mutedForeground }]}>{selectedClient ? `Continue with ${selectedClient.name.split(' ')[0]}` : 'Add client to booking'}</Text><Feather name="arrow-right" size={19} color={clientCanContinue ? colors.primaryForeground : colors.mutedForeground} /></TouchableOpacity>
+            <TouchableOpacity testID="continue-booking" disabled={!clientCanContinue} onPress={continueToDetails} style={[styles.primaryButton, { backgroundColor: clientCanContinue ? colors.primary : colors.muted }]}><Text style={[styles.primaryButtonText, { color: clientCanContinue ? colors.primaryForeground : colors.mutedForeground }]}>{selectedClient ? `Continue with ${selectedClient.name.split(' ')[0]}` : 'Add client to appointment'}</Text><Feather name="arrow-right" size={19} color={clientCanContinue ? colors.primaryForeground : colors.mutedForeground} /></TouchableOpacity>
             <Text style={[styles.footerNote, { color: colors.mutedForeground }]}>Client records are loaded from and saved to Certxa.</Text>
           </View>
         </>

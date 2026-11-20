@@ -44,19 +44,19 @@ export const HELP: Record<string, HelpPage> = {
     intro: 'Your day at a glance, in your business’s time zone.',
     sections: [
       { heading: 'At the top', points: [
-        'Today’s date. The ⋮ button at the top right opens quick links: Past 30 days (every booking from the last 30 days, newest first).',
+        'Today’s date. The ⋮ button at the top right opens quick links: Past 30 days (every appointment from the last 30 days, newest first).',
         'The envelope opens your Inbox (messages clients send from your website). A number on it shows how many are new.',
       ] },
       { heading: 'Taken today', points: ['What you’ve been paid today, how many visits are paid, and how many appointments are still to go.'] },
       { heading: 'Weekly goal', points: ['Set a goal (top right of Taken today) sets or changes your weekly revenue goal. Once set, a card under Taken today shows how much of it you’ve made this week (Sunday to Saturday); tap it to see past weeks.'] },
       { heading: 'Needs your attention', points: [
-        'A blinking pink dot marks each item. Late cancellation: a booking cancelled inside your cancellation policy (by the client online, by phone with Autumn, or by you) when the client has a card on file. It stays here until you open it and mark it as a no-show, collecting the fee from their card or not.',
-        'Booking requests waiting for your answer: tap one to approve it, offer other times or decline it.',
+        'A blinking pink dot marks each item. Late cancellation: an appointment cancelled inside your cancellation policy (by the client online, by phone with Autumn, or by you) when the client has a card on file. It stays here until you open it and mark it as a no-show, collecting the fee from their card or not.',
+        'Appointment requests waiting for your answer: tap one to approve it, offer other times or decline it.',
         'Texts from clients you haven’t read: tap one to open the conversation. All messages opens every conversation.',
         'Each item leaves the list once you’ve answered or read it.',
       ] },
       { heading: 'Next up and today', points: [
-        'Next up: your next appointment that isn’t paid yet. Tap it to open the booking.',
+        'Next up: your next appointment that isn’t paid yet. Tap it to open the appointment.',
         'Today’s Appointments: everything booked today and the next 6 days, by day, with its status: Booked, In progress, Completed (done, not paid yet: open it to check out), Paid, No-show or Cancelled. Tap one to open it.',
         'Calendar opens the calendar to see other days.',
       ] },
@@ -82,33 +82,33 @@ export const HELP: Record<string, HelpPage> = {
     title: 'Past 30 days',
     intro: 'Every booking from the last 30 days, newest first, by day. Open it from Home › ⋮.',
     sections: [
-      { heading: 'Each booking', points: ['Its time, the client and the service, and how it ended: Paid, Completed (done, not paid), Cancelled or No-show. Booked means it was never checked out or closed. Tap one to open it.'] },
+      { heading: 'Each appointment', points: ['Its time, the client and the service, and how it ended: Paid, Completed (done, not paid), Cancelled or No-show. Booked means it was never checked out or closed. Tap one to open it.'] },
     ],
   },
   calendar: {
     title: 'Calendar',
-    intro: 'Your bookings and blocked time, on a 24-hour calendar.',
+    intro: 'Your appointments and blocked time, on a 24-hour calendar.',
     sections: [
       { heading: 'Moving around', points: [
-        'The + button next to the title opens Add (New booking, Block time), Calendar view (Day, Week or Month; the view you’re on says Showing now) and Settings: Time grid, how often the Day view draws a line and a time label (every 10, 15, 30 or 60 minutes, kept on this phone).',
+        'The + button next to the title opens Add (New appointment, Block time), Calendar view (Day, Week or Month; the view you’re on says Showing now) and Settings: Time grid, how often the Day view draws a line and a time label (every 10, 15, 30 or 60 minutes, kept on this phone).',
         'Under the title: the day you’re on and how many appointments it has.',
         'The arrows go to the previous or next day, week or month. Today jumps back to today.',
-        'Day: tap a day in the strip at the top to see it. Week: the week’s dates and how many bookings, then each day with its bookings (time, status, client and service); tap a booking to open it, or a day to see it; No bookings when nothing is booked. Month: tap a day to open it.',
+        'Day: tap a day in the strip at the top to see it. Week: the week’s dates and how many appointments, then each day with its appointments (time, status, client and service); tap an appointment to open it, or a day to see it; No appointments when nothing is booked. Month: tap a day to open it.',
         'The refresh button reloads your calendar from Certxa.',
       ] },
-      { heading: 'Bookings', points: [
-        'Tap a booking to open it: edit it, check out, mark it paid, cancel it or mark a no-show.',
-        'A label on a booking shows when it’s PAID, a NO-SHOW or has a DEPOSIT DUE.',
-        'CONFIRMED on a booking (Confirmed in the Week view): the client confirmed they’re coming, with the Confirm I’ll be there button on their booking page (the link in their texts) or by replying yes to a text.',
-        'A booking with processing time shows that part lighter, marked Processing; another booking can sit beside it then.',
-        'A booking shows in its service’s calendar colour (Services › Calendar colour); one with several services takes the first one’s colour.',
-        'To move a booking, press and hold it, then drag it to the new time. You’re shown the new time and choose whether to text the client about it (Notify client), or Cancel to leave it where it was.',
+      { heading: 'Appointments', points: [
+        'Tap an appointment to open it: edit it, check out, mark it paid, cancel it or mark a no-show.',
+        'A label on an appointment shows when it’s PAID, a NO-SHOW or has a DEPOSIT DUE.',
+        'CONFIRMED on an appointment (Confirmed in the Week view): the client confirmed they’re coming, with the Confirm I’ll be there button on their booking page (the link in their texts) or by replying yes to a text.',
+        'An appointment with processing time shows that part lighter, marked Processing; another appointment can sit beside it then.',
+        'An appointment shows in its service’s calendar colour (Services › Calendar colour); one with several services takes the first one’s colour.',
+        'To move an appointment, press and hold it, then drag it to the new time. You’re shown the new time and choose whether to text the client about it (Notify client), or Cancel to leave it where it was.',
       ] },
       { heading: 'Adding', points: [
-        'The + button: New booking books a client; Block time takes time off.',
+        'The + button: New appointment books a client; Block time takes time off.',
         'Blocked time shows as Blocked (or Day off for a whole day), with its note. Clients can’t book online inside it. Tap it to remove it.',
       ] },
-      { heading: 'Booking requests', points: ['When you review online bookings before accepting them, a banner shows how many requests are waiting. Tap it to answer them.'] },
+      { heading: 'Appointment requests', points: ['When you review online appointments before accepting them, a banner shows how many requests are waiting. Tap it to answer them.'] },
     ],
   },
   clients: {
@@ -117,7 +117,7 @@ export const HELP: Record<string, HelpPage> = {
     sections: [
       { heading: 'Finding a client', points: [
         'Search by name, phone number or e-mail.',
-        'The filters show All, Upcoming (with a booking coming up), New, Regular, At risk, Inactive or VIP clients.',
+        'The filters show All, Upcoming (with an appointment coming up), New, Regular, At risk, Inactive or VIP clients.',
         'Each client shows their next visit, or their last visit and service. Tap one to open their profile.',
       ] },
       { heading: 'What the statuses mean', points: [
@@ -140,8 +140,8 @@ export const HELP: Record<string, HelpPage> = {
     sections: [
       { heading: 'At the top', points: [
         'Their photo and name. The ⋮ button at the top right opens Card on file (their saved card and every payment, with receipts), Edit profile (name, phone, e-mail, the name they go by, birthday and allergies; Delete Client removes them and their history for good), Notes, Photos (goes to their before and after photos) and History (goes to their visits).',
-        'Heard about you: how they found you, from your website’s question or what you added on a booking.',
-        'Merge with another client (in ⋮ › Edit profile): find duplicate profiles of this client by name, phone or e-mail, then Merge. Their bookings, notes, photos and records move to this client, whose contact details are kept; the duplicates are removed. It can’t be undone, and a duplicate with package visits left or an active membership can’t be merged yet.',
+        'Heard about you: how they found you, from your website’s question or what you added on an appointment.',
+        'Merge with another client (in ⋮ › Edit profile): find duplicate profiles of this client by name, phone or e-mail, then Merge. Their appointments, notes, photos and records move to this client, whose contact details are kept; the duplicates are removed. It can’t be undone, and a duplicate with package visits left or an active membership can’t be merged yet.',
         'Under the name: a Card on file badge when they have a saved card. Their tags are in the Tags section further down.',
         'Text opens a text to them. Call rings them from your business number when you have Business Phone or Plus, so your own number stays private. Email opens an e-mail.',
         'Book appointment books this client straight away.',
@@ -172,33 +172,33 @@ export const HELP: Record<string, HelpPage> = {
     ],
   },
   appointment: {
-    title: 'Booking details',
-    intro: 'One booking and everything you can do with it.',
+    title: 'Appointment details',
+    intro: 'One appointment and everything you can do with it.',
     sections: [
       { heading: 'What you see', points: [
         'Confirmed by client: they tapped Confirm I’ll be there on their booking page or replied yes to a text.',
         'Add how they heard about you (when you ask it in Booking rules and the client hasn’t answered): choose Social media, Web search, A friend or Other.',
-        'The client, with Text, Call and Email buttons. A Card on file badge under the name means the client (or this booking) has a saved card, so a no-show or late-cancel fee can be charged.',
+        'The client, with Text, Call and Email buttons. A Card on file badge under the name means the client (or this appointment) has a saved card, so a no-show or late-cancel fee can be charged.',
         'The services, add-ons, date, time and total, and any deposit: paid, due (a link was texted), kept or refunded.',
         'For a house call: the client’s address (Open in Maps), when to leave, the drive, setup and pack-up time, and the travel fee.',
         'Forms: the forms and waivers this visit needs — filled in (View), sent and waiting, or not sent. Send e-mails the link (or texts it when there’s no e-mail); Fill in here opens the form on your phone for the client. Send another form sends any of your other forms.',
       ] },
       { heading: 'Before the visit', points: [
-        'The ⋮ button at the top right holds every action: Client notes, Edit appointment, Mark as completed, No-show (no fee), No-show (collect fee), Resend appointment details, Cancel appointment and Delete appointment. One that doesn’t apply right now is grey, with why under it. On a cancelled booking, No-show (no fee), No-show (collect fee) and Delete appointment can be chosen at any time.',
+        'The ⋮ button at the top right holds every action: Client notes, Edit appointment, Mark as completed, No-show (no fee), No-show (collect fee), Resend appointment details, Cancel appointment and Delete appointment. One that doesn’t apply right now is grey, with why under it. On a cancelled appointment, No-show (no fee), No-show (collect fee) and Delete appointment can be chosen at any time.',
         'Edit appointment: change the services, add-ons, date or time.',
         'Text a payment link: the client pays from their phone.',
-        'Resend appointment details: sends the booking confirmation again (with the link to manage the booking), by text and/or e-mail as your Notifications send it.',
-        'Cancel appointment: choose Cancel and text the client, Cancel without a text, or Keep the booking. A late-cancel fee can apply under your cancellation policy.',
+        'Resend appointment details: sends the appointment confirmation again (with the link to manage the appointment), by text and/or e-mail as your Notifications send it.',
+        'Cancel appointment: choose Cancel and text the client, Cancel without a text, or Keep the appointment. A late-cancel fee can apply under your cancellation policy.',
         'Delete appointment (once it’s cancelled or a no-show) removes it completely, as if it was never booked.',
       ] },
       { heading: 'Getting paid', points: [
         'CHECKOUT opens checkout for this visit, with tip and discount.',
-        'MARK AS COMPLETED marks the visit as done. It does not record a payment: the booking shows COMPLETED, and you can still take payment with CHECKOUT, a package visit or a payment link. When the client already paid in full online, it says MARK AS DONE.',
+        'MARK AS COMPLETED marks the visit as done. It does not record a payment: the appointment shows COMPLETED, and you can still take payment with CHECKOUT, a package visit or a payment link. When the client already paid in full online, it says MARK AS DONE.',
         'USE A PACKAGE VISIT pays with one visit from a package the client bought (it shows how many are left).',
         'USE A MEMBERSHIP VISIT pays with a visit included in the client’s membership this period (it shows how many are left).',
-        'History, at the bottom: every change to the booking, newest first: who booked it, moves (old and new time), service, length, price or add-on changes, payments, deposits, fees, refunds and cancellations, and who made each change (you, the client or Autumn).',
-        'Late cancellation: cancelled inside your cancellation policy, by the client or by you, with a card on file. Nothing is charged by itself: opening the booking shows when it was cancelled and how many hours before the appointment (tap GOT IT to close it), and on the page you slide the handle left for YES (collect the fee from their card on file) or right for NO (no fee), then tap MARK AS NO-SHOW. Not sure yet? Tap the handle (or slide it back) to put it in the middle and decide later. A cancel within the policy, with no card, or with a paid deposit kept as the penalty, isn’t asked.',
-        'No-show (no fee) and No-show (collect fee) work once the booking’s time is over. Collect fee shows when your policy has a no-show fee, and charges it to the client’s card on file (grey with “No card on file” when they have none). With no fee you can still charge it later with CHARGE NO-SHOW FEE.',
+        'History, at the bottom: every change to the appointment, newest first: who booked it, moves (old and new time), service, length, price or add-on changes, payments, deposits, fees, refunds and cancellations, and who made each change (you, the client or Autumn).',
+        'Late cancellation: cancelled inside your cancellation policy, by the client or by you, with a card on file. Nothing is charged by itself: opening the appointment shows when it was cancelled and how many hours before the appointment (tap GOT IT to close it), and on the page you slide the handle left for YES (collect the fee from their card on file) or right for NO (no fee), then tap MARK AS NO-SHOW. Not sure yet? Tap the handle (or slide it back) to put it in the middle and decide later. A cancel within the policy, with no card, or with a paid deposit kept as the penalty, isn’t asked.',
+        'No-show (no fee) and No-show (collect fee) work once the appointment’s time is over. Collect fee shows when your policy has a no-show fee, and charges it to the client’s card on file (grey with “No card on file” when they have none). With no fee you can still charge it later with CHARGE NO-SHOW FEE.',
       ] },
       { heading: 'After', points: [
         'REBOOK books their next visit with the same services.',
@@ -244,11 +244,11 @@ export const HELP: Record<string, HelpPage> = {
     intro: 'Taking payment for a visit or a quick sale.',
     sections: [
       { heading: 'The amount', points: [
-        'The amount due comes from the booking; for a quick sale you key it in.',
+        'The amount due comes from the appointment; for a quick sale you key it in.',
         'Discount: 10%, 15%, 20% or 25% off, or a custom amount off. Tax is worked out after the discount, never on the tip.',
         'For a member with a member discount, it is put in as the amount off for you (you can change it).',
         'Promo code: type one of your codes and tap Apply; it becomes the discount (one per visit). A code the client typed when booking online is already on. × takes it off. If a code can’t be used, the message says why (not started, expired, first visit only, used up).',
-        'Custom charges: Add a custom charge puts a named amount on the visit, like a late fee. It is saved on the booking, so the booking, the bill and reports show it; × takes it off again.',
+        'Custom charges: Add a custom charge puts a named amount on the visit, like a late fee. It is saved on the appointment, so the appointment, the bill and reports show it; × takes it off again.',
         'Products: Add a product puts a retail item on the visit (it shows how many you have in stock); − and + change how many. Retail sales tax is added on products. They come out of your stock when the visit is paid, and you get a notification when one is down to its low-stock level.',
         'A deposit the client already paid comes off; sales tax and the platform fee are added if you charge them (Settings › Card reader & Checkout).',
         'Card: the client sees “Say thanks to (your first name) with a tip” and your three tips as whole-dollar amounts. Tapping one starts the card payment at once — Tap to Pay or the card reader, whichever this device uses (Settings › Card payments). Skip starts it with no tip; Custom tip: type the amount and tap Confirm tip. In the tablet POS the tip page fills the screen, so you can turn it to the client.',
@@ -272,7 +272,7 @@ export const HELP: Record<string, HelpPage> = {
   },
   pos: {
     title: 'POS',
-    intro: 'Take a payment that isn’t a booking, like a product or a gift.',
+    intro: 'Take a payment that isn’t an appointment, like a product or a gift.',
     sections: [{ heading: 'How it works', points: [
       'Key in the amount, then tap Next.',
       'What is this for?: an optional description for the receipt and your reports.',
@@ -308,23 +308,23 @@ export const HELP: Record<string, HelpPage> = {
         'Earnings and reports for any dates: sales, payments, tips, sales tax collected, no-shows, busy times, top clients, clients who haven’t been back, client retention, loyalty, services, reviews and texts sent.',
         'Your schedule for any day or week.',
         'Any client and their history: visits, spend, last service.',
-        'Booking requests waiting for you, your services and prices, text credits and Plus, card payments, your booking link, business hours, sales tax, tip choices and deposits.',
+        'Appointment requests waiting for you, your services and prices, text credits and Plus, card payments, your booking link, business hours, sales tax, tip choices and deposits.',
       ] },
-      { heading: 'What it can change (only when you tap Confirm)', points: ['Your business hours.', 'Sales tax.', 'Tip choices at checkout.', 'Booking approval: accept online bookings automatically, or review each one.', 'Your About text, written from a few questions.', 'You see exactly what will change first; nothing changes until you tap Confirm, and you can tap Cancel.'] },
+      { heading: 'What it can change (only when you tap Confirm)', points: ['Your business hours.', 'Sales tax.', 'Tip choices at checkout.', 'Booking approval: accept online appointments automatically, or review each one.', 'Your About text, written from a few questions.', 'You see exactly what will change first; nothing changes until you tap Confirm, and you can tap Cancel.'] },
       { heading: 'Texting clients', points: ['It drafts a text to a client (a thank you, a reminder, an invitation back). Tap Open in Messages to send it yourself from your phone; no credits are used.', 'Clients it mentions get a Profile button that opens them.'] },
-      { heading: 'What it won’t do', points: ['Make, move or cancel bookings, take payments, refund or change prices. It tells you where in the app to do it instead.'] },
+      { heading: 'What it won’t do', points: ['Make, move or cancel appointments, take payments, refund or change prices. It tells you where in the app to do it instead.'] },
     ],
     examples: [
       { q: 'How much did I make this week?', a: 'You’ve made $110 in net sales this week so far, from your Sales report for November 2–3. You’ve collected $125 including $15 in tax.' },
       { q: 'Who haven’t I seen in a while?', a: 'No clients are showing as not back in 60 days or more, from your Clients not back report for January 1 through November 3.' },
       { q: 'Draft a text to Linda Parker inviting her back for a fill next week', a: 'Drafted a text to Linda Parker inviting her back for a fill next week, with your booking link. It’s ready to open in Messages and send from your phone.' },
       { q: 'Close me on Saturdays from now on', a: 'I’ve proposed closing on Saturdays. Your current Saturday hours are 9:00 AM–6:00 PM, from your business settings. Tap Confirm to apply the change.' },
-      { q: 'Move Linda’s 2pm today to 4pm', a: 'I can’t move bookings here. You can do that in Calendar: tap Linda Parker’s appointment, choose Schedule, and change the time to 4:00 PM.' },
+      { q: 'Move Linda’s 2pm today to 4pm', a: 'I can’t move appointments here. You can do that in Calendar: tap Linda Parker’s appointment, choose Schedule, and change the time to 4:00 PM.' },
       { q: 'How do I ask clients for a deposit?', a: 'Go to More → Settings → Payments → Deposits.' },
       { q: 'What’s on my schedule tomorrow?', a: 'Your appointments for tomorrow with times, clients and services, from your calendar.' },
       { q: 'Who are my top clients this year?', a: 'Your top clients by spend for the year, each with a button to open their profile.' },
-      { q: 'Do I have any booking requests waiting?', a: 'The requests waiting for your answer, with the client, service and time asked for.' },
-      { q: 'Turn on booking approval so I review new bookings first', a: 'A proposal to review each online booking before it’s accepted. Tap Confirm to apply it.' },
+      { q: 'Do I have any appointment requests waiting?', a: 'The requests waiting for your answer, with the client, service and time asked for.' },
+      { q: 'Turn on booking approval so I review new appointments first', a: 'A proposal to review each online booking before it’s accepted. Tap Confirm to apply it.' },
       { q: 'How many text credits do I have left?', a: 'Your credit balance, and whether Plus is on (notification texts are free on Plus).' },
     ],
   },
@@ -343,12 +343,12 @@ export const HELP: Record<string, HelpPage> = {
   },
   appointmentsReport: {
     title: 'Appointments report',
-    intro: 'Every booking in a period: past, paid, cancelled and no-shows.',
+    intro: 'Every appointment in a period: past, paid, cancelled and no-shows.',
     sections: [
       { heading: 'Choosing what to see', points: [
         'Period: today, this or last week, this or last month, the last 30 days, this year, or Custom dates (type them as YYYY-MM-DD).',
         'Show: all appointments, or only Booked, Completed (not paid), Paid, Cancelled or No-shows.',
-        'The list shows each booking’s day and time, client, services, status and amount. Tap one to open it.',
+        'The list shows each appointment’s day and time, client, services, status and amount. Tap one to open it.',
       ] },
       { heading: 'Getting the file', points: [
         'Save or share CSV opens the report as a spreadsheet file, with Share and Save to Files. The link works for 10 minutes.',
@@ -362,7 +362,7 @@ export const HELP: Record<string, HelpPage> = {
     intro: 'What you’ve taken and where it is.',
     sections: [
       { heading: 'Period', points: ['Today, This week, This month or Last month at the top picks the time the page shows.'] },
-      { heading: 'At the top', points: ['Appointments report: past, paid and cancelled bookings, as a list or a spreadsheet.', 'Invoices: bill a client with a link to pay by card.'] },
+      { heading: 'At the top', points: ['Appointments report: past, paid and cancelled appointments, as a list or a spreadsheet.', 'Invoices: bill a client with a link to pay by card.'] },
       { heading: 'What you see', points: [
         'Taken: everything clients paid in that time.',
         'How you were paid: the total for each way clients paid: cash, card, Tap to Pay, card reader (M2), gift card, package visit or split payment.',
@@ -403,8 +403,8 @@ export const HELP: Record<string, HelpPage> = {
     ] }],
   },
   requests: {
-    title: 'Booking requests',
-    intro: 'Online bookings waiting for your answer (when you review each booking before it’s accepted).',
+    title: 'Appointment requests',
+    intro: 'Online appointments waiting for your answer (when you review each appointment before it’s accepted).',
     sections: [{ heading: 'How it works', points: [
       'Each request shows the client, what they asked for and its status: Waiting for you, or Offered (you sent other times; the link is open until the date shown).',
       'Tap a request to answer it: approve it, offer other times, or decline it.',
@@ -412,7 +412,7 @@ export const HELP: Record<string, HelpPage> = {
     ] }],
   },
   request: {
-    title: 'Booking request',
+    title: 'Appointment request',
     intro: 'One client asking for a time.',
     sections: [
       { heading: 'What you see', points: ['The client (Text and Call), the service, the time they asked for, any note, and for a house call their address and travel fee.', 'Its status, and the date by which you need to answer.'] },
@@ -428,7 +428,7 @@ export const HELP: Record<string, HelpPage> = {
     intro: 'What your clients said about you.',
     sections: [{ heading: 'How it works', points: [
       'At the top: your average rating and how many reviews have each number of stars.',
-      'Each review shows the stars, the comment and any photo the client added. View booking opens the visit it was for.',
+      'Each review shows the stars, the comment and any photo the client added. View appointment opens the visit it was for.',
       'Reply: write an answer your clients will see on your website and tap Post reply. Edit your reply or Remove reply changes it later.',
       'Reviews come from the review request clients get after a visit (Settings › Client notifications). They can’t be edited or removed.',
     ] }, { heading: 'Google reviews', points: [
@@ -486,7 +486,7 @@ export const HELP: Record<string, HelpPage> = {
     intro: 'Clients who want in on a day that’s full.',
     sections: [{ heading: 'How it works', points: [
       'Add to waitlist: choose the client, the service (optional), the day, roughly when (Any time, Morning, Afternoon or Evening) and a note.',
-      'When a booking that day is cancelled, you get a notification, so you can offer the time.',
+      'When an appointment that day is cancelled, you get a notification, so you can offer the time.',
       'Tap someone to Book now, Text them, or Take off the waitlist.',
     ] }],
   },
@@ -521,7 +521,7 @@ export const HELP: Record<string, HelpPage> = {
       'New package: a name, the service, how many visits (2 to 50), the price and a description. Save package adds it.',
       'The switch puts a package on sale on your website or takes it off. Card payments must be set up so clients can buy.',
       'A client buys online and the visits are saved on their client record, matched by phone number.',
-      'When they come in, open the booking and tap Use a package visit.',
+      'When they come in, open the appointment and tap Use a package visit.',
       'Bought by clients: who bought each package and how many visits they have left.',
     ] }],
   },
@@ -596,9 +596,9 @@ export const HELP: Record<string, HelpPage> = {
       'Clients choose how many: for anything priced per item; clients see − 1 + on your website, up to 10.',
       'Add-on groups: give it a group of add-ons, and every add-on in the group is offered with it.',
       'Where you offer it (if you have your own place and do house calls): your place, house calls only, or both.',
-      'Options: versions of the service with their own minutes and price, like Short, Medium and Long (up to 12). Add an option, give it a name, minutes and price, and Save. On your website the service shows “from” its lowest price and clients choose one; when you book, you pick the option. Each option is booked as “Service · Option” and gets the service’s category, staff, add-on groups and processing time. × removes an option (bookings already made keep it). A service with options shows “N options” in your list.',
-      'Processing time: for a service with time in the middle when the client waits (colour, a mask). Enter the minutes of work first and the minutes of processing; the rest is the finish. During processing you can take another client: online booking, Autumn and your own bookings can use that time. Bookings keep the processing time they were made with.',
-      'Calendar colour: one of 18 colours for this service’s bookings on your calendar (Default leaves the usual colours).',
+      'Options: versions of the service with their own minutes and price, like Short, Medium and Long (up to 12). Add an option, give it a name, minutes and price, and Save. On your website the service shows “from” its lowest price and clients choose one; when you book, you pick the option. Each option is booked as “Service · Option” and gets the service’s category, staff, add-on groups and processing time. × removes an option (appointments already made keep it). A service with options shows “N options” in your list.',
+      'Processing time: for a service with time in the middle when the client waits (colour, a mask). Enter the minutes of work first and the minutes of processing; the rest is the finish. During processing you can take another client: online booking, Autumn and your own appointments can use that time. Appointments keep the processing time they were made with.',
+      'Calendar colour: one of 18 colours for this service’s appointments on your calendar (Default leaves the usual colours).',
       'Share booking link: a link to your website with this service already picked, to send in a text or post anywhere.',
       'Remove service takes it off your menu.',
     ] }],
@@ -626,7 +626,7 @@ export const HELP: Record<string, HelpPage> = {
     sections: [{ heading: 'How it works', points: [
       'Tap + for a new code: its name (3 to 32 letters, numbers, - or _), percent off or an amount off, what a percent applies to (the whole visit, services or products), New clients only, limits on total uses and uses per client, and start and end dates (YYYY-MM-DD, or empty to keep it on).',
       'A new code is a Draft: it doesn’t work yet, and you can Edit or Delete it. Publish makes it work and fixes it; it can’t be changed after that. End code stops it.',
-      'Each code shows Draft, Scheduled (starts later), Active, Expired or Ended, and how many times it’s been used. A use is a booking with the code that wasn’t cancelled.',
+      'Each code shows Draft, Scheduled (starts later), Active, Expired or Ended, and how many times it’s been used. A use is an appointment with the code that wasn’t cancelled.',
       'Clients type a code when they book on your website (the field shows only while you have an active code). You apply codes at checkout.',
       'Codes aren’t shown on your website: share them in a campaign, on social media or in a text.',
     ] }],
@@ -658,7 +658,7 @@ export const HELP: Record<string, HelpPage> = {
     intro: 'Groups for your services, like Manicures or Pedicures. Clients filter by them on your website.',
     sections: [{ heading: 'How it works', points: [
       'Tap + to add one, or tap one to change it.',
-      'Each has a name, a calendar colour (bookings in it show in that colour) and an optional photo.',
+      'Each has a name, a calendar colour (appointments in it show in that colour) and an optional photo.',
       'The arrows move a category up or down; your website lists them in this order.',
       'Turn off Show on my booking site to hide a category and its services from clients.',
       'Remove category keeps its services; they show as Uncategorized.',
@@ -706,15 +706,15 @@ export const HELP: Record<string, HelpPage> = {
     intro: 'Intake forms and waivers your clients fill in on their phone before the visit.',
     sections: [
       { heading: 'Your forms', points: ['Tap + to start one: a blank form, or a ready-made one (new client form, service waiver, photo release, before each visit) you can change.', 'Each form shows its type, how often it is asked, when it is sent and how many clients filled it in. Tap one to change it.'] },
-      { heading: 'Making a form', points: ['Type: an intake form asks questions; a waiver ends with the client’s signature.', 'Ask clients: Once keeps their answers for good; Before every visit asks again for each booking.', 'Send when clients book: a few minutes after a client books, Certxa e-mails them the link (or texts it when they have no e-mail; a text uses a credit).', 'For every service, or only the services you tick.', 'Questions: choose the kind (short or long answer, yes or no, pick one, pick any, date, I agree, text to read, signature), write it, and set Required. The arrows move a question; the bin removes it.'] },
-      { heading: 'Good to know', points: ['A client’s signed copy keeps the questions as they were, so changing a form later never changes what they signed.', 'Switch off stops a form being sent. Delete removes it; a form clients have filled in is switched off instead, and their copies are kept.', 'Forms you send and the answers are on the booking and on the client’s profile.'] },
+      { heading: 'Making a form', points: ['Type: an intake form asks questions; a waiver ends with the client’s signature.', 'Ask clients: Once keeps their answers for good; Before every visit asks again for each appointment.', 'Send when clients book: a few minutes after a client books, Certxa e-mails them the link (or texts it when they have no e-mail; a text uses a credit).', 'For every service, or only the services you tick.', 'Questions: choose the kind (short or long answer, yes or no, pick one, pick any, date, I agree, text to read, signature), write it, and set Required. The arrows move a question; the bin removes it.'] },
+      { heading: 'Good to know', points: ['A client’s signed copy keeps the questions as they were, so changing a form later never changes what they signed.', 'Switch off stops a form being sent. Delete removes it; a form clients have filled in is switched off instead, and their copies are kept.', 'Forms you send and the answers are on the appointment and on the client’s profile.'] },
     ],
   },
   referrals: {
     title: 'Referrals',
     intro: 'Reward clients who send you a friend.',
     sections: [
-      { heading: 'Your reward', points: ['Reward referrals turns it on. Set the credit for the client who referred and for the new client, then tap Save.', 'Every client has a personal referral link: Share referral link on their profile, and Refer a friend under My bookings on your website. A new client who books through it is saved as referred by them by itself. Referred by on a new client’s profile is for a friend who calls or walks in. The new client gets their credit at once; the client who referred them gets theirs after the new client’s first paid visit (you get a notification).', 'Credit is used at checkout with Use credit.'] },
+      { heading: 'Your reward', points: ['Reward referrals turns it on. Set the credit for the client who referred and for the new client, then tap Save.', 'Every client has a personal referral link: Share referral link on their profile, and Refer a friend under My appointments on your website. A new client who books through it is saved as referred by them by itself. Referred by on a new client’s profile is for a friend who calls or walks in. The new client gets their credit at once; the client who referred them gets theirs after the new client’s first paid visit (you get a notification).', 'Credit is used at checkout with Use credit.'] },
       { heading: 'Referrals', points: ['Every referral, and whether both have been rewarded. Tap one to open the new client.'] },
     ],
   },
@@ -733,7 +733,7 @@ export const HELP: Record<string, HelpPage> = {
     sections: [
       { heading: 'Your memberships', points: ['Each shows what it includes, its price and how many members it has. Tap + to make one, or tap one to change it.', 'Members lists everyone with a membership: when it renews or ends, or that a payment was declined. Tap one to open the client.', 'Card payments must be set up first: members pay by card.'] },
       { heading: 'Making a membership', points: ['Name, description (clients see it when they join), price and whether it’s charged every month or every year.', 'Included each month (or year): a service and how many visits of it. Visits not used don’t carry over.', 'Member discount: a percent off their services at checkout. Use it on its own or with included visits.', 'Changing a membership doesn’t change what existing members pay or get. Stop offering keeps current members but no one new can join.'] },
-      { heading: 'Members', points: ['Add a member from the client’s profile: Add membership. Charge card on file charges the first month now; Send link to join e-mails (or texts) them a page where they pay and their card is saved.', 'Certxa charges each renewal on your Stripe account. A declined card is tried again daily, three times, then the membership ends; you get a notification.', 'On a booking, USE A MEMBERSHIP VISIT pays for an included service. At checkout the member discount is put in for you; you can change it.', 'Cancel from the client’s profile: at the end of the paid period, or now. Nothing is refunded.'] },
+      { heading: 'Members', points: ['Add a member from the client’s profile: Add membership. Charge card on file charges the first month now; Send link to join e-mails (or texts) them a page where they pay and their card is saved.', 'Certxa charges each renewal on your Stripe account. A declined card is tried again daily, three times, then the membership ends; you get a notification.', 'On an appointment, USE A MEMBERSHIP VISIT pays for an included service. At checkout the member discount is put in for you; you can change it.', 'Cancel from the client’s profile: at the end of the paid period, or now. Nothing is refunded.'] },
     ],
   },
   'form-response': {
@@ -801,7 +801,7 @@ export const HELP: Record<string, HelpPage> = {
     intro: 'The texts and e-mails Certxa sends your clients for you, before and after their appointments.',
     sections: [
       { heading: 'Before the appointment', points: [
-        'Booking confirmation: sent as soon as a booking is made.',
+        'Appointment confirmation: sent as soon as an appointment is made.',
         'Appointment reminder: sent the number of hours you choose before the appointment, so fewer clients forget.',
         'Each can go by Text, E-mail or both.',
       ] },
@@ -814,7 +814,7 @@ export const HELP: Record<string, HelpPage> = {
       ] },
       { heading: 'Replies and phone numbers', points: [
         'Cancellation replies: when a client texts something clear like “Please cancel my appointment”, Certxa cancels their next appointment and confirms. Unclear messages stay for you to read.',
-        'Confirmation replies: a clear yes, like “Yes”, “Confirmed” or “See you then”, marks the client’s next booking in the coming week Confirmed. Nothing is texted back.',
+        'Confirmation replies: a clear yes, like “Yes”, “Confirmed” or “See you then”, marks the client’s next appointment in the coming week Confirmed. Nothing is texted back.',
         'Phone number verification: Verify phone numbers checks which client numbers are landlines, so texts aren’t wasted on them.',
       ] },
       { heading: 'Saving', points: ['Customize messages shows each text and e-mail so you can change the wording. Words in {braces}, like {customerName}, are filled in for each client.', 'Tap Save when you’re done; you’re asked before leaving with unsaved changes.'] },
@@ -827,7 +827,7 @@ export const HELP: Record<string, HelpPage> = {
     intro: 'How your business is set up. Everything here is saved to Certxa, so it’s the same on your website.',
     sections: [{ heading: 'Sections', points: [
       'My Business: Business details, Location, Where you see clients, Hours and Catalog.',
-      'Bookings: Online booking, Booking approval, Cancellation policy and Blocked clients.',
+      'Appointments: Online booking, Booking approval, Cancellation policy and Blocked clients.',
       'Website: your link, design and look.',
       'Google: Google Business Profile — connect it to show and reply to your Google reviews, or follow the steps to create one.',
       'Client Messages: Client notifications and Business Phone.',
@@ -861,15 +861,15 @@ export const HELP: Record<string, HelpPage> = {
       'Who can book: All clients, Existing clients only (new clients are asked to contact you), or Off. Clients always see your website.',
       'Minimum notice: how far ahead clients must book (1 to 24 hours). You can still book any time yourself.',
       'Booking increments: which start times clients can pick (every 15 minutes offers 9:00, 9:15, 9:30…).',
-      'Padded time: extra minutes kept free at the end of every booking. The times clients see include it.',
-      'Minimize scheduling gaps: on a day that already has bookings or blocked time, clients online see only times next to them (back to back, or with a gap up to the time you choose). A day with nothing booked shows every time. Keep to my booking increments: off offers the exact time a booking ends; on, the next increment. Autumn offers the same times. You can still book any time yourself.',
+      'Padded time: extra minutes kept free at the end of every appointment. The times clients see include it.',
+      'Minimize scheduling gaps: on a day that already has appointments or blocked time, clients online see only times next to them (back to back, or with a gap up to the time you choose). A day with nothing booked shows every time. Keep to my booking increments: off offers the exact time an appointment ends; on, the next increment. Autumn offers the same times. You can still book any time yourself.',
       'Ask how clients heard about you: after a client books online for the first time, your website asks Social media, Web search, A friend or Other. The answers so far show under the switch; you can add a client’s answer on their booking.',
       'Advance booking: limit how many months ahead clients can book.',
-      'Allow online cancelling and rescheduling: from the link in their texts, clients can cancel, or move the booking to another open time (same services, same length, and a deposit stays with it), up to your cancellation notice (Cancellation policy). You get a notification when a client moves a booking, and its History shows the old and new time. Not while you review each booking by hand.',
+      'Allow online cancelling and rescheduling: from the link in their texts, clients can cancel, or move the appointment to another open time (same services, same length, and a deposit stays with it), up to your cancellation notice (Cancellation policy). You get a notification when a client moves an appointment, and its History shows the old and new time. Not while you review each appointment by hand.',
     ] }],
   },
-  'settings.approval': { title: 'Booking approval', intro: 'Accept online bookings automatically, or review each one first.', sections: [{ heading: 'What you can set', points: ['Approve automatically: every online booking goes straight into your calendar.', 'Review each one first: clients send a request; you approve it, offer other times, or decline it. The time is only booked once you approve.', 'Answer requests within: a request you haven’t answered by then expires, and the client is told.', 'Offered times stay open for: how many days the link with your other times works.'] }] },
-  'settings.policy': { title: 'Cancellation policy', intro: 'What clients agree to when they book.', sections: [{ heading: 'What you can set', points: ['Your cancellation policy: the text shown on your website and when clients book. Clients must accept it to book makes them tick a box.', 'Cancellation notice: cancelling later than this is a late cancellation (the fee can apply and a deposit is kept). Clients can cancel online only before it.', 'No-show and late-cancel fee: a percent of the booking, charged to the card the client saved when booking. Ask for a card in Deposits.', 'Charging a fee needs card payments: until they are set up, Set up payments to charge fees opens the payments page instead.'] }] },
+  'settings.approval': { title: 'Booking approval', intro: 'Accept online appointments automatically, or review each one first.', sections: [{ heading: 'What you can set', points: ['Approve automatically: every online booking goes straight into your calendar.', 'Review each one first: clients send a request; you approve it, offer other times, or decline it. The time is only booked once you approve.', 'Answer requests within: a request you haven’t answered by then expires, and the client is told.', 'Offered times stay open for: how many days the link with your other times works.'] }] },
+  'settings.policy': { title: 'Cancellation policy', intro: 'What clients agree to when they book.', sections: [{ heading: 'What you can set', points: ['Your cancellation policy: the text shown on your website and when clients book. Clients must accept it to book makes them tick a box.', 'Cancellation notice: cancelling later than this is a late cancellation (the fee can apply and a deposit is kept). Clients can cancel online only before it.', 'No-show and late-cancel fee: a percent of the appointment, charged to the card the client saved when booking. Ask for a card in Deposits.', 'Charging a fee needs card payments: until they are set up, Set up payments to charge fees opens the payments page instead.'] }] },
   'settings.blocked': { title: 'Blocked clients', intro: 'Phone numbers that can’t book online.', sections: [{ heading: 'How it works', points: ['Block a phone number: enter it, add a reason if you like, and tap Block this number. Remove unblocks it.', 'You can still book them yourself.', 'Blocking someone from calling is separate: Settings › Business Phone.'] }] },
   'settings.phone': { title: 'Business Phone settings', intro: 'Your number, your calling rules and blocked callers.', sections: [{ heading: 'What you can do', points: ['Ring my phone: During business hours, or Any time. When it doesn’t ring, or a call isn’t answered in 25 seconds, the caller is told you can’t take the call and you get a missed call.', 'Block a client or number: they hear a busy signal and you aren’t told.', 'Your plan: Cancel Business Phone (your number works to the end of the paid month, then it’s released), Keep my number to undo that, or Pay $10 now after a failed payment.', 'Change number ($5): your old number is released and can’t be had back.', 'On Plus, your clients call and text you on Certxa’s Plus number.'] }] },
   'settings.website': { title: 'Website', intro: 'Your booking website.', sections: [{ heading: 'What’s here', points: ['Your website and booking address: Share my booking link sends it anywhere; Open my website shows it.', 'About you: the text and photo on your About tab.', 'Edit my link, design and look: change your address, design, colour, photos and social links.'] }] },
@@ -886,5 +886,5 @@ export const HELP: Record<string, HelpPage> = {
     ] }],
   },
   'settings.tax': { title: 'Card reader & Checkout', intro: 'The platform fee, sales tax and tips at checkout.', sections: [{ heading: 'What you can set', points: ['Each setting shows its value; tap Edit to change it, then Save. The back arrow leaves without saving.', 'Platform fee rate: 0% to 3%, paid by the client on card payments, shown as its own line at checkout and on the receipt. It isn’t added to cash payments, and it isn’t charged on the tip. Card fees aren’t allowed everywhere, so check your state’s rules first.', 'Service sales tax: the tax on services and add-ons. Retail sales tax: the tax on products. 0% means no tax. Tax rules differ by place, so check with your tax adviser.', 'Tip customized options: your three tips, as percentages of the visit (new accounts start with 18%, 20% and 25%). The client sees each as a whole-dollar amount — 50¢ and under rounds down, 51¢ and up rounds up — and can also enter their own amount or skip.'] }] },
-  'settings.account': { title: 'Account', intro: 'Your sign-in and account.', sections: [{ heading: 'What you can do', points: ['Mobile number: change it; a code is texted to the new number to confirm it.', 'Password: E-mail me a link to change it.', 'Sign out signs this phone out.', 'Delete my account: asks for your password, then deletes your business, bookings, clients and website for good.'] }] },
+  'settings.account': { title: 'Account', intro: 'Your sign-in and account.', sections: [{ heading: 'What you can do', points: ['Mobile number: change it; a code is texted to the new number to confirm it.', 'Password: E-mail me a link to change it.', 'Sign out signs this phone out.', 'Delete my account: asks for your password, then deletes your business, appointments, clients and website for good.'] }] },
 };

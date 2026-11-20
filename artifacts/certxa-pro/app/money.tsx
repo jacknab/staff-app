@@ -121,7 +121,7 @@ export default function MoneyScreen() {
               <Feather name="list" size={22} color={colors.foreground} />
               <View style={{ flex: 1 }}>
                 <Text style={[styles.cardTitle, { color: colors.foreground }]}>Appointments report</Text>
-                <Text style={[styles.muted, { color: colors.mutedForeground }]}>Past, paid and cancelled bookings · CSV</Text>
+                <Text style={[styles.muted, { color: colors.mutedForeground }]}>Past, paid and cancelled appointments · CSV</Text>
               </View>
               <Feather name="chevron-right" size={20} color={colors.mutedForeground} />
             </TouchableOpacity>

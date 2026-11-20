@@ -191,7 +191,7 @@ export default function NotificationsScreen() {
 
             {/* Grouped by when they're sent (owner, 2026-11-09; GlossGenius review): before, after, then replies and numbers. */}
             <SectionTitle style={styles.group}>Before the appointment</SectionTitle>
-            <Section colors={colors} icon="calendar" title="Booking confirmation" hint="Let clients know their appointment is booked, as soon as it's made.">
+            <Section colors={colors} icon="calendar" title="Appointment confirmation" hint="Let clients know their appointment is booked, as soon as it's made.">
               {toggle("confirmation-text", "message-square", "Text", sms.bookingConfirmationEnabled, (v) => setSms((s) => ({ ...s, bookingConfirmationEnabled: v })))}
               {toggle("confirmation-email", "mail", "E-mail", mail.bookingConfirmationEnabled, (v) => setMail((m) => ({ ...m, bookingConfirmationEnabled: v })))}
               {customize("confirmation", sms.bookingConfirmationEnabled, mail.bookingConfirmationEnabled, "confirmationTemplate", BOOKING_VARS)}

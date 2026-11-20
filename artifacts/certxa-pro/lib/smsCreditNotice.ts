@@ -29,7 +29,7 @@ export function phoneLabel(phone: string): string {
 /** What the text was, for "…to send the booking link to…". */
 const WHAT: Record<string, string> = {
   booking_link: 'the booking link', pos_receipt: 'the receipt link', pos_receipt_link: 'the receipt link', pay_link: 'the payment link', booking_payment_required: 'the payment link',
-  intake_form: 'the form', membership_invite: 'the membership link', booking_request: 'the booking update', two_way_reply: 'your reply',
+  intake_form: 'the form', membership_invite: 'the membership link', booking_request: 'the appointment update', two_way_reply: 'your reply',
   campaign: 'the campaign', package_balance: 'the package update', no_show_reminder: 'the reminder', win_back: 'the message',
 };
 export const whatWasSent = (messageType: string) => WHAT[messageType] ?? 'the text message';

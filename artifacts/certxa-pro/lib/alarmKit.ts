@@ -66,7 +66,7 @@ export async function syncRealAlarms(): Promise<void> {
       const at = houseCall ? start - leadMinutes * 60_000 : start;
       if (at <= now + 30_000) continue;
       const who = [a.customer?.name ?? a.customer?.fullName ?? 'Your client', a.service?.name].filter(Boolean).join(' · ');
-      const title = houseCall ? `Leave for your house call: ${who} at ${timeLabel(a.date)}` : `Booking now: ${who}`;
+      const title = houseCall ? `Leave for your house call: ${who} at ${timeLabel(a.date)}` : `Appointment now: ${who}`;
       wanted.set(uuidFor(`${a.id}@${at}`), { appointmentId: a.id, at, title, sound: houseCall ? 'alarm.wav' : 'reminder.wav' });
     }
 

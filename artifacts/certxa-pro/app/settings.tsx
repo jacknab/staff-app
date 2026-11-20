@@ -367,7 +367,7 @@ export default function SettingsScreen() {
     setDraft((d) => ({ ...d, mobile: result?.phone ?? mobileDigits, mobileNow: result?.phone ?? mobileDigits, codeSent: false, code: '' }));
   }, 'Mobile number changed.');
   const deleteAccount = () => {
-    Alert.alert('Delete your account?', 'Your business, bookings, clients and website are permanently deleted. This cannot be undone.', [
+    Alert.alert('Delete your account?', 'Your business, appointments, clients and website are permanently deleted. This cannot be undone.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: () => void run(async () => {
         const token = await getStoredToken();
@@ -448,9 +448,9 @@ export default function SettingsScreen() {
             <Feather name="chevron-right" size={20} color={colors.mutedForeground} />
           </TouchableOpacity>
         </Group>
-        <Group title="Bookings">
+        <Group title="Appointments">
           <Row icon="sliders" title="Online booking" hint="Who can book, notice, start times, how far ahead" to="rules" />
-          <Row icon="check-square" title="Booking approval" hint="Accept bookings automatically, or review each one" to="approval" />
+          <Row icon="check-square" title="Booking approval" hint="Accept appointments automatically, or review each one" to="approval" />
           <Row icon="file-text" title="Cancellation policy" hint="Your policy, cancellation notice and no-show fee" to="policy" />
           <Row icon="slash" title="Blocked clients" hint="Phone numbers that cannot book online" to="blocked" />
         </Group>
@@ -565,7 +565,7 @@ export default function SettingsScreen() {
         {draft.depositType !== 'full' ? field('depositValue', draft.depositType === 'percentage' ? 'Percent, e.g. 20' : 'Dollars, e.g. 25', { keyboardType: 'decimal-pad' }) : null}
         {draft.houseCalls ? toggle('includeTravelFee', 'Include the house-call travel fee', 'On: the fee is part of what the client pays when they book. Off: they pay it at the visit.') : null}
         <Help>{draft.approval === 'manual'
-          ? 'You review each booking first, so the deposit is asked for after you approve: the client gets a text with a payment link and has 30 minutes to pay. The time is only confirmed once it is paid; if not, it is released and the client is told.'
+          ? 'You review each appointment first, so the deposit is asked for after you approve: the client gets a text with a payment link and has 30 minutes to pay. The time is only confirmed once it is paid; if not, it is released and the client is told.'
           : 'Clients pay by card on your booking page as they book. If they leave without paying, the time is held for an hour and they get a text with a link to pay.'}</Help>
         <Help>{draft.depositType === 'full' ? 'Nothing is left to pay at the visit: tap Mark as done when you finish.' : 'The deposit comes off the price at checkout.'} Payments go to your Stripe account.</Help>
         {!draft.cardsReady ? <>
@@ -578,7 +578,7 @@ export default function SettingsScreen() {
     if (screen === 'approval') return draft.eligible === false ? (
       <Help>Booking approval is part of the Solo plan.</Help>
     ) : (<>
-      <Label>New online bookings</Label>
+      <Label>New online appointments</Label>
       {choices('bookingApproval', [{ value: 'auto', label: 'Approve automatically' }, { value: 'manual', label: 'Review each one first' }])}
       <Help>{draft.bookingApproval === 'manual'
         ? 'Clients send a request. You approve it, offer other times, or decline it. The time is only booked once you approve.'
@@ -611,13 +611,13 @@ export default function SettingsScreen() {
       {/* Gap between appointments removed (owner, 2026-11-09): Padded time does that job for a solo pro. */}
       {/* Padded time (owner, 2026-11-09): extra time saved on the end of every booking, online and in the app. */}
       <Label>Padded time</Label>{withCurrent('paddedMinutes', [0, 15, 30, 45, 60], (value) => (value === 0 ? 'Off' : `${value} min`))}
-      <Help>Extra time added to the end of every booking, so you can offer extras. The times clients see include it.</Help>
+      <Help>Extra time added to the end of every appointment, so you can offer extras. The times clients see include it.</Help>
       {/* Minimize scheduling gaps (owner, 2026-11-18, GlossGenius). */}
       <Label>Minimize scheduling gaps</Label>{choices('gapRuleMinutes', [{ value: -1, label: 'Off' }, { value: 0, label: 'Back to back' }, ...([[30, '30 min'], [60, '1 hr'], [90, '1 hr 30 min'], [120, '2 hrs'], [150, '2 hrs 30 min'], [180, '3 hrs']] as const).map(([m, l]) => ({ value: m, label: `Gaps up to ${l}` }))])}
-      <Help>On a day that already has bookings, clients online only see times next to them, so you aren’t left with gaps nobody can book. A day with nothing booked shows every time. Best once your calendar fills; you can still book any time yourself.</Help>
-      {Number(draft.gapRuleMinutes) >= 0 ? toggle('gapRuleIncrements', 'Keep to my booking increments', 'Off: clients can book right when a booking ends (2:15). On: the next increment (2:30), which can leave a small gap.') : null}
+      <Help>On a day that already has appointments, clients online only see times next to them, so you aren’t left with gaps nobody can book. A day with nothing booked shows every time. Best once your calendar fills; you can still book any time yourself.</Help>
+      {Number(draft.gapRuleMinutes) >= 0 ? toggle('gapRuleIncrements', 'Keep to my booking increments', 'Off: clients can book right when an appointment ends (2:15). On: the next increment (2:30), which can leave a small gap.') : null}
       {/* "How did you hear about us?" (owner, 2026-11-18, GlossGenius client origin survey). */}
-      {toggle('askHowHeard', 'Ask how clients heard about you', 'After a client books online for the first time, your website asks: social media, web search, a friend or other. You can also add it on a booking.')}
+      {toggle('askHowHeard', 'Ask how clients heard about you', 'After a client books online for the first time, your website asks: social media, web search, a friend or other. You can also add it on an appointment.')}
       {draft.askHowHeard && draft.heardSummary?.length ? <Help>{`So far: ${draft.heardSummary.map((a: any) => `${a.source} ${a.count}`).join(' · ')}`}</Help> : null}
 
       <SectionTitle style={styles.section}>Advance booking</SectionTitle>
@@ -626,7 +626,7 @@ export default function SettingsScreen() {
 
       <SectionTitle style={styles.section}>Cancelling</SectionTitle>
       {/* Moving a booking online follows the same rule (owner, 2026-11-18, GlossGenius; api-server lib/clientReschedule.ts). */}
-      {toggle('allowOnlineCancellation', 'Allow online cancelling and rescheduling', 'Clients can cancel or move their appointment to another open time from the link in their texts, up to your cancellation notice (Settings › Cancellation policy). After that, they have to contact you. Only the day and time change; a deposit stays with the booking.')}
+      {toggle('allowOnlineCancellation', 'Allow online cancelling and rescheduling', 'Clients can cancel or move their appointment to another open time from the link in their texts, up to your cancellation notice (Settings › Cancellation policy). After that, they have to contact you. Only the day and time change; a deposit stays with the appointment.')}
       {saveButton()}
     </>);
     if (screen === 'policy') return (<>
@@ -649,7 +649,7 @@ export default function SettingsScreen() {
           <Feather name="chevron-right" size={20} color={colors.mutedForeground} />
         </TouchableOpacity>
       ) : <>
-        {field('feePercent', 'Percent of the booking, e.g. 50 (empty = no fee)', { keyboardType: 'decimal-pad' })}        <Help>Protects your time from no-shows. Most pros set 20–30% of the appointment price. It's charged to the client's card on file, only when you tap Charge fee on a no-show or cancelled booking. Ask for a card on file in Settings › Deposits. When you save, the policy above is updated to say this % and your cancellation hours.</Help>
+        {field('feePercent', 'Percent of the appointment, e.g. 50 (empty = no fee)', { keyboardType: 'decimal-pad' })}        <Help>Protects your time from no-shows. Most pros set 20–30% of the appointment price. It's charged to the client's card on file, only when you tap Charge fee on a no-show or cancelled appointment. Ask for a card on file in Settings › Deposits. When you save, the policy above is updated to say this % and your cancellation hours.</Help>
       </>}
       {saveButton()}
     </>);
@@ -866,7 +866,7 @@ export default function SettingsScreen() {
       <Label>This phone</Label>
       <TouchableOpacity testID="settings-sign-out" onPress={() => void logout()} style={[styles.save, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}><Text style={[styles.saveText, { color: colors.foreground }]}>Sign out</Text></TouchableOpacity>
       <Label>Delete my account</Label>
-      <Help>Enter your password to confirm. Your business, bookings, clients and website are permanently deleted. This cannot be undone.</Help>
+      <Help>Enter your password to confirm. Your business, appointments, clients and website are permanently deleted. This cannot be undone.</Help>
       {field('password', 'Your password', { secureTextEntry: true, autoCapitalize: 'none', autoCorrect: false })}
       <TouchableOpacity testID="settings-delete-account" disabled={saving || !String(draft.password ?? '')} onPress={deleteAccount} style={styles.linkButton}><Text style={[styles.link, { color: String(draft.password ?? '') ? colors.destructive : colors.mutedForeground }]}>Delete my account</Text></TouchableOpacity>
     </>);

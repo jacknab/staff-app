@@ -128,7 +128,7 @@ export default function RequestScreen() {
       <AppBackground />
       <View style={styles.nav}>
         <TouchableOpacity accessibilityLabel="Back" onPress={() => (offering ? setOffering(false) : router.back())} style={styles.back} testID="request-back"><Feather name="arrow-left" size={20} color={colors.foreground} /></TouchableOpacity>
-        <HelpTitle help="request" style={[styles.navTitle, { color: colors.foreground }]}>{offering ? 'Offer other times' : 'Booking request'}</HelpTitle>
+        <HelpTitle help="request" style={[styles.navTitle, { color: colors.foreground }]}>{offering ? 'Offer other times' : 'Appointment request'}</HelpTitle>
         <View style={styles.back} />
       </View>
       {!request ? (

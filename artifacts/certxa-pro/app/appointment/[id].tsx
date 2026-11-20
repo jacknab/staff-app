@@ -153,7 +153,7 @@ export default function AppointmentDetailScreen() {
     <View testID="appointment-loading" style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.background, paddingTop: insets.top }}>
       {failed ? (
         <>
-          <Text style={[styles.clientSubtitle, { color: colors.mutedForeground }]}>This booking could not be opened.</Text>
+          <Text style={[styles.clientSubtitle, { color: colors.mutedForeground }]}>This appointment could not be opened.</Text>
           <TouchableOpacity onPress={() => router.back()} style={styles.textAction}><Text style={{ color: colors.primary }}>Back</Text></TouchableOpacity>
         </>
       ) : <ActivityIndicator color={colors.mutedForeground} />}
@@ -424,7 +424,7 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
         // Cancelled inside the cancellation policy with a card on file: ask about the late-cancel fee now.
         if (path === 'cancel' && r?.appointment?.clientCancelPending) setFlagged(true);
         if (path === 'cancel' && body?.notifyClient && r?.notification?.status === 'not_sent') {
-          Alert.alert('Cancelled', 'The booking is cancelled, but the text to the client could not be sent.');
+          Alert.alert('Cancelled', 'The appointment is cancelled, but the text to the client could not be sent.');
         }
         // Marking a no-show charges the no-show fee to the card on file (11-07); a declined card is said here.
         if (path === 'no-show' && r?.feeError) Alert.alert('No-show fee not charged', String(r.feeError));
@@ -432,13 +432,13 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
       }
       setStatus(path === 'cancel' ? 'cancelled' : 'no_show');
     } catch (cause) {
-      setError(cause instanceof ApiError ? cause.message : 'Could not update the booking.');
+      setError(cause instanceof ApiError ? cause.message : 'Could not update the appointment.');
     } finally { setSaving(false); }
   };
-  const cancelBooking = () => Alert.alert('Cancel this booking?', `${clientName} · ${serviceName}`, [
+  const cancelBooking = () => Alert.alert('Cancel this appointment?', `${clientName} · ${serviceName}`, [
     { text: 'Cancel and text the client', onPress: () => void close('cancel', { notifyClient: true }) },
     { text: 'Cancel without a text', onPress: () => void close('cancel', { notifyClient: false }) },
-    { text: 'Keep the booking', style: 'cancel' },
+    { text: 'Keep the appointment', style: 'cancel' },
   ]);
   // The fee (decided 10-22): only when the pro taps it, to the client's card on file. The amount is the one agreed
   // when the client booked (saved with the booking, 11-07); older bookings: the fee % of the booking.
@@ -517,7 +517,7 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
       if (r?.feeChargedCents != null) setFeeCharged(Number(r.feeChargedCents));
       if (r?.feeError) Alert.alert('Fee not charged yet', String(r.feeError));
     } catch (cause) {
-      setError(cause instanceof ApiError ? cause.message : 'Could not update the booking.');
+      setError(cause instanceof ApiError ? cause.message : 'Could not update the appointment.');
     } finally { setSaving(false); }
   };
   const feeAsk = `$${(feeCents / 100).toFixed(2)}`;
@@ -528,7 +528,7 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
   const [lateNoticeOpen, setLateNoticeOpen] = useState(false);
   const cancelledAt = params.cancelledAt ? new Date(params.cancelledAt) : null;
   const lateNotice = (() => {
-    const base = 'This booking was cancelled inside your cancellation policy.';
+    const base = 'This appointment was cancelled inside your cancellation policy.';
     if (!cancelledAt || Number.isNaN(cancelledAt.getTime())) return `${base} Mark it as a no-show below, with or without the ${feeAsk} fee.`;
     const mins = Math.round((originalDate.getTime() - cancelledAt.getTime()) / 60000);
     const span = mins < 60 ? `${Math.max(mins, 0)} minute${mins === 1 ? '' : 's'}`
@@ -578,7 +578,7 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
       const since = Date.now();
       const r = await api.post<{ text: boolean; email: boolean }>(`/api/pro/appointments/${appointmentId}/resend`, {});
       if (textHeldBack(since) && !r.email) return;
-      Alert.alert('Details sent', `${clientName} got the booking details again by ${r.text && r.email ? 'text and e-mail' : r.text ? 'text' : 'e-mail'}.`);
+      Alert.alert('Details sent', `${clientName} got the appointment details again by ${r.text && r.email ? 'text and e-mail' : r.text ? 'text' : 'e-mail'}.`);
       setHistoryTick((n) => n + 1);
     } catch (cause) {
       Alert.alert('Not sent', cause instanceof Error ? cause.message : 'Try again in a minute.');
@@ -666,13 +666,13 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
   const menuItems: { key: string; label: string; why?: string; on: boolean; run: () => void }[] = [
     // The client's notes (owner, 2026-11-18): from here instead of a row on the page.
     { key: 'notes', label: 'Client notes', on: !isPreview, why: '', run: () => router.push({ pathname: '/notes', params: { customerId: params.customerId ?? '', clientName, appointmentId: String(appointmentId) } }) },
-    { key: 'edit', label: 'Edit appointment', on: canEdit && !isPreview, why: 'Only an upcoming booking can be edited', run: openEdit },
-    { key: 'complete', label: prepaid ? 'Mark as done' : 'Mark as completed', on: isOpenBooking, why: 'This booking is already closed', run: () => void markCompleted() },
-    { key: 'no-show', label: 'No-show (no fee)', on: canNoShow && !isPreview, why: isOpenBooking ? 'After the appointment’s time is over' : 'This booking is already closed', run: () => noShowFee(false) },
+    { key: 'edit', label: 'Edit appointment', on: canEdit && !isPreview, why: 'Only an upcoming appointment can be edited', run: openEdit },
+    { key: 'complete', label: prepaid ? 'Mark as done' : 'Mark as completed', on: isOpenBooking, why: 'This appointment is already closed', run: () => void markCompleted() },
+    { key: 'no-show', label: 'No-show (no fee)', on: canNoShow && !isPreview, why: isOpenBooking ? 'After the appointment’s time is over' : 'This appointment is already closed', run: () => noShowFee(false) },
     ...(noShowFeeSetUp ? [{ key: 'no-show-fee', label: `No-show (collect fee · ${feeMoney})`, on: canNoShow && params.cardOnFile === '1' && !isPreview,
-      why: params.cardOnFile !== '1' ? 'No card on file' : isOpenBooking ? 'After the appointment’s time is over' : 'This booking is already closed', run: () => noShowFee(true) }] : []),
-    { key: 'resend', label: 'Resend appointment details', on: !isPreview && canEdit && !visitOver, why: 'Only for an upcoming booking', run: () => void resendDetails() },
-    { key: 'cancel', label: 'Cancel appointment', on: isOpenBooking && status !== 'started', why: 'This booking can’t be cancelled now', run: cancelBooking },
+      why: params.cardOnFile !== '1' ? 'No card on file' : isOpenBooking ? 'After the appointment’s time is over' : 'This appointment is already closed', run: () => noShowFee(true) }] : []),
+    { key: 'resend', label: 'Resend appointment details', on: !isPreview && canEdit && !visitOver, why: 'Only for an upcoming appointment', run: () => void resendDetails() },
+    { key: 'cancel', label: 'Cancel appointment', on: isOpenBooking && status !== 'started', why: 'This appointment can’t be cancelled now', run: cancelBooking },
     { key: 'delete', label: 'Delete appointment', on: closed, why: 'Cancel it or mark a no-show first; it then stays on the client’s record until you delete it', run: deleteAppointment },
   ];
 
@@ -834,7 +834,7 @@ function AppointmentDetail({ params }: { params: AppointmentRouteParams }) {
                 </TouchableOpacity>
               </LinearGradient>
               {!paidRecorded && !isPreview ? (
-                <Text testID="appointment-no-payment" style={[styles.refundedNote, { color: colors.mutedForeground }]}>No payment was recorded for this booking (it was marked paid in an older version of the app), so there's nothing to refund.</Text>
+                <Text testID="appointment-no-payment" style={[styles.refundedNote, { color: colors.mutedForeground }]}>No payment was recorded for this appointment (it was marked paid in an older version of the app), so there's nothing to refund.</Text>
               ) : (
               <TouchableOpacity testID="appointment-refund" disabled={refundable <= 0 || isPreview} onPress={() => setRefundOpen(true)}
                   style={[styles.secondaryAction, { backgroundColor: colors.card, borderColor: colors.border, opacity: refundable <= 0 ? 0.6 : 1 }]}>
