@@ -3,6 +3,7 @@ import { PaymentsSetupBanner } from '@/components/PaymentsSetupBanner';
 import type { ComponentProps } from 'react';
 import { Feather } from '@expo/vector-icons';
 import {
+  Modal,
   Platform,
   ScrollView,
   StatusBar,
@@ -1013,9 +1014,10 @@ export default function CheckoutScreen() {
     router.replace('/(tabs)');
   };
 
-  // Tap to Pay or Card reader chosen: the tip, then that payment starts.
+  // Tap to Pay or Card reader chosen: the tip, then that payment starts. In the tablet POS the tip is shown full screen,
+  // for the client (owner, 2026-11-20): a tip or Skip starts the Stripe M2's search, connect and charge.
   if (tipFor) {
-    return <TipCheckout
+    const tipPage = <TipCheckout
       baseCents={Number(params.amountCents) || 0}
       presets={tipPresets}
       defaultPercent={defaultTip}
@@ -1029,6 +1031,14 @@ export default function CheckoutScreen() {
         startCard(mode);
       }}
     />;
+    if (inPane) {
+      return (
+        <Modal visible animationType="fade" presentationStyle="fullScreen" supportedOrientations={['landscape', 'portrait']} onRequestClose={() => setTipFor(null)}>
+          {tipPage}
+        </Modal>
+      );
+    }
+    return tipPage;
   }
 
   if (step !== 'idle') {

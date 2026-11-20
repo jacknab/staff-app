@@ -132,10 +132,10 @@ export function TipCheckout({ baseCents, serviceName, presets, defaultPercent, o
                 );
               })}
             </View>
-            {/* No tip on the left, Custom tip on the right, one row (owner, 2026-11-17). */}
+            {/* Skip (no tip) on the left, Custom tip on the right, one row (owner, 2026-11-17; "Skip" 2026-11-20). */}
             <View style={styles.choiceRow}>
               <TouchableOpacity testID="tip-no-tip" onPress={() => choosePercent(0)} accessibilityRole="button" accessibilityState={{ selected: selectedPercent === 0 }} style={[styles.customButton, styles.choiceHalf, { backgroundColor: selectedPercent === 0 ? colors.secondary : colors.card, borderColor: selectedPercent === 0 ? colors.primary : colors.border }]}>
-                <Text numberOfLines={1} style={[styles.customButtonText, { color: selectedPercent === 0 ? colors.primary : colors.foreground }]}>No tip</Text>
+                <Text numberOfLines={1} style={[styles.customButtonText, { color: selectedPercent === 0 ? colors.primary : colors.foreground }]}>Skip</Text>
               </TouchableOpacity>
               <TouchableOpacity testID="custom-tip" onPress={() => setScreen('custom')} accessibilityRole="button" style={[styles.customButton, styles.choiceHalf, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <Feather name="edit-3" size={18} color={colors.primary} />
@@ -177,12 +177,13 @@ export function TipCheckout({ baseCents, serviceName, presets, defaultPercent, o
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  header: { height: 55, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  // A tablet shows this full screen to the client: one centered column, the phone's width (owner, 2026-11-20).
+  header: { width: '100%', maxWidth: 640, alignSelf: 'center', height: 55, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerButton: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
   backButton: { minWidth: 84, height: 42, flexDirection: 'row', alignItems: 'center', gap: 6 },
   backText: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
   eyebrow: { fontSize: 13, letterSpacing: 1.4, fontFamily: 'Inter_700Bold' },
-  content: { flex: 1, paddingHorizontal: 20, paddingTop: 16 },
+  content: { flex: 1, width: '100%', maxWidth: 640, alignSelf: 'center', paddingHorizontal: 20, paddingTop: 16 },
   title: { fontSize: 29, letterSpacing: -0.8, fontFamily: 'Inter_600SemiBold', marginTop: 5 },
   subtitle: { fontSize: 15, lineHeight: 22, fontFamily: 'Inter_400Regular', marginTop: 6, maxWidth: 320 },
   summaryCard: { borderWidth: 1, borderRadius: 18, padding: 15, marginTop: 25, gap: 10, ...cardShadow },
@@ -207,7 +208,7 @@ const styles = StyleSheet.create({
   keypad: { flexDirection: 'row', flexWrap: 'wrap', gap: 9, marginTop: 17 },
   key: { width: '31.5%', height: 51, borderWidth: 1, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   keyText: { fontSize: 21, fontFamily: 'Inter_500Medium' },
-  footer: { paddingHorizontal: 20, paddingBottom: 22 },
+  footer: { width: '100%', maxWidth: 640, alignSelf: 'center', paddingHorizontal: 20, paddingBottom: 22 },
   confirmButton: { height: 53, borderRadius: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
   confirmText: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
 });

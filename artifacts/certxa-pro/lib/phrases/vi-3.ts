@@ -465,4 +465,5 @@ export const VI_3: Record<string, string> = {
   "Choose Tap to Pay or the card reader": "Chọn Tap to Pay hoặc máy đọc thẻ",
   "Confirm tip": "Xác nhận tip",
   "This phone can’t take Tap to Pay (it has no NFC). Take cards with the Stripe M2 card reader: Settings › Card payments.": "Điện thoại này không dùng được Tap to Pay (không có NFC). Hãy nhận thẻ bằng máy đọc thẻ Stripe M2: Cài đặt › Thanh toán thẻ.",
+  "Skip": "Bỏ qua",
 };

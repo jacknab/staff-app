@@ -251,7 +251,7 @@ export const HELP: Record<string, HelpPage> = {
         'Custom charges: Add a custom charge puts a named amount on the visit, like a late fee. It is saved on the booking, so the booking, the bill and reports show it; × takes it off again.',
         'Products: Add a product puts a retail item on the visit (it shows how many you have in stock); − and + change how many. Retail sales tax is added on products. They come out of your stock when the visit is paid, and you get a notification when one is down to its low-stock level.',
         'A deposit the client already paid comes off; sales tax and the platform fee are added if you charge them (Settings › Card reader & Checkout).',
-        'Card: the client chooses a tip, and the tip starts the card payment at once — Tap to Pay or the card reader, whichever this device uses (Settings › Card payments). Custom tip: type the amount and tap Confirm tip. No tip starts it with no tip.',
+        'Card: the client chooses a tip, and the tip starts the card payment at once — Tap to Pay or the card reader, whichever this device uses (Settings › Card payments). Custom tip: type the amount and tap Confirm tip. Skip starts it with no tip. In the tablet POS the tip page fills the screen, so you can turn it to the client.',
       ] },
       { heading: 'How the client pays', points: [
         'Choose how the client pays from the list: Card (Tap to Pay or the Stripe M2 card reader, as set for this device; the reader shows connected and its battery once it is linked — the first time, you’re asked which one), Card on file, Enter new card, Client credit, Gift card, Cash or Other payment.',
