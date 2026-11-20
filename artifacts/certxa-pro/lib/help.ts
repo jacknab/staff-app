@@ -25,7 +25,8 @@ export const HELP: Record<string, HelpPage> = {
     intro: 'Setting up your business in a few steps. Everything can be changed later in Settings.',
     sections: [
       { heading: 'The steps', points: [
-        'Tell us about your business: your first and last name, your business name and the type of business.',
+        'What does your business specialize in?: tap your type of business (Nails, Hair, Barber…). It decides the services and add-ons you’re offered, and can’t be changed later.',
+        'Tell us about your business: your first and last name and your business name.',
         'What do you offer?: tap every kind of service you do (for example Manicure, Pedicure, Acrylic). Tap I’ll add my services later to skip.',
         'Your services, one at a time: type the price in whole dollars and tap ENTER, then the minutes (the usual length is filled in; ENTER keeps it). Tap ENTER with no price to skip a service you don’t do. PREV goes back, NEXT CATEGORY skips the rest of a category, EXIT moves on with what you’ve entered. These become your menu; you can change them later under Services.',
         'Where do you offer your services?: turn on Business location (your own place) and/or House call. With a business location, enter its address; tick "This is my home studio" to keep it private, so clients see only your city until they book.',

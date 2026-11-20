@@ -11,7 +11,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { CertxaApiError, sendSignupPhoneCode, verifySignupPhoneCode } from '@/lib/certxa-api';
 import { CatalogBuilder, entryKey, type CatalogCategory, type CatalogEntries } from '@/components/signup/CatalogBuilder';
 import { CategoryTiles } from '@/components/signup/CategoryTiles';
-import { BUSINESS_TYPES, CATALOG_TYPE, loadCatalog } from '@/lib/serviceCatalog';
+import { BUSINESS_TYPE_CARDS, CATALOG_TYPE, loadCatalog } from '@/lib/serviceCatalog';
+import { IntroIcon } from '@/components/IntroIcon';
 import { api } from '@/lib/live-api';
 import { BusinessHoursEditor, DAY_NAMES, type DayHours } from '@/components/BusinessHoursEditor';
 
@@ -20,8 +21,9 @@ import { look, cardShadow } from '@/components/look/tokens';
 import { HelpTitle } from '@/components/HelpTitle';
 import { WhyWeAsk } from '@/components/WhyWeAsk';
 import { BUSINESS_STRUCTURES, WHY, dateOfBirthIso, isCompany } from '@/lib/stripe-details';
-type StepId = 'business' | 'categories' | 'prices' | 'place' | 'hours' | 'stripe' | 'login' | 'phone';
-const ALL_STEPS: StepId[] = ['business', 'categories', 'prices', 'place', 'hours', 'stripe', 'login', 'phone'];
+// Step 1 is just the type of business, as cards (owner, 2026-11-20); the names come next.
+type StepId = 'business' | 'about' | 'categories' | 'prices' | 'place' | 'hours' | 'stripe' | 'login' | 'phone';
+const ALL_STEPS: StepId[] = ['business', 'about', 'categories', 'prices', 'place', 'hours', 'stripe', 'login', 'phone'];
 
 function deviceTimezone() {
   try { return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined; } catch { return undefined; }
@@ -114,7 +116,8 @@ export default function SignupScreen() {
   const homeReady = homeIsBusiness || Boolean(homeStreet.trim() && homeCity.trim() && /^[A-Za-z]{2}$/.test(homeState.trim()) && /^\d{5}$/.test(homeZip.trim()));
   const einDigits = ein.replace(/\D/g, '');
   const ready =
-    stepId === 'business' ? Boolean(firstName.trim() && lastName.trim() && businessName.trim().length >= 2 && businessType && (!catalogType || catalog !== null))
+    stepId === 'business' ? Boolean(businessType && (!catalogType || catalog !== null))
+    : stepId === 'about' ? Boolean(firstName.trim() && lastName.trim() && businessName.trim().length >= 2)
     : stepId === 'categories' ? chosenCats.length > 0
     : stepId === 'prices' ? true
     : stepId === 'place' ? (houseCalls || hasPlace) && (!hasPlace || addressReady)
@@ -251,6 +254,22 @@ export default function SignupScreen() {
 
         {stepId === 'business' ? (
           <>
+            <HelpTitle help="signup" style={[styles.title, { color: colors.foreground }]}>Welcome! What does your business specialize in?</HelpTitle>
+            <View style={styles.typeCards}>
+              {BUSINESS_TYPE_CARDS.map((t) => {
+                const on = businessType === t.value;
+                return (
+                  <TouchableOpacity key={t.value} testID={`signup-type-${t.value}`} onPress={() => setBusinessType(t.value)} accessibilityRole="radio" accessibilityState={{ selected: on }}
+                    style={[styles.typeCard, on && styles.typeCardOn]}>
+                    <IntroIcon icon={t.icon} size={21} color={on ? '#FFFFFF' : look.violet} />
+                    <Text style={[styles.typeCardText, on && { color: "#FFFFFF" }]} numberOfLines={2}>{t.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </>
+        ) : stepId === 'about' ? (
+          <>
             <HelpTitle help="signup" style={[styles.title, { color: colors.foreground }]}>Tell us about your business</HelpTitle>
             <View style={styles.form}>
               <View style={styles.pair}>
@@ -258,9 +277,6 @@ export default function SignupScreen() {
                 <TextInput autoCapitalize="words" autoComplete="family-name" onChangeText={setLastName} placeholder="Last name" placeholderTextColor={colors.mutedForeground} style={[styles.input, field, inputText, { flex: 1, minWidth: 0 }]} testID="signup-last-name" value={lastName} />
               </View>
               <TextInput autoCapitalize="words" onChangeText={setBusinessName} placeholder="Business name" placeholderTextColor={colors.mutedForeground} style={[styles.input, field, inputText]} testID="signup-business-name" value={businessName} />
-              <Text style={[styles.sectionLabel, { color: colors.foreground }]}>Type of business</Text>
-              <SelectField testID="signup-type" title="Type of business" placeholder="Choose your type of business" value={businessType || null}
-                options={BUSINESS_TYPES.map((type) => ({ value: type, label: type }))} onChange={setBusinessType} />
             </View>
           </>
         ) : stepId === 'categories' ? (
@@ -458,4 +474,10 @@ const styles = StyleSheet.create({
   footer: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 24, paddingTop: 14 },
   button: { height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
   buttonText: { fontSize: 19, fontFamily: 'Inter_600SemiBold' },
+  // Step 1's type cards: the app's white cards, the chosen one violet.
+  typeCards: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 26 },
+  typeCard: { flexGrow: 1, flexBasis: '45%', minHeight: 64, borderRadius: 16, borderWidth: 1, borderColor: look.cardBorder, backgroundColor: look.card,
+    flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, ...cardShadow },
+  typeCardOn: { backgroundColor: look.violet, borderColor: look.violet },
+  typeCardText: { flex: 1, fontSize: 16, fontFamily: 'Inter_600SemiBold', color: look.heading },
 });
